@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NanoDelivery - Entregador</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-gray-800 flex items-center justify-center min-h-screen p-4">
+
+    <!-- Mobile Frame -->
+    <div class="w-full max-w-md bg-gray-900 text-white h-[800px] overflow-hidden flex flex-col shadow-2xl rounded-3xl border border-gray-700">
+        
+        <!-- Header -->
+        <header class="p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold">Driver App</h1>
+                <div class="flex items-center gap-2 bg-green-500/20 px-3 py-1 rounded-full text-green-400 text-sm font-bold">
+                    <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    Online
+                </div>
+            </div>
+            <div class="flex gap-4 mb-2">
+                <div class="flex-1 bg-gray-800 p-3 rounded-xl border border-gray-700">
+                    <div class="text-gray-400 text-xs uppercase font-bold">Ganhos</div>
+                    <div class="text-xl font-bold">R$ 124,50</div>
+                </div>
+                <div class="flex-1 bg-gray-800 p-3 rounded-xl border border-gray-700">
+                    <div class="text-gray-400 text-xs uppercase font-bold">Corridas</div>
+                    <div class="text-xl font-bold">8</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- List -->
+        <div class="flex-1 overflow-y-auto px-4 pb-4">
+            <h2 class="text-gray-400 uppercase text-xs font-bold mb-4 tracking-wider">Entregas Disponíveis</h2>
+            
+            <!-- Card 1 -->
+            <div class="bg-gray-800 p-5 rounded-2xl border border-gray-700 mb-4 hover:border-gray-500 transition cursor-pointer">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="font-bold text-lg text-white">Pizzaria da Vila</h3>
+                        <div class="text-sm text-gray-400 flex items-center gap-1 mt-1">
+                            <i data-lucide="map-pin" class="w-3 h-3"></i> 2.5km • Est. R$ 8.50
+                        </div>
+                    </div>
+                    <div class="bg-orange-500/20 text-orange-400 px-2 py-1 rounded text-xs font-bold border border-orange-500/30">
+                        PRONTO
+                    </div>
+                </div>
+                
+                <div class="h-px bg-gray-700 my-4"></div>
+                
+                <div class="flex justify-between items-center">
+                        <div class="text-sm text-gray-400">
+                        3 caixas de pizza
+                        </div>
+                        <button class="bg-white text-black px-6 py-2 rounded-lg font-bold hover:bg-gray-200 transition">
+                        Aceitar
+                        </button>
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="bg-gray-800 p-5 rounded-2xl border border-gray-700 mb-4 hover:border-gray-500 transition cursor-pointer">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="font-bold text-lg text-white">Mercadinho do Bairro</h3>
+                        <div class="text-sm text-gray-400 flex items-center gap-1 mt-1">
+                            <i data-lucide="map-pin" class="w-3 h-3"></i> 1.2km • Est. R$ 5.00
+                        </div>
+                    </div>
+                    <div class="bg-orange-500/20 text-orange-400 px-2 py-1 rounded text-xs font-bold border border-orange-500/30">
+                        PRONTO
+                    </div>
+                </div>
+                
+                <div class="h-px bg-gray-700 my-4"></div>
+                
+                <div class="flex justify-between items-center">
+                        <div class="text-sm text-gray-400">
+                        1 sacola média
+                        </div>
+                        <button class="bg-white text-black px-6 py-2 rounded-lg font-bold hover:bg-gray-200 transition">
+                        Aceitar
+                        </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Bottom Nav -->
+        <div class="bg-gray-900 border-t border-gray-800 p-4 flex justify-around text-gray-500">
+            <div class="flex flex-col items-center text-green-500"><i data-lucide="bike"></i><span class="text-[10px] mt-1">Corridas</span></div>
+            <div class="flex flex-col items-center"><i data-lucide="dollar-sign"></i><span class="text-[10px] mt-1">Extrato</span></div>
+            <div class="flex flex-col items-center"><i data-lucide="user"></i><span class="text-[10px] mt-1">Perfil</span></div>
+        </div>
+
+    </div>
+
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>

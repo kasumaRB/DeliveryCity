@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NanoDelivery - Portal do Parceiro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+    <div class="max-w-6xl mx-auto p-6">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row md:justify-between md:items-center mb-8 gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                    <i data-lucide="chef-hat" class="text-orange-500"></i> Portal do Parceiro
+                </h1>
+                <p class="text-gray-500 text-sm">Burger Kingpin • Aberto</p>
+            </div>
+            
+            <div class="flex gap-2">
+                <button class="bg-orange-600 text-white px-4 py-2 rounded-lg font-bold shadow-md">Pedidos (3)</button>
+                <button class="bg-white text-gray-600 px-4 py-2 rounded-lg font-bold hover:bg-gray-50">Cardápio</button>
+                <button class="bg-white text-gray-600 px-4 py-2 rounded-lg font-bold hover:bg-gray-50"><i data-lucide="settings" class="w-5 h-5"></i></button>
+            </div>
+        </header>
+
+        <!-- Kanban Board -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <!-- Pending Column -->
+            <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100 h-fit">
+                <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+                    <i data-lucide="clock" class="text-yellow-500"></i> Pendentes
+                </h2>
+                
+                <!-- Order Card 1 -->
+                <div class="border-l-4 border-yellow-500 bg-yellow-50 p-4 rounded-r-lg shadow-sm mb-4">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="font-bold text-lg text-gray-800">#9281</span>
+                        <span class="text-sm text-gray-500">19:42</span>
+                    </div>
+                    <ul class="mb-4 text-sm text-gray-700 bg-white/50 p-2 rounded border border-yellow-100">
+                        <li class="flex justify-between py-1"><span>2x X-Bacon Supremo</span></li>
+                        <li class="flex justify-between py-1"><span>1x Coca-Cola 2L</span></li>
+                    </ul>
+                    <div class="flex gap-2">
+                        <button class="flex-1 bg-green-600 text-white py-2 rounded font-semibold text-sm hover:bg-green-700 shadow-sm">Aceitar</button>
+                        <button class="px-3 bg-white text-red-600 border border-red-200 rounded font-semibold text-sm hover:bg-red-50">Recusar</button>
+                    </div>
+                </div>
+
+                <!-- Order Card 2 -->
+                <div class="border-l-4 border-yellow-500 bg-yellow-50 p-4 rounded-r-lg shadow-sm mb-4">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="font-bold text-lg text-gray-800">#9282</span>
+                        <span class="text-sm text-gray-500">19:45</span>
+                    </div>
+                    <ul class="mb-4 text-sm text-gray-700 bg-white/50 p-2 rounded border border-yellow-100">
+                        <li class="flex justify-between py-1"><span>1x Batata Rústica</span></li>
+                    </ul>
+                    <div class="flex gap-2">
+                        <button class="flex-1 bg-green-600 text-white py-2 rounded font-semibold text-sm hover:bg-green-700 shadow-sm">Aceitar</button>
+                        <button class="px-3 bg-white text-red-600 border border-red-200 rounded font-semibold text-sm hover:bg-red-50">Recusar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cooking/Ready Column -->
+            <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100 h-fit">
+                <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+                    <i data-lucide="utensils" class="text-blue-500"></i> Na Cozinha
+                </h2>
+
+                <!-- Cooking Card -->
+                <div class="p-4 rounded-lg border border-blue-200 bg-blue-50 mb-4">
+                    <div class="flex justify-between mb-2">
+                        <span class="font-bold">#9278</span>
+                        <span class="text-xs font-bold px-2 py-1 rounded bg-blue-200 text-blue-800">PREPARANDO</span>
+                    </div>
+                    <div class="text-sm text-gray-600 mb-4">
+                        1x X-Salada, 1x Batata Frita
+                    </div>
+                    <button class="w-full bg-blue-600 text-white py-2 rounded font-semibold text-sm hover:bg-blue-700 shadow-sm">
+                        Marcar como Pronto
+                    </button>
+                </div>
+
+                <!-- Ready Card -->
+                <div class="p-4 rounded-lg border border-green-200 bg-green-50">
+                    <div class="flex justify-between mb-2">
+                        <span class="font-bold">#9275</span>
+                        <span class="text-xs font-bold px-2 py-1 rounded bg-green-200 text-green-800">PRONTO</span>
+                    </div>
+                    <div class="text-sm text-gray-600 mb-4">
+                        3x Pizza Calabresa
+                    </div>
+                    <div class="text-center text-sm text-green-700 font-medium flex items-center justify-center gap-2">
+                        <i data-lucide="loader" class="animate-spin w-4 h-4"></i> Aguardando Motoboy...
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>

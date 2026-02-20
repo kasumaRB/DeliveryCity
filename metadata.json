@@ -1,0 +1,7 @@
+{
+  "name": "DeliveryCity 0.1",
+  "description": "A comprehensive delivery platform simulation including Client, Restaurant, Driver, and Admin interfaces in a single React application. Features AI-powered menu generation.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
