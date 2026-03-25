@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "524559004011",
+    "project_id": "delivery-city-auth",
+    "storage_bucket": "delivery-city-auth.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:524559004011:android:942eea9e4f48d230765c2e",
+        "android_client_info": {
+          "package_name": "com.deliverycity.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "524559004011-n6a7uditqedv7jfetq8127v4l9qu63f5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAxkaevrnczBFMpQvM1FHuYZuZeFez170k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "524559004011-n6a7uditqedv7jfetq8127v4l9qu63f5.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -2,7 +2,40 @@ import { Order } from '../types';
 
 // Chaves para o localStorage
 const ACTIVE_ORDER_KEY = 'deliverycity_active_order';
+const CART_KEY = 'deliverycity_cart';
 const SYNC_QUEUE_KEY = 'deliverycity_sync_queue';
+const CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 horas
+
+// Funções utilitárias de cache com expiração
+const getCacheWithExpiry = <T>(key: string): T | null => {
+  try {
+    const item = localStorage.getItem(key);
+    if (!item) return null;
+    
+    const data = JSON.parse(item);
+    if (Date.now() > data.expiry) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    
+    return data.value;
+  } catch (error) {
+    console.error(`Erro ao ler cache ${key}:`, error);
+    return null;
+  }
+};
+
+const setCacheWithExpiry = <T>(key: string, value: T): void => {
+  try {
+    const item = {
+      value,
+      expiry: Date.now() + CACHE_EXPIRY
+    };
+    localStorage.setItem(key, JSON.stringify(item));
+  } catch (error) {
+    console.error(`Erro ao salvar cache ${key}:`, error);
+  }
+};
 
 /**
  * Salva o pedido ativo no armazenamento local do dispositivo.
@@ -10,8 +43,7 @@ const SYNC_QUEUE_KEY = 'deliverycity_sync_queue';
  */
 export const saveActiveOrderToOffline = (order: Order): void => {
   try {
-    const orderJson = JSON.stringify(order);
-    localStorage.setItem(ACTIVE_ORDER_KEY, orderJson);
+    setCacheWithExpiry(ACTIVE_ORDER_KEY, order);
   } catch (error) {
     console.error("Falha ao salvar pedido offline:", error);
   }
@@ -23,8 +55,7 @@ export const saveActiveOrderToOffline = (order: Order): void => {
  */
 export const getActiveOrderFromOffline = (): Order | null => {
   try {
-    const orderJson = localStorage.getItem(ACTIVE_ORDER_KEY);
-    return orderJson ? JSON.parse(orderJson) : null;
+    return getCacheWithExpiry<Order>(ACTIVE_ORDER_KEY);
   } catch (error) {
     console.error("Falha ao buscar pedido offline:", error);
     return null;
@@ -36,6 +67,60 @@ export const getActiveOrderFromOffline = (): Order | null => {
  */
 export const clearOfflineActiveOrder = (): void => {
   localStorage.removeItem(ACTIVE_ORDER_KEY);
+};
+
+/**
+ * Salva o carrinho no armazenamento local.
+ * @param cart - O objeto do carrinho a ser salvo.
+ */
+export const saveCartToOffline = (cart: any): void => {
+  try {
+    setCacheWithExpiry(CART_KEY, cart);
+  } catch (error) {
+    console.error("Falha ao salvar carrinho offline:", error);
+  }
+};
+
+/**
+ * Busca o carrinho do armazenamento local.
+ * @returns O objeto do carrinho ou null se não houver nenhum.
+ */
+export const getCartFromOffline = (): any | null => {
+  try {
+    return getCacheWithExpiry<any>(CART_KEY);
+  } catch (error) {
+    console.error("Falha ao buscar carrinho offline:", error);
+    return null;
+  }
+};
+
+/**
+ * Limpa o carrinho do armazenamento local.
+ */
+export const clearOfflineCart = (): void => {
+  localStorage.removeItem(CART_KEY);
+};
+
+/**
+ * Limpa todos os caches expirados do sistema.
+ */
+export const clearExpiredCache = (): void => {
+  const keys = Object.keys(localStorage);
+  keys.forEach(key => {
+    if (key.startsWith('deliverycity_')) {
+      try {
+        const item = localStorage.getItem(key);
+        if (item) {
+          const data = JSON.parse(item);
+          if (data.expiry && Date.now() > data.expiry) {
+            localStorage.removeItem(key);
+          }
+        }
+      } catch (error) {
+        console.error(`Erro ao limpar cache expirado ${key}:`, error);
+      }
+    }
+  });
 };
 
 /**

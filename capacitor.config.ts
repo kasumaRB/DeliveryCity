@@ -7,8 +7,12 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https',
   },
-  // Adicionado para incluir as variáveis de ambiente no build nativo
   plugins: {
+    GoogleAuth: {
+      scopes: ['profile', 'email'],
+      serverClientId: process.env.VITE_GOOGLE_CLIENT_ID || '',
+      forceCodeForRefreshToken: true,
+    },
     CapacitorHttp: {
       enabled: true,
     },

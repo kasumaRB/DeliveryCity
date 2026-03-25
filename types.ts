@@ -1,9 +1,8 @@
-
 export enum UserRole {
   CLIENT = 'CLIENT',
   RESTAURANT = 'RESTAURANT',
   DRIVER = 'DRIVER',
-  ADMIN = 'ADMIN'
+  ADMIN = 'ADMIN',
 }
 
 export enum OrderStatus {
@@ -12,14 +11,14 @@ export enum OrderStatus {
   READY = 'READY',
   OUT_FOR_DELIVERY = 'OUT_FOR_DELIVERY',
   DELIVERED = 'DELIVERED',
-  CANCELLED = 'CANCELLED'
+  CANCELLED = 'CANCELLED',
 }
 
 export type PaymentMethod = 'CREDIT_CARD' | 'DEBIT_CARD' | 'PIX' | 'CASH';
 
 export interface UserAddress {
   id: string;
-  label: string; 
+  label: string;
   street: string;
   number: string;
   neighborhood: string;
@@ -27,49 +26,50 @@ export interface UserAddress {
   state: string;
   zipCode?: string;
   complement?: string;
-  reference?: string; 
-  coords: { lat: number; lng: number }; 
+  reference?: string;
+  coords: { lat: number; lng: number };
 }
 
 export interface UserProfile {
-  id: string; 
+  id: string;
   email: string;
   name: string;
   businessName?: string;
   role: UserRole;
-  cpf?: string; 
+  cpf?: string;
   cnpj?: string;
+  birthDate?: string;
   vehicleType?: string;
   licensePlate?: string;
-  birthDate?: string; 
-  pixKey?: string; 
-  pagseguroRecipientId?: string; // Added this line
-  status: 'PENDING' | 'APPROVED' | 'BLOCKED'; 
+  pixKey?: string;
+  description?: string;
+  workingHours?: string;
+  pagseguroRecipientId?: string;
+  pushToken?: string;
+  status: 'PENDING' | 'APPROVED' | 'BLOCKED';
   phoneNumber?: string;
-  savedAddresses: UserAddress[]; 
-  currentLocation?: { lat: number; lng: number }; 
+  savedAddresses: UserAddress[];
+  currentLocation?: { lat: number; lng: number };
   createdAt: number;
   lastOrderTimestamp?: number;
   averageRating?: number;
   ratingsCount?: number;
   commissionBalance?: number;
-  commissionRate?: number;
-  deliveryRate?: number;
-  passwordPlain?: string;
+  avatarUrl?: string;
 }
 
 export interface Product {
   id: string;
   name: string;
   description: string;
-  price: number; 
-  ownerPrice?: number; 
+  price: number;
+  ownerPrice?: number;
   image: string;
 }
 
 export interface Restaurant {
   id: string;
-  ownerId: string; 
+  ownerId: string;
   name: string;
   category: string;
   rating: number;
@@ -79,7 +79,11 @@ export interface Restaurant {
   address?: string;
   coords: { lat: number; lng: number };
   menu: Product[];
-  pagseguroRecipientId?: string; // Added this line
+  pagseguroRecipientId?: string;
+  deliveryFee?: number;
+  minOrder?: number;
+  isOpen?: boolean;
+  promotions?: Promotion[];
 }
 
 export interface OrderItem {
@@ -87,36 +91,49 @@ export interface OrderItem {
   quantity: number;
 }
 
-export interface OrderRating {
-  storeStars: number;
-  driverStars: number;
-  productOk: boolean;
-  packagingOk: boolean;
-  comment?: string;
-}
-
 export interface Order {
   id: string;
   restaurantId: string;
   restaurantName: string;
   items: OrderItem[];
-  subtotal: number;       
-  deliveryFee: number;    
-  platformFee: number;    
-  driverNetEarnings: number; 
-  restaurantNetEarnings?: number; 
-  total: number;          
+  subtotal: number;
+  deliveryFee: number;
+  platformFee: number;
+  driverNetEarnings: number;
+  restaurantNetEarnings?: number;
+  total: number;
   paymentMethod: PaymentMethod;
-  changeFor?: number; 
+  changeFor?: number;
+  paymentId?: string;
   status: OrderStatus;
-  customerAddress: string; 
+  customerAddress: string;
   customerName: string;
   customerId?: string;
+  coords?: { lat: number; lng: number };
   timestamp: number;
-  driverId?: string; 
-  offeredToDriverId?: string; 
-  rejectedByDrivers: string[]; 
-  pickupCode?: string; 
-  deliveryCode?: string; 
+  driverId?: string;
+  pickupCode?: string;
+  deliveryCode?: string;
   rating?: OrderRating;
+}
+
+export interface OrderRating {
+  storeStars: number;
+  driverStars?: number;
+  productOk: boolean;
+  packagingOk: boolean;
+}
+
+export interface Promotion {
+  id: string;
+  code: string;
+  discountType: 'PERCENT' | 'FIXED';
+  discountValue: number;
+  minOrderValue?: number;
+  description?: string;
+  validFrom: number;
+  validUntil: number;
+  isActive: boolean;
+  usageCount?: number;
+  maxUsage?: number;
 }

@@ -1,3 +1,32 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Safe area insets para barra de status e notch no celular */
+:root {
+  --sat: env(safe-area-inset-top);
+  --sar: env(safe-area-inset-right);
+  --sab: env(safe-area-inset-bottom);
+  --sal: env(safe-area-inset-left);
+}
+
+html, body, #root {
+  /* Impede que a tela fique "solta" (botão de elástico / pull-to-refresh nativo) */
+  overscroll-behavior-y: none;
+  overflow-x: hidden;
+  
+  /* Desativa seleção de texto como num app nativo (exceto em inputs, tratado em outro lugar) */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+
+  /* O padding com env(safe-area-inset) foi removido para a tela subir e encostar na barra de status,
+     já que o próprio Android está cuidando da margem do sistema via styles.xml */
+  background-color: #F8F9FC;
+}
+
+/* Reativa texto selecionável apenas em inputs e textareas */
+input, textarea {
+  user-select: auto;
+  -webkit-user-select: auto;
+}
