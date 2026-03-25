@@ -25,7 +25,8 @@
       ]
     },
     "allowImportingTsExtensions": true,
-    "noEmit": true,
-    "include": ["src", "tests", "*.ts", "*.tsx"]
-  }
+    "noEmit": true
+  },
+  "include": ["src", "tests", "*.ts", "*.tsx"],
+  "exclude": ["supabase", "node_modules"]
 }
