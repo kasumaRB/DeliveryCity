@@ -1,6 +1,60 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppStore } from '../store';
+import { supabase } from '../lib/supabase';
 import { OrderStatus, Product, UserRole, Promotion } from '../types';
+
+const resizeImage = (file: File, maxWidth: number, maxHeight: number): Promise<File> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height *= maxWidth / width;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width *= maxHeight / height;
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Canvas context not available'));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          blob => {
+            if (blob) {
+              const resizedFile = new File([blob], file.name, { type: 'image/jpeg' });
+              resolve(resizedFile);
+            } else {
+              reject(new Error('Failed to resize image'));
+            }
+          },
+          'image/jpeg',
+          0.85
+        );
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+};
+
 import {
   Clock,
   CheckCircle,
@@ -29,6 +83,7 @@ import {
   Gift,
   DollarSign,
   TrendingUp,
+  MessageCircle,
 } from 'lucide-react';
 import Logo from '../assets/Logo.png';
 import Nome from '../assets/Nome.png';
@@ -52,15 +107,20 @@ export const RestaurantView: React.FC = () => {
   const myOrders = myRestaurant ? orders.filter(o => o.restaurantId === myRestaurant.id) : [];
 
   const [activeTab, setActiveTab] = useState<
-    'orders' | 'menu' | 'promotions' | 'stats' | 'profile'
+    'orders' | 'menu' | 'promotions' | 'stats' | 'profile' | 'support'
   >('orders');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [itemFormName, setItemFormName] = useState('');
   const [itemFormOwnerPrice, setItemFormOwnerPrice] = useState('');
   const [itemFormDesc, setItemFormDesc] = useState('');
   const [itemFormImage, setItemFormImage] = useState('');
+  const [itemFormCategory, setItemFormCategory] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [restaurantImage, setRestaurantImage] = useState(myRestaurant?.image || '');
+
+  // Support
+  const [supportMessage, setSupportMessage] = useState('');
 
   // Profile Form States
   const [storeName, setStoreName] = useState(myRestaurant?.name || '');
@@ -82,6 +142,11 @@ export const RestaurantView: React.FC = () => {
   const [promoDescription, setPromoDescription] = useState('');
   const [promoValidUntil, setPromoValidUntil] = useState('');
   const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
+  const [promoType, setPromoType] = useState<
+    'PRODUCT_SPECIFIC' | 'MULTIPLE_PRODUCTS' | 'COUPON' | 'FREE_DELIVERY'
+  >('COUPON');
+  const [promoProductIds, setPromoProductIds] = useState<string[]>([]);
+  const [promoMaxUsage, setPromoMaxUsage] = useState('');
 
   useEffect(() => {
     if (myRestaurant && currentUserProfile) {
@@ -96,12 +161,70 @@ export const RestaurantView: React.FC = () => {
     }
   }, [myRestaurant, currentUserProfile]);
 
+  const restaurantImageInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleRestaurantImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !myRestaurant) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Selecione uma imagem válida');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const resizedFile = await resizeImage(file, 600, 600);
+      const fileExt = 'jpg';
+      const fileName = `restaurants/${myRestaurant.id}-${Date.now()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, resizedFile);
+      if (uploadError) throw uploadError;
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from('avatars').getPublicUrl(fileName);
+      await updateRestaurant(myRestaurant.id, { image: publicUrl });
+      setRestaurantImage(publicUrl);
+      alert('Foto da loja atualizada!');
+    } catch (error: any) {
+      alert('Erro ao atualizar foto: ' + error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const productImageInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleProductImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Selecione uma imagem válida');
+      return;
+    }
+    try {
+      const resizedFile = await resizeImage(file, 400, 400);
+      const fileExt = 'jpg';
+      const fileName = `products/${currentUserProfile?.id}-${Date.now()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, resizedFile);
+      if (uploadError) throw uploadError;
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from('avatars').getPublicUrl(fileName);
+      setItemFormImage(publicUrl);
+    } catch (error: any) {
+      alert('Erro ao carregar imagem: ' + error.message);
+    }
+  };
+
   const resetMenuForm = () => {
     setEditingProduct(null);
     setItemFormName('');
     setItemFormOwnerPrice('');
     setItemFormDesc('');
     setItemFormImage('');
+    setItemFormCategory('');
   };
 
   const handleEditClick = (product: Product) => {
@@ -111,6 +234,7 @@ export const RestaurantView: React.FC = () => {
     setItemFormOwnerPrice(basePrice.toFixed(2));
     setItemFormDesc(product.description);
     setItemFormImage(product.image);
+    setItemFormCategory(product.category || '');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -128,6 +252,7 @@ export const RestaurantView: React.FC = () => {
           price: Number(finalPrice.toFixed(2)),
           description: itemFormDesc,
           image: img,
+          category: itemFormCategory || undefined,
         });
       else
         await updateMenu(myRestaurant.id, {
@@ -137,11 +262,12 @@ export const RestaurantView: React.FC = () => {
           ownerPrice,
           price: Number(finalPrice.toFixed(2)),
           image: img,
+          category: itemFormCategory || undefined,
         });
       resetMenuForm();
       alert('Item salvo!');
-    } catch (e) {
-      alert('Erro ao salvar.');
+    } catch (e: any) {
+      alert('Erro ao salvar: ' + e.message);
     }
   };
 
@@ -165,6 +291,29 @@ export const RestaurantView: React.FC = () => {
       setShowEditModal(false);
     } catch (e: any) {
       alert(e.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSendSupport = async () => {
+    if (!supportMessage.trim() || !currentUserProfile) return;
+    setIsSaving(true);
+    try {
+      const { error } = await supabase.from('support_tickets').insert({
+        user_id: currentUserProfile.id,
+        user_name: currentUserProfile.name,
+        user_role: currentUserProfile.role,
+        message: supportMessage,
+        status: 'OPEN',
+        created_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+      alert('Mensagem enviada! Retornaremos em breve.');
+      setSupportMessage('');
+      setActiveTab('orders');
+    } catch (e: any) {
+      alert('Erro ao enviar mensagem.');
     } finally {
       setIsSaving(false);
     }
@@ -197,6 +346,12 @@ export const RestaurantView: React.FC = () => {
       validFrom: now,
       validUntil,
       isActive: true,
+      type: promoType,
+      productIds:
+        promoType === 'PRODUCT_SPECIFIC' || promoType === 'MULTIPLE_PRODUCTS'
+          ? promoProductIds
+          : undefined,
+      maxUsage: promoMaxUsage ? parseInt(promoMaxUsage) : undefined,
     };
 
     const currentPromos = myRestaurant.promotions || [];
@@ -204,7 +359,13 @@ export const RestaurantView: React.FC = () => {
       ? currentPromos.map(p => (p.id === editingPromo.id ? newPromo : p))
       : [...currentPromos, newPromo];
 
-    await updateRestaurant(myRestaurant.id, { promotions: updatedPromos });
+    try {
+      await updateRestaurant(myRestaurant.id, { promotions: updatedPromos });
+      alert(editingPromo ? 'Promoção atualizada!' : 'Promoção criada!');
+    } catch (e: any) {
+      alert('Erro ao salvar promoção: ' + e.message);
+      return;
+    }
 
     // Reset form
     setPromoCode('');
@@ -212,8 +373,10 @@ export const RestaurantView: React.FC = () => {
     setPromoMinValue('');
     setPromoDescription('');
     setPromoValidUntil('');
+    setPromoType('COUPON');
+    setPromoProductIds([]);
+    setPromoMaxUsage('');
     setEditingPromo(null);
-    alert(editingPromo ? 'Promoção atualizada!' : 'Promoção criada!');
   };
 
   const handleDeletePromotion = async (promoId: string) => {
@@ -230,6 +393,9 @@ export const RestaurantView: React.FC = () => {
     setPromoMinValue(promo.minOrderValue?.toString() || '');
     setPromoDescription(promo.description || '');
     setPromoValidUntil(new Date(promo.validUntil).toISOString().split('T')[0]);
+    setPromoType(promo.type || 'COUPON');
+    setPromoProductIds(promo.productIds || []);
+    setPromoMaxUsage(promo.maxUsage?.toString() || '');
   };
 
   return (
@@ -247,6 +413,7 @@ export const RestaurantView: React.FC = () => {
             { id: 'promotions', label: 'Promoções', icon: Tag },
             { id: 'stats', label: 'Vendas', icon: TrendingUp },
             { id: 'profile', label: 'Minha Loja', icon: Store },
+            { id: 'support', label: 'Suporte', icon: MessageCircle },
           ].map(item => (
             <button
               key={item.id}
@@ -496,6 +663,59 @@ export const RestaurantView: React.FC = () => {
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">
+                        Categoria / Tipo
+                      </label>
+                      <select
+                        value={itemFormCategory}
+                        onChange={e => setItemFormCategory(e.target.value)}
+                        className="w-full p-5 bg-gray-50 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-orange-100 shadow-inner"
+                      >
+                        <option value="">Selecione...</option>
+                        <option value="Lanche">Lanche</option>
+                        <option value="Pizza">Pizza</option>
+                        <option value="Hambúrguer">Hambúrguer</option>
+                        <option value="Açai">Açai</option>
+                        <option value="Sorvete">Sorvete</option>
+                        <option value="Bebida">Bebida</option>
+                        <option value="Sobremesa">Sobremesa</option>
+                        <option value="Salgado">Salgado</option>
+                        <option value=" Japonesa">Japonesa</option>
+                        <option value="Mexicana">Mexicana</option>
+                        <option value="Italiana">Italiana</option>
+                        <option value="Brasileira">Brasileira</option>
+                        <option value="Outro">Outro</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">
+                        Foto do Prato
+                      </label>
+                      <div className="flex items-center gap-4">
+                        <div className="w-20 h-20 bg-gray-100 rounded-2xl overflow-hidden flex items-center justify-center">
+                          {itemFormImage ? (
+                            <img src={itemFormImage} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-gray-400 text-xs">Sem foto</span>
+                          )}
+                        </div>
+                        <input
+                          type="file"
+                          ref={productImageInputRef}
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleProductImageUpload}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => productImageInputRef.current?.click()}
+                          className="px-4 py-3 bg-orange-100 text-orange-600 rounded-xl font-bold text-xs"
+                        >
+                          Escolher Imagem
+                        </button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">
                         Preço na sua mão (R$)
                       </label>
                       <input
@@ -668,6 +888,64 @@ export const RestaurantView: React.FC = () => {
                       placeholder="Ex: Inauguração"
                     />
                   </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">
+                      Tipo de Promoção
+                    </label>
+                    <select
+                      value={promoType}
+                      onChange={e => setPromoType(e.target.value as any)}
+                      className="w-full p-5 bg-gray-50 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-orange-100"
+                    >
+                      <option value="COUPON">Cupom de Desconto (qualquer pedido)</option>
+                      <option value="PRODUCT_SPECIFIC">Produto Específico</option>
+                      <option value="MULTIPLE_PRODUCTS">Múltiplos Produtos</option>
+                      <option value="FREE_DELIVERY">Frete Grátis</option>
+                    </select>
+                  </div>
+                  {(promoType === 'PRODUCT_SPECIFIC' || promoType === 'MULTIPLE_PRODUCTS') && (
+                    <div className="md:col-span-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">
+                        Selecione os Produtos
+                      </label>
+                      <div className="bg-gray-50 p-4 rounded-2xl max-h-40 overflow-y-auto space-y-2">
+                        {myRestaurant.menu.map(product => (
+                          <label
+                            key={product.id}
+                            className="flex items-center gap-3 p-2 hover:bg-white rounded-xl cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={promoProductIds.includes(product.id)}
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  setPromoProductIds([...promoProductIds, product.id]);
+                                } else {
+                                  setPromoProductIds(
+                                    promoProductIds.filter(id => id !== product.id)
+                                  );
+                                }
+                              }}
+                              className="w-5 h-5 rounded text-orange-600"
+                            />
+                            <span className="font-bold text-sm">{product.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">
+                      Limite de Uso (vezes)
+                    </label>
+                    <input
+                      type="number"
+                      value={promoMaxUsage}
+                      onChange={e => setPromoMaxUsage(e.target.value)}
+                      className="w-full p-5 bg-gray-50 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-orange-100"
+                      placeholder="Ilimitado"
+                    />
+                  </div>
                 </div>
                 <div className="flex gap-4 mt-6">
                   <button
@@ -682,6 +960,9 @@ export const RestaurantView: React.FC = () => {
                         setEditingPromo(null);
                         setPromoCode('');
                         setPromoDiscountValue('');
+                        setPromoType('COUPON');
+                        setPromoProductIds([]);
+                        setPromoMaxUsage('');
                       }}
                       className="px-6 bg-gray-100 text-gray-600 py-5 rounded-2xl font-bold text-xs uppercase"
                     >
@@ -834,7 +1115,17 @@ export const RestaurantView: React.FC = () => {
                       src={myRestaurant.image}
                       className="w-48 h-48 rounded-[3rem] object-cover shadow-2xl border-8 border-white ring-1 ring-gray-100"
                     />
-                    <button className="absolute bottom-0 right-0 bg-gray-950 text-white p-3 rounded-2xl shadow-2xl active:scale-95 border-4 border-white">
+                    <input
+                      type="file"
+                      ref={restaurantImageInputRef}
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleRestaurantImageUpload}
+                    />
+                    <button
+                      onClick={() => restaurantImageInputRef.current?.click()}
+                      className="absolute bottom-0 right-0 bg-gray-950 text-white p-3 rounded-2xl shadow-2xl active:scale-95 border-4 border-white"
+                    >
                       <Edit2 size={16} />
                     </button>
                   </div>
@@ -922,6 +1213,57 @@ export const RestaurantView: React.FC = () => {
               </div>
             </div>
           )}
+
+          {activeTab === 'support' && (
+            <div className="max-w-2xl mx-auto py-10 animate-in fade-in duration-500">
+              <div className="bg-white rounded-[3rem] p-10 shadow-xl shadow-gray-100 border border-gray-50">
+                <div className="text-center mb-10">
+                  <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <MessageCircle size={40} className="text-orange-600" />
+                  </div>
+                  <h2 className="text-3xl font-black text-gray-900 tracking-tighter mb-2">
+                    Precisa de Ajuda?
+                  </h2>
+                  <p className="text-gray-500 font-bold text-sm">
+                    Nossa equipe está pronta para atender você.
+                  </p>
+                </div>
+
+                <div className="space-y-6">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4 mb-2 block">
+                      Descreva seu problema ou dúvida
+                    </label>
+                    <textarea
+                      value={supportMessage}
+                      onChange={e => setSupportMessage(e.target.value)}
+                      placeholder="Ex: Problema com pedido, dúvida sobre taxas, preciso de ajuda com..."
+                      className="w-full p-5 bg-gray-50 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-orange-100 min-h-[150px] resize-none"
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleSendSupport}
+                    disabled={isSaving || !supportMessage.trim()}
+                    className="w-full bg-orange-600 text-white py-6 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+                  >
+                    {isSaving ? (
+                      <Loader className="animate-spin" size={20} />
+                    ) : (
+                      <MessageCircle size={20} />
+                    )}
+                    Enviar Mensagem
+                  </button>
+
+                  <div className="text-center pt-4">
+                    <p className="text-gray-400 text-xs font-bold">
+                      Respondemos em até 24 horas úteis
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* BARRA INFERIOR MOBILE */}
@@ -979,6 +1321,17 @@ export const RestaurantView: React.FC = () => {
               className={`text-[8px] font-black uppercase tracking-widest ${activeTab === 'profile' ? 'opacity-100' : 'opacity-0'}`}
             >
               Loja
+            </span>
+          </button>
+          <button
+            onClick={() => setActiveTab('support')}
+            className={`flex flex-col items-center gap-1.5 transition-all active:scale-90 ${activeTab === 'support' ? 'text-orange-600 scale-110' : 'text-gray-300'}`}
+          >
+            <MessageCircle size={26} strokeWidth={activeTab === 'support' ? 3 : 2} />
+            <span
+              className={`text-[8px] font-black uppercase tracking-widest ${activeTab === 'support' ? 'opacity-100' : 'opacity-0'}`}
+            >
+              Ajuda
             </span>
           </button>
         </nav>

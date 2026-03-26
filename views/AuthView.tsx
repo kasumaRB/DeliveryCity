@@ -1,6 +1,59 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store';
 import { UserRole, UserProfile, UserAddress } from '../types';
+
+const resizeImage = (file: File, maxWidth: number, maxHeight: number): Promise<File> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height *= maxWidth / width;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width *= maxHeight / height;
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Canvas context not available'));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          blob => {
+            if (blob) {
+              const resizedFile = new File([blob], file.name, { type: 'image/jpeg' });
+              resolve(resizedFile);
+            } else {
+              reject(new Error('Failed to resize image'));
+            }
+          },
+          'image/jpeg',
+          0.85
+        );
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+};
+
 import {
   X,
   User,
@@ -156,11 +209,14 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
 
     setLoading(true);
     try {
-      const fileExt = file.name.split('.').pop();
+      const resizedFile = await resizeImage(file, 400, 400);
+      const fileExt = 'jpg';
       const fileName = `${currentUserProfile.id}-${Date.now()}.${fileExt}`;
       const filePath = `avatars/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file);
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, resizedFile);
 
       if (uploadError) throw uploadError;
 
@@ -321,6 +377,19 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
           : [],
         createdAt: Date.now(),
       });
+
+      if (mode === 'REGISTER_PARTNER' && partnerType === UserRole.RESTAURANT) {
+        await supabase.from('restaurants').insert({
+          id: `rest-${userId}`,
+          owner_id: userId,
+          name: businessName || name,
+          address: regAddress ? regAddress.address : '',
+          description: description || '',
+          working_hours: workingHours || '',
+          menu: [],
+          is_active: true,
+        });
+      }
 
       const msg =
         mode === 'REGISTER_PARTNER'

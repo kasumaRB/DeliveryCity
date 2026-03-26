@@ -84,11 +84,20 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
 
   // Coupon states
   const [couponCode, setCouponCode] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(
-    null
-  );
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    discount: number;
+    isFreeDelivery?: boolean;
+  } | null>(null);
   const [couponError, setCouponError] = useState('');
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+
+  // Search and filter states
+  const [selectedCategory, setSelectedCategory] = useState('');
+
+  useEffect(() => {
+    setSelectedCategory('');
+  }, [selectedRestaurant?.id]);
 
   useEffect(() => {
     if (currentUserProfile) {
@@ -193,7 +202,11 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     () => cart.reduce((total, item) => total + item.product.price * item.quantity, 0),
     [cart]
   );
-  const deliveryFee = useMemo(() => (cartSubtotal > 0 ? 5.0 : 0), [cartSubtotal]);
+  const deliveryFee = useMemo(() => {
+    if (cartSubtotal === 0) return 0;
+    if (appliedCoupon?.isFreeDelivery) return 0;
+    return 5.0;
+  }, [cartSubtotal, appliedCoupon]);
   const discount = appliedCoupon ? (appliedCoupon.discount > 0 ? appliedCoupon.discount : 0) : 0;
   const cartTotal = Math.max(0, cartSubtotal + deliveryFee - discount);
 
@@ -218,12 +231,20 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
       return;
     }
 
-    const discountValue =
-      promo.discountType === 'PERCENT'
+    if (promo.type === 'FREE_DELIVERY' && cartSubtotal < 30) {
+      setCouponError('Frete grátis válido only para pedidos acima de R$ 30,00');
+      setIsApplyingCoupon(false);
+      return;
+    }
+
+    const isFreeDelivery = promo.type === 'FREE_DELIVERY';
+    const discountValue = isFreeDelivery
+      ? 0
+      : promo.discountType === 'PERCENT'
         ? (cartSubtotal * promo.discountValue) / 100
         : promo.discountValue;
 
-    setAppliedCoupon({ code: promo.code, discount: discountValue });
+    setAppliedCoupon({ code: promo.code, discount: discountValue, isFreeDelivery });
     setIsApplyingCoupon(false);
   };
 
@@ -324,7 +345,8 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
           `${selectedAddress.street}, ${selectedAddress.number}`,
           currentUserProfile.name,
           data.id,
-          selectedAddress.coords
+          selectedAddress.coords,
+          deliveryFee
         );
       } else {
         await createOrder(
@@ -334,7 +356,8 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
           `${selectedAddress.street}, ${selectedAddress.number}`,
           currentUserProfile.name,
           undefined,
-          selectedAddress.coords
+          selectedAddress.coords,
+          deliveryFee
         );
       }
       setCart([]);
@@ -484,63 +507,100 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                   </p>
                 </div>
               </div>
+
+              {selectedRestaurant.menu.some(p => p.category) && (
+                <div className="flex gap-3 overflow-x-auto pb-4 mb-6 -mt-4 px-2">
+                  <button
+                    onClick={() => setSelectedCategory('')}
+                    className={`px-6 py-3 rounded-2xl font-bold text-xs whitespace-nowrap transition-all ${
+                      selectedCategory === ''
+                        ? 'bg-orange-600 text-white'
+                        : 'bg-white text-gray-600 border border-gray-100'
+                    }`}
+                  >
+                    Todos
+                  </button>
+                  {[...new Set(selectedRestaurant.menu.map(p => p.category).filter(Boolean))].map(
+                    cat => (
+                      <button
+                        key={cat}
+                        onClick={() => setSelectedCategory(cat as string)}
+                        className={`px-6 py-3 rounded-2xl font-bold text-xs whitespace-nowrap transition-all ${
+                          selectedCategory === cat
+                            ? 'bg-orange-600 text-white'
+                            : 'bg-white text-gray-600 border border-gray-100'
+                        }`}
+                      >
+                        {cat as string}
+                      </button>
+                    )
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {selectedRestaurant.menu.map(product => {
-                  const cartItem = cart.find(item => item.product.id === product.id);
-                  return (
-                    <div
-                      key={product.id}
-                      className="bg-white rounded-[2rem] p-5 flex gap-5 shadow-lg shadow-gray-100 border border-gray-50 hover:shadow-xl transition-all"
-                    >
-                      <div className="w-24 h-24 bg-gray-100 rounded-2xl overflow-hidden shrink-0">
-                        <img
-                          src={
-                            product.image ||
-                            'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500'
-                          }
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-black text-gray-900 text-sm mb-1 leading-tight">
-                          {product.name}
-                        </h4>
-                        <p className="font-black text-gray-900 mb-3 text-base">
-                          {product.price.toLocaleString('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          })}
-                        </p>
-                        {cartItem ? (
-                          <div className="flex items-center gap-3 bg-gray-50 p-1.5 rounded-xl w-fit border border-gray-100">
+                {selectedRestaurant.menu
+                  .filter(p => !selectedCategory || p.category === selectedCategory)
+                  .map(product => {
+                    const cartItem = cart.find(item => item.product.id === product.id);
+                    return (
+                      <div
+                        key={product.id}
+                        className="bg-white rounded-[2rem] p-5 flex gap-5 shadow-lg shadow-gray-100 border border-gray-50 hover:shadow-xl transition-all"
+                      >
+                        <div className="w-24 h-24 bg-gray-100 rounded-2xl overflow-hidden shrink-0">
+                          <img
+                            src={
+                              product.image ||
+                              'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500'
+                            }
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-black text-gray-900 text-sm mb-1 leading-tight">
+                            {product.name}
+                          </h4>
+                          <p className="font-black text-gray-900 mb-3 text-base">
+                            {product.price.toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </p>
+                          {cartItem ? (
+                            <div className="flex items-center gap-3 bg-gray-50 p-1.5 rounded-xl w-fit border border-gray-100">
+                              <button
+                                onClick={() =>
+                                  updateCartQuantity(product.id, cartItem.quantity - 1)
+                                }
+                                className="p-1.5 bg-white text-gray-500 rounded-lg shadow-sm"
+                              >
+                                <Minus size={14} />
+                              </button>
+                              <span className="font-black text-gray-900 text-xs w-4 text-center">
+                                {cartItem.quantity}
+                              </span>
+                              <button
+                                onClick={() =>
+                                  updateCartQuantity(product.id, cartItem.quantity + 1)
+                                }
+                                className="p-1.5 bg-white text-gray-500 rounded-lg shadow-sm"
+                              >
+                                <Plus size={14} />
+                              </button>
+                            </div>
+                          ) : (
                             <button
-                              onClick={() => updateCartQuantity(product.id, cartItem.quantity - 1)}
-                              className="p-1.5 bg-white text-gray-500 rounded-lg shadow-sm"
+                              onClick={() => handleAddToCart(product)}
+                              className="bg-orange-600 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-orange-100 active:scale-95"
                             >
-                              <Minus size={14} />
+                              Adicionar
                             </button>
-                            <span className="font-black text-gray-900 text-xs w-4 text-center">
-                              {cartItem.quantity}
-                            </span>
-                            <button
-                              onClick={() => updateCartQuantity(product.id, cartItem.quantity + 1)}
-                              className="p-1.5 bg-white text-gray-500 rounded-lg shadow-sm"
-                            >
-                              <Plus size={14} />
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => handleAddToCart(product)}
-                            className="bg-orange-600 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-orange-100 active:scale-95"
-                          >
-                            Adicionar
-                          </button>
-                        )}
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </div>
             </div>
           )}
@@ -796,8 +856,10 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                 </div>
                 <div className="flex justify-between items-center text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">
                   <span>Entrega</span>
-                  <span className="text-green-600">
-                    {deliveryFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  <span className={deliveryFee === 0 ? 'text-green-600' : 'text-gray-900'}>
+                    {deliveryFee === 0 && appliedCoupon?.isFreeDelivery
+                      ? 'GRÁTIS'
+                      : deliveryFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </span>
                 </div>
                 {discount > 0 && (

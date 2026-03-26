@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../store';
 import { Order, OrderStatus } from '../types';
-import { getActiveOrderFromOffline, addToSyncQueue } from '../services/offlineService';
 import {
   Navigation,
   CheckCircle,
@@ -27,6 +26,14 @@ import {
   DollarSign,
   Package,
   TrendingUp,
+  Phone,
+  Wallet,
+  History,
+  BarChart3,
+  Home,
+  Power,
+  MessageCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import Logo from '../assets/Logo.png';
 import Nome from '../assets/Nome.png';
@@ -37,6 +44,7 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [vehicle, setVehicle] = useState(currentUserProfile?.vehicleType || 'Moto');
   const [plate, setPlate] = useState(currentUserProfile?.licensePlate || '');
   const [phone, setPhone] = useState(currentUserProfile?.phoneNumber || '');
+  const [pixKey, setPixKey] = useState(currentUserProfile?.pixKey || '');
 
   const myRatings = useMemo(() => {
     return orders
@@ -45,6 +53,11 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       .reverse();
   }, [orders, currentUserProfile]);
 
+  const avgRating = useMemo(() => {
+    if (myRatings.length === 0) return 0;
+    return myRatings.reduce((sum, r) => sum + (r.driverStars || 0), 0) / myRatings.length;
+  }, [myRatings]);
+
   const handleSave = async () => {
     if (!currentUserProfile) return;
     setIsSaving(true);
@@ -52,6 +65,7 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       vehicleType: vehicle,
       licensePlate: plate,
       phoneNumber: phone,
+      pixKey: pixKey,
     });
     setIsSaving(false);
     alert('Dados atualizados!');
@@ -59,98 +73,124 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   };
 
   return (
-    <div className="animate-in fade-in p-6 md:p-12 max-w-5xl mx-auto">
+    <div className="animate-in fade-in p-6 md:p-8 max-w-4xl mx-auto">
       <button
         onClick={onBack}
-        className="flex items-center gap-2 text-gray-400 font-bold mb-8 hover:text-white transition-colors"
+        className="flex items-center gap-2 text-gray-400 font-bold mb-6 hover:text-white transition-colors"
       >
         <ChevronRight className="rotate-180" /> Voltar
       </button>
-      <h1 className="text-4xl font-black tracking-tighter mb-12">Meu Perfil</h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-gray-900 p-8 rounded-[2.5rem] border border-gray-800 shadow-xl">
-          <h3 className="text-lg font-bold mb-6 text-gray-300">Configurações de Trabalho</h3>
-          <div className="space-y-5">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-2">
-                Veículo
-              </label>
-              <select
-                value={vehicle}
-                onChange={e => setVehicle(e.target.value)}
-                className="w-full p-4 bg-gray-800 rounded-2xl font-bold border-none outline-none text-white focus:ring-2 focus:ring-green-500/20 transition-all"
-              >
-                <option>Moto</option>
-                <option>Bicicleta</option>
-                <option>Carro</option>
-              </select>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="bg-gradient-to-br from-blue-600 to-blue-700 p-8 rounded-[3rem] shadow-xl shadow-blue-900/20">
+            <h1 className="text-3xl font-black text-white mb-2">Meu Perfil</h1>
+            <p className="text-blue-200 font-medium">Gerencie suas informações</p>
+          </div>
+
+          <div className="bg-gray-800/50 p-8 rounded-[3rem] border border-gray-700/50">
+            <h3 className="text-lg font-bold mb-6 text-white flex items-center gap-3">
+              <Bike className="text-blue-400" /> Veículo
+            </h3>
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              {['Moto', 'Bicicleta', 'Carro'].map(v => (
+                <button
+                  key={v}
+                  onClick={() => setVehicle(v)}
+                  className={`p-5 rounded-2xl font-bold transition-all ${
+                    vehicle === v
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30'
+                      : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700'
+                  }`}
+                >
+                  {v}
+                </button>
+              ))}
             </div>
+
             {vehicle !== 'Bicicleta' && (
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-2">
-                  Placa
+              <div className="space-y-2 mb-6">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">
+                  Placa do Veículo
                 </label>
                 <input
                   value={plate}
                   onChange={e => setPlate(e.target.value.toUpperCase())}
-                  className="w-full p-4 bg-gray-800 rounded-2xl font-bold border-none outline-none text-white focus:ring-2 focus:ring-green-500/20 transition-all"
+                  className="w-full p-5 bg-gray-700/50 rounded-2xl font-bold border-2 border-transparent outline-none text-white focus:border-blue-500 transition-all"
+                  placeholder="ABC-1234"
                 />
               </div>
             )}
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-2">
+
+            <div className="space-y-2 mb-6">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">
                 WhatsApp
               </label>
               <input
                 value={phone}
                 onChange={e => setPhone(e.target.value)}
-                className="w-full p-4 bg-gray-800 rounded-2xl font-bold border-none outline-none text-white focus:ring-2 focus:ring-green-500/20 transition-all"
+                className="w-full p-5 bg-gray-700/50 rounded-2xl font-bold border-2 border-transparent outline-none text-white focus:border-blue-500 transition-all"
+                placeholder="(00) 00000-0000"
               />
             </div>
+
+            <div className="space-y-2 mb-6">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">
+                Chave PIX
+              </label>
+              <input
+                value={pixKey}
+                onChange={e => setPixKey(e.target.value)}
+                className="w-full p-5 bg-gray-700/50 rounded-2xl font-bold border-2 border-transparent outline-none text-white focus:border-blue-500 transition-all"
+                placeholder="CPF, telefone ou e-mail"
+              />
+            </div>
+
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="w-full bg-green-600 hover:bg-green-700 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg shadow-green-900/20 mt-4"
+              className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white py-5 rounded-2xl font-black uppercase text-sm tracking-widest flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg shadow-blue-900/20"
             >
-              {isSaving ? <Loader className="animate-spin" size={20} /> : <Save size={20} />} Salvar
-              Dados
+              {isSaving ? <Loader className="animate-spin" size={20} /> : <Save size={20} />}
+              Salvar Alterações
             </button>
           </div>
         </div>
 
-        <div className="bg-gray-900 p-8 rounded-[2.5rem] border border-gray-800 shadow-xl">
-          <h3 className="text-lg font-bold mb-6 text-gray-300">Feedback dos Clientes</h3>
-          <div className="space-y-4 max-h-[400px] overflow-y-auto no-scrollbar">
-            {myRatings.length > 0 ? (
-              myRatings.map((r, i) => (
-                <div
+        <div className="space-y-6">
+          <div className="bg-gradient-to-br from-amber-500 to-orange-500 p-8 rounded-[3rem] shadow-xl shadow-orange-900/20 text-center">
+            <Star className="mx-auto mb-3 text-white" size={40} />
+            <h3 className="text-5xl font-black text-white mb-1">{avgRating.toFixed(1)}</h3>
+            <p className="text-white/80 font-medium text-sm">Média de Avaliações</p>
+            <div className="flex justify-center gap-1 mt-4">
+              {[...Array(5)].map((_, i) => (
+                <Star
                   key={i}
-                  className="flex items-center justify-between p-5 bg-gray-800/50 rounded-2xl border border-gray-700"
-                >
-                  <div className="flex gap-1">
-                    {[...Array(5)].map((_, starIdx) => (
-                      <Star
-                        key={starIdx}
-                        size={14}
-                        className={
-                          starIdx < r.driverStars
-                            ? 'text-yellow-500 fill-yellow-500'
-                            : 'text-gray-600'
-                        }
-                      />
-                    ))}
-                  </div>
-                  <span className="text-[9px] font-black text-gray-500 uppercase">
-                    Avaliação #{i + 1}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-10 opacity-30 italic text-sm">
-                Nenhuma avaliação ainda.
-              </div>
-            )}
+                  size={16}
+                  className={i < Math.round(avgRating) ? 'text-white fill-white' : 'text-white/30'}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-gray-800/50 p-8 rounded-[3rem] border border-gray-700/50">
+            <h3 className="text-lg font-bold mb-4 text-white flex items-center gap-3">
+              <Info className="text-blue-400" size={20} /> Dicas
+            </h3>
+            <ul className="space-y-3 text-gray-400 text-sm font-medium">
+              <li className="flex items-start gap-2">
+                <CheckCircle size={16} className="text-green-500 shrink-0 mt-0.5" />
+                Mantenha seu perfil atualizado
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle size={16} className="text-green-500 shrink-0 mt-0.5" />
+                Responda rápido para mais pedidos
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle size={16} className="text-green-500 shrink-0 mt-0.5" />
+                Avaliações boas = mais entregas
+              </li>
+            </ul>
           </div>
         </div>
       </div>
@@ -171,9 +211,8 @@ export const DriverView: React.FC = () => {
     processSyncQueue,
     restaurants,
   } = useAppStore();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'history' | 'stats' | 'profile'>(
-    'dashboard'
-  );
+
+  const [activeTab, setActiveTab] = useState<'home' | 'available' | 'history' | 'profile'>('home');
   const [showCodeInput, setShowCodeInput] = useState(false);
   const [inputCode, setInputCode] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
@@ -188,6 +227,30 @@ export const DriverView: React.FC = () => {
       ),
     [orders, currentUserProfile]
   );
+
+  const todayEarnings = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return orders
+      .filter(
+        o =>
+          o.driverId === currentUserProfile?.id &&
+          o.status === OrderStatus.DELIVERED &&
+          new Date(o.timestamp).getTime() >= today.getTime()
+      )
+      .reduce((sum, o) => sum + (o.driverNetEarnings || 0), 0);
+  }, [orders, currentUserProfile]);
+
+  const completedToday = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return orders.filter(
+      o =>
+        o.driverId === currentUserProfile?.id &&
+        o.status === OrderStatus.DELIVERED &&
+        new Date(o.timestamp).getTime() >= today.getTime()
+    ).length;
+  }, [orders, currentUserProfile]);
 
   const availableOrdersWithScore = useMemo(() => {
     return orders
@@ -223,7 +286,6 @@ export const DriverView: React.FC = () => {
         pos => {
           const newPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
           setCurrentPos(newPos);
-          // Atualiza localização no banco apenas a cada 10 segundos para não sobrecarregar
           const now = Date.now();
           if (currentUserProfile?.id && isOnline && now - lastLocationUpdate > 10000) {
             lastLocationUpdate = now;
@@ -256,498 +318,307 @@ export const DriverView: React.FC = () => {
     setIsVerifying(false);
   };
 
+  const formatCurrency = (value: number) =>
+    value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
   if (activeTab === 'profile')
     return (
-      <div className="min-h-screen bg-gray-950 text-white">
-        <DriverProfile onBack={() => setActiveTab('dashboard')} />
+      <div className="min-h-screen bg-gray-900 text-white">
+        <DriverProfile onBack={() => setActiveTab('home')} />
       </div>
     );
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col md:flex-row h-screen overflow-hidden">
-      {/* SIDEBAR DESKTOP */}
-      <aside className="hidden md:flex w-80 bg-gray-900 flex-col p-10 h-full border-r border-gray-800 shadow-2xl">
-        <div className="flex flex-col items-center mb-16 gap-3">
-          <img src={Logo} alt="Logo" className="h-16 w-auto object-contain drop-shadow-xl" />
-          <img src={Nome} alt="DeliveryCity" className="h-5 w-auto object-contain opacity-50" />
-        </div>
-
-        <div className="space-y-6 flex-1">
-          <div className="bg-gray-800/40 p-8 rounded-[3rem] border border-gray-800 shadow-inner">
-            <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">
-              Minha Reputação
-            </p>
-            <div className="flex items-center gap-3">
-              <h2 className="text-4xl font-black text-white">
-                {(currentUserProfile?.averageRating || 0).toFixed(1)}
-              </h2>
-              <Star className="text-yellow-500 fill-yellow-500 animate-pulse" size={28} />
-            </div>
-          </div>
-          <div className="bg-gray-800/40 p-8 rounded-[3rem] border border-gray-800 shadow-inner">
-            <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">
-              {isOnline ? 'Online' : 'Offline'}
-            </p>
-            <div className="flex items-center gap-3">
-              <div
-                className={`w-4 h-4 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}
-              ></div>
-              <h2 className="text-xl font-black text-white">
-                {isOnline ? 'Recebendo pedidos' : 'Indisponível'}
-              </h2>
-            </div>
-          </div>
-          <div className="bg-gray-800/40 p-8 rounded-[3rem] border border-gray-800 shadow-inner">
-            <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">
-              Ganhos de Hoje
-            </p>
-            <h2 className="text-4xl font-black text-green-400 tracking-tighter">
-              R$ {(currentUserProfile?.commissionBalance || 0).toFixed(2)}
-            </h2>
-          </div>
-        </div>
-
-        <div className="pt-10 space-y-2">
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`w-full flex items-center gap-5 p-5 rounded-2xl transition-all font-black text-xs uppercase tracking-widest ${activeTab === 'history' ? 'text-white bg-white/10' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-          >
-            <Clock size={20} /> Histórico
-          </button>
-          <button
-            onClick={() => setActiveTab('stats')}
-            className={`w-full flex items-center gap-5 p-5 rounded-2xl transition-all font-black text-xs uppercase tracking-widest ${activeTab === 'stats' ? 'text-white bg-white/10' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-          >
-            <TrendingUp size={20} /> Estatísticas
-          </button>
-          <button
-            onClick={() => setActiveTab('profile')}
-            className={`w-full flex items-center gap-5 p-5 rounded-2xl transition-all font-black text-xs uppercase tracking-widest ${activeTab === 'profile' ? 'text-white bg-white/10' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-          >
-            <Settings size={20} /> Configurações
-          </button>
-          <button
-            onClick={signOut}
-            className="w-full flex items-center gap-5 p-5 text-gray-600 hover:text-red-400 hover:bg-red-500/5 rounded-2xl transition-all font-black text-xs uppercase tracking-widest"
-          >
-            <LogOut size={20} /> Sair
-          </button>
-        </div>
-      </aside>
-
-      {/* HEADER MOBILE */}
-      <header className="md:hidden bg-gray-900/80 backdrop-blur-xl border-b border-gray-800 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col h-screen overflow-hidden">
+      {/* Top Bar */}
+      <header className="bg-gray-800/80 backdrop-blur-xl border-b border-gray-700/50 px-6 py-4 flex justify-between items-center shrink-0">
         <div className="flex items-center gap-3">
           <img src={Logo} alt="Logo" className="h-10 w-auto object-contain" />
-          <div className="h-6 w-px bg-gray-800 mx-1"></div>
-          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
-            Entregador
-          </span>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setActiveTab('dashboard')}
-            className={`p-2 rounded-xl transition-all ${activeTab === 'dashboard' ? 'text-white bg-white/10' : 'text-gray-400'}`}
+
+        <div className="flex items-center gap-4">
+          <div
+            className={`flex items-center gap-2 px-4 py-2 rounded-full ${isOnline ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}
           >
-            <Bike size={20} />
-          </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`p-2 rounded-xl transition-all ${activeTab === 'history' ? 'text-white bg-white/10' : 'text-gray-400'}`}
-          >
-            <Clock size={20} />
-          </button>
-          <button
-            onClick={() => setActiveTab('stats')}
-            className={`p-2 rounded-xl transition-all ${activeTab === 'stats' ? 'text-white bg-white/10' : 'text-gray-400'}`}
-          >
-            <TrendingUp size={20} />
-          </button>
-          <button
-            onClick={() => setActiveTab('profile')}
-            className={`p-2.5 bg-gray-800 rounded-xl border border-gray-700 ${activeTab === 'profile' ? 'text-white' : 'text-gray-400'}`}
-          >
-            <User size={20} />
-          </button>
-          <button
-            onClick={signOut}
-            className="p-2.5 bg-gray-800 rounded-xl border border-gray-700 text-gray-500"
-          >
-            <LogOut size={20} />
-          </button>
+            <div
+              className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}
+            ></div>
+            <span className="text-xs font-bold uppercase tracking-wider">
+              {isOnline ? 'Online' : 'Offline'}
+            </span>
+          </div>
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto no-scrollbar relative p-6 md:p-12 pb-32">
-        {!isOnline && (
-          <div className="fixed top-20 right-6 bg-red-600 text-white text-[9px] font-black px-4 py-2 rounded-full flex items-center gap-2 animate-bounce z-50 shadow-xl uppercase tracking-widest">
-            Sem Conexão
+      {/* Main Content */}
+      <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-24">
+        {/* Status Cards */}
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="bg-gradient-to-br from-green-600 to-green-700 p-5 rounded-[2rem] shadow-lg shadow-green-900/20">
+            <DollarSign className="text-white/80 mb-2" size={24} />
+            <p className="text-green-100 text-xs font-bold uppercase tracking-wider mb-1">Hoje</p>
+            <p className="text-2xl font-black text-white">{formatCurrency(todayEarnings)}</p>
           </div>
-        )}
+          <div className="bg-gradient-to-br from-blue-600 to-blue-700 p-5 rounded-[2rem] shadow-lg shadow-blue-900/20">
+            <CheckCircle className="text-white/80 mb-2" size={24} />
+            <p className="text-blue-100 text-xs font-bold uppercase tracking-wider mb-1">
+              Entregas
+            </p>
+            <p className="text-2xl font-black text-white">{completedToday}</p>
+          </div>
+          <div className="bg-gradient-to-br from-amber-500 to-orange-500 p-5 rounded-[2rem] shadow-lg shadow-orange-900/20">
+            <Star className="text-white/80 mb-2" size={24} />
+            <p className="text-orange-100 text-xs font-bold uppercase tracking-wider mb-1">Nota</p>
+            <p className="text-2xl font-black text-white">
+              {(currentUserProfile?.averageRating || 0).toFixed(1)}
+            </p>
+          </div>
+        </div>
 
-        {activeOrder ? (
-          <div className="max-w-3xl mx-auto animate-in fade-in h-full flex flex-col">
-            <header className="mb-10">
-              <h2 className="text-4xl font-black tracking-tighter">Missão Ativa</h2>
-              <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest mt-1">
-                Siga as instruções para {activeOrder.status === 'READY' ? 'Coleta' : 'Entrega'}
-              </p>
-            </header>
+        {/* Active Order */}
+        {activeOrder && (
+          <div className="mb-6 animate-in fade-in slide-in-from-top-4">
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 rounded-[2.5rem] shadow-xl shadow-blue-900/20">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-blue-100 text-sm font-bold uppercase tracking-wider">
+                  {activeOrder.status === 'READY' ? '🛒 Retirada' : '🚚 Entrega'}
+                </span>
+                <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-black text-white">
+                  #{activeOrder.id.slice(-4)}
+                </span>
+              </div>
 
-            <div className="bg-gray-900 rounded-[4rem] border border-gray-800 overflow-hidden shadow-2xl">
-              <div className="bg-gray-800/50 p-6 flex items-center justify-around border-b border-gray-800">
+              <div className="flex items-center gap-4 mb-4">
                 <div
-                  className={`flex flex-col items-center gap-2 ${activeOrder.status === 'READY' ? 'opacity-100' : 'opacity-20'}`}
+                  className={`p-4 rounded-2xl ${activeOrder.status === 'READY' ? 'bg-orange-500' : 'bg-green-500'}`}
                 >
-                  <div className="w-10 h-10 rounded-full bg-orange-600 flex items-center justify-center font-black text-sm">
-                    1
-                  </div>
-                  <span className="text-[8px] font-black uppercase tracking-widest">Retirada</span>
+                  {activeOrder.status === 'READY' ? <Store size={28} /> : <MapPin size={28} />}
                 </div>
-                <div className="h-px w-16 bg-gray-800" />
-                <div
-                  className={`flex flex-col items-center gap-2 ${activeOrder.status === 'OUT_FOR_DELIVERY' ? 'opacity-100' : 'opacity-20'}`}
-                >
-                  <div className="w-10 h-10 rounded-full bg-green-600 flex items-center justify-center font-black text-sm">
-                    2
-                  </div>
-                  <span className="text-[8px] font-black uppercase tracking-widest">Entrega</span>
+                <div className="flex-1">
+                  <h3 className="text-xl font-black text-white">
+                    {activeOrder.status === 'READY'
+                      ? activeOrder.restaurantName
+                      : activeOrder.customerName}
+                  </h3>
+                  <p className="text-blue-200 text-sm font-medium">
+                    {activeOrder.status === 'READY'
+                      ? 'Vá até o restaurante'
+                      : activeOrder.customerAddress}
+                  </p>
                 </div>
               </div>
 
-              <div className="p-10 md:p-16 space-y-12">
-                <div className="flex items-start gap-6">
-                  <div
-                    className={`p-5 rounded-[2rem] shadow-inner ${activeOrder.status === 'READY' ? 'bg-orange-500/10 text-orange-500' : 'bg-green-500/10 text-green-500'}`}
-                  >
-                    {activeOrder.status === 'READY' ? <Store size={40} /> : <MapIcon size={40} />}
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-3xl font-black text-white tracking-tighter mb-2">
-                      {activeOrder.status === 'READY'
-                        ? activeOrder.restaurantName
-                        : activeOrder.customerName}
-                    </h3>
-                    <div className="bg-gray-800/80 p-6 rounded-[2rem] border border-gray-700 text-base font-bold leading-relaxed text-gray-300">
-                      {activeOrder.status === 'READY'
-                        ? 'Vá até o restaurante para retirar o pedido.'
-                        : activeOrder.customerAddress}
-                    </div>
-                  </div>
-                </div>
-
+              <div className="flex gap-3">
                 <button
                   onClick={() => setShowCodeInput(true)}
-                  className={`w-full py-8 rounded-[2.5rem] font-black text-xl uppercase tracking-[0.2em] shadow-2xl transition active:scale-95 flex items-center justify-center gap-4 ${activeOrder.status === 'READY' ? 'bg-orange-600 text-white' : 'bg-green-600 text-white'}`}
+                  className="flex-1 bg-white text-blue-600 py-4 rounded-2xl font-black uppercase text-sm tracking-wider shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
                 >
-                  <KeyRound size={28} />{' '}
-                  {activeOrder.status === 'READY' ? 'Validar Retirada' : 'Finalizar Entrega'}
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="max-w-5xl mx-auto animate-in fade-in">
-            <header className="mb-14">
-              <h2 className="text-5xl font-black text-white tracking-tighter mb-2">Disponíveis</h2>
-              <p className="text-gray-500 font-bold uppercase text-[10px] tracking-[0.3em]">
-                Novas oportunidades em tempo real
-              </p>
-            </header>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {availableOrdersWithScore.map(order => (
-                <div
-                  key={order.id}
-                  className="bg-gray-900 p-10 rounded-[3.5rem] border border-gray-800 hover:border-green-500/30 transition-all group relative overflow-hidden shadow-xl active:scale-[0.98]"
-                >
-                  <div className="absolute -top-10 -right-10 opacity-5 group-hover:opacity-10 transition-opacity">
-                    <Bike size={200} />
-                  </div>
-                  <div className="mb-10 relative z-10">
-                    <h3 className="font-black text-3xl text-white tracking-tighter mb-4">
-                      {order.restaurantName}
-                    </h3>
-                    <div className="flex gap-4">
-                      <span className="bg-gray-800 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                        <MapPin size={12} className="text-green-500" /> {order.distance}
-                      </span>
-                      <span className="bg-gray-800 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                        <Trophy size={12} className="text-yellow-500" /> Score{' '}
-                        {order.score.toFixed(1)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-end relative z-10">
-                    <div>
-                      <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">
-                        Você recebe
-                      </p>
-                      <div className="text-green-400 font-black text-4xl tracking-tighter">
-                        R$ {order.driverNetEarnings.toFixed(2)}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() =>
-                        isOnline
-                          ? assignDriver(order.id, currentUserProfile?.id!)
-                          : alert('Fique Online!')
-                      }
-                      className="bg-white text-black px-10 py-5 rounded-[2rem] font-black uppercase text-xs tracking-widest hover:bg-green-600 hover:text-white transition-all shadow-xl"
-                    >
-                      Aceitar
-                    </button>
-                  </div>
-                </div>
-              ))}
-              {availableOrdersWithScore.length === 0 && (
-                <div className="col-span-full py-32 flex flex-col items-center justify-center text-gray-800 border-4 border-dashed border-gray-900 rounded-[4rem]">
-                  <RefreshCw size={48} className="animate-spin mb-6 opacity-20" />
-                  <p className="font-black uppercase tracking-[0.4em] text-[10px] opacity-30 text-center px-10 leading-relaxed">
-                    Aguardando novos pedidos
-                    <br />
-                    para a sua localização...
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {showCodeInput && (
-          <div className="fixed inset-0 bg-black/95 z-[110] flex items-center justify-center p-6 backdrop-blur-2xl animate-in zoom-in-95 duration-300">
-            <div className="bg-gray-900 w-full max-w-sm rounded-[4rem] p-12 border border-gray-800 text-center shadow-3xl">
-              <div className="w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-8 text-green-500 border border-gray-700 shadow-inner">
-                <KeyRound size={40} />
-              </div>
-              <h3 className="text-3xl font-black mb-2 tracking-tighter text-white">
-                Código Seguro
-              </h3>
-              <p className="text-gray-500 text-[10px] font-black mb-10 uppercase tracking-widest leading-relaxed">
-                Confirme os 4 dígitos com{' '}
-                {activeOrder?.status === 'READY' ? 'o Lojista' : 'o Cliente'}
-              </p>
-              <input
-                type="text"
-                maxLength={4}
-                value={inputCode}
-                onChange={e => setInputCode(e.target.value.replace(/\D/g, ''))}
-                className="w-full bg-gray-800 border-4 border-gray-700 rounded-[2rem] text-center text-5xl font-black py-8 mb-10 tracking-[15px] focus:border-green-500 outline-none text-white transition-all"
-                placeholder="0000"
-              />
-              <div className="flex flex-col gap-4">
-                <button
-                  onClick={handleVerifyCode}
-                  disabled={inputCode.length !== 4 || isVerifying}
-                  className="w-full bg-white text-black font-black py-6 rounded-[2rem] text-sm uppercase tracking-widest shadow-xl flex items-center justify-center gap-4 active:scale-95 disabled:opacity-50"
-                >
-                  {isVerifying ? (
-                    <Loader className="animate-spin" size={24} />
-                  ) : (
-                    <CheckCircle size={24} />
-                  )}{' '}
-                  Confirmar
-                </button>
-                <button
-                  onClick={() => setShowCodeInput(false)}
-                  className="text-gray-600 font-black text-[9px] uppercase tracking-[0.3em] py-4 hover:text-white transition-colors"
-                >
-                  Cancelar
+                  <KeyRound size={20} />
+                  {activeOrder.status === 'READY' ? 'Confirmar Retirada' : 'Finalizar'}
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* HISTÓRICO DE ENTREGAS */}
-        {activeTab === 'history' && (
-          <div className="max-w-5xl mx-auto animate-in fade-in">
-            <header className="mb-14">
-              <h2 className="text-5xl font-black text-white tracking-tighter mb-2">Histórico</h2>
-              <p className="text-gray-500 font-bold uppercase text-[10px] tracking-[0.3em]">
-                Todas as suas entregas realizadas
-              </p>
-            </header>
+        {/* Available Orders */}
+        {!activeOrder && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-black text-white">Pedidos Disponíveis</h2>
+              <span className="bg-blue-500/20 text-blue-400 px-4 py-2 rounded-full text-xs font-bold">
+                {availableOrdersWithScore.length} novos
+              </span>
+            </div>
 
             <div className="space-y-4">
-              {orders
-                .filter(
-                  o => o.driverId === currentUserProfile?.id && o.status === OrderStatus.DELIVERED
-                )
-                .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-                .map(order => (
+              {availableOrdersWithScore.length === 0 ? (
+                <div className="bg-gray-800/50 p-12 rounded-[3rem] text-center border border-gray-700/50">
+                  <Bike size={48} className="mx-auto mb-4 text-gray-600" />
+                  <p className="text-gray-400 font-bold">Nenhum pedido disponível no momento</p>
+                  <p className="text-gray-500 text-sm mt-2">Aguarde novos pedidos</p>
+                </div>
+              ) : (
+                availableOrdersWithScore.map(order => (
                   <div
                     key={order.id}
-                    className="bg-gray-900 p-6 rounded-[2.5rem] border border-gray-800 shadow-xl"
+                    className="bg-gray-800/50 p-6 rounded-[2.5rem] border border-gray-700/50 hover:border-blue-500/50 transition-all cursor-pointer active:scale-[0.98]"
+                    onClick={() => isOnline && assignDriver(order.id, currentUserProfile?.id!)}
                   >
-                    <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-start justify-between mb-4">
                       <div>
-                        <h4 className="font-black text-white text-xl">{order.restaurantName}</h4>
-                        <p className="text-gray-400 text-sm">{order.customerName}</p>
+                        <h3 className="text-lg font-black text-white">{order.restaurantName}</h3>
+                        <p className="text-gray-400 text-sm">{order.customerAddress}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-green-400 font-black text-2xl">
-                          R$ {order.driverNetEarnings.toFixed(2)}
+                        <p className="text-green-400 font-black text-xl">
+                          {formatCurrency(order.driverNetEarnings)}
                         </p>
-                        <p className="text-gray-500 text-xs">
-                          {order.createdAt
-                            ? new Date(order.createdAt).toLocaleDateString('pt-BR')
-                            : '---'}
-                        </p>
+                        <p className="text-gray-500 text-xs">Você recebe</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4 text-gray-400 text-xs">
-                      <span className="flex items-center gap-1">
-                        <MapPin size={12} /> {order.customerAddress}
+
+                    <div className="flex items-center gap-4">
+                      <span className="flex items-center gap-2 bg-gray-700/50 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-300">
+                        <MapPin size={14} /> {order.distance}
                       </span>
+                      <span className="flex items-center gap-2 bg-gray-700/50 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-300">
+                        <Trophy size={14} className="text-yellow-500" /> {order.score.toFixed(1)}
+                      </span>
+                      <span className="flex-1"></span>
+                      <button
+                        onClick={e => {
+                          e.stopPropagation();
+                          isOnline ? assignDriver(order.id, currentUserProfile?.id!) : null;
+                        }}
+                        disabled={!isOnline}
+                        className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-xl font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Aceitar
+                      </button>
                     </div>
-                    {order.rating && (
-                      <div className="mt-4 flex items-center gap-1">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            size={14}
-                            className={
-                              i < order.rating!.driverStars
-                                ? 'text-yellow-500 fill-yellow-500'
-                                : 'text-gray-600'
-                            }
-                          />
-                        ))}
-                      </div>
-                    )}
                   </div>
-                ))}
-              {orders.filter(
-                o => o.driverId === currentUserProfile?.id && o.status === OrderStatus.DELIVERED
-              ).length === 0 && (
-                <div className="py-20 text-center text-gray-600">
-                  <Package size={48} className="mx-auto mb-4 opacity-30" />
-                  <p className="font-black uppercase tracking-widest text-sm">
-                    Nenhuma entrega ainda
-                  </p>
-                </div>
+                ))
               )}
             </div>
           </div>
         )}
 
-        {/* ESTATÍSTICAS */}
-        {activeTab === 'stats' && (
-          <div className="max-w-5xl mx-auto animate-in fade-in">
-            <header className="mb-14">
-              <h2 className="text-5xl font-black text-white tracking-tighter mb-2">Estatísticas</h2>
-              <p className="text-gray-500 font-bold uppercase text-[10px] tracking-[0.3em]">
-                Seu desempenho como entregador
-              </p>
-            </header>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-              <div className="bg-gray-900 p-6 rounded-[2rem] border border-gray-800">
-                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">
-                  Total Entregas
-                </p>
-                <p className="text-3xl font-black text-white">
-                  {
-                    orders.filter(
-                      o =>
-                        o.driverId === currentUserProfile?.id && o.status === OrderStatus.DELIVERED
-                    ).length
-                  }
-                </p>
-              </div>
-              <div className="bg-gray-900 p-6 rounded-[2rem] border border-gray-800">
-                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">
-                  Ganhos Total
-                </p>
-                <p className="text-3xl font-black text-green-400">
-                  R${' '}
-                  {orders
-                    .filter(o => o.driverId === currentUserProfile?.id)
-                    .reduce((sum, o) => sum + (o.driverNetEarnings || 0), 0)
-                    .toFixed(2)}
-                </p>
-              </div>
-              <div className="bg-gray-900 p-6 rounded-[2rem] border border-gray-800">
-                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">
-                  Média por Entrega
-                </p>
-                <p className="text-3xl font-black text-white">
-                  R${' '}
-                  {(
-                    orders
-                      .filter(
-                        o =>
-                          o.driverId === currentUserProfile?.id &&
-                          o.status === OrderStatus.DELIVERED
-                      )
-                      .reduce((sum, o) => sum + (o.driverNetEarnings || 0), 0) /
-                    Math.max(
-                      orders.filter(
-                        o =>
-                          o.driverId === currentUserProfile?.id &&
-                          o.status === OrderStatus.DELIVERED
-                      ).length,
-                      1
-                    )
-                  ).toFixed(2)}
-                </p>
-              </div>
-              <div className="bg-gray-900 p-6 rounded-[2rem] border border-gray-800">
-                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">
-                  Avaliação
-                </p>
-                <div className="flex items-center gap-2">
-                  <p className="text-3xl font-black text-white">
-                    {(currentUserProfile?.averageRating || 0).toFixed(1)}
-                  </p>
-                  <Star className="text-yellow-500 fill-yellow-500" size={20} />
+        {/* History Tab */}
+        {activeTab === 'history' && (
+          <div>
+            <h2 className="text-2xl font-black text-white mb-4">Histórico</h2>
+            <div className="space-y-3">
+              {orders.filter(o => o.driverId === currentUserProfile?.id).length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <History size={48} className="mx-auto mb-4 opacity-30" />
+                  <p>Nenhum pedido realizado</p>
                 </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-900 p-8 rounded-[2.5rem] border border-gray-800">
-              <h3 className="text-lg font-black text-white mb-6">Últimas Avaliações</h3>
-              <div className="space-y-4">
-                {orders
-                  .filter(o => o.driverId === currentUserProfile?.id && o.rating)
-                  .slice(0, 5)
+              ) : (
+                orders
+                  .filter(o => o.driverId === currentUserProfile?.id)
+                  .slice(0, 20)
                   .map(order => (
                     <div
                       key={order.id}
-                      className="flex items-center justify-between p-4 bg-gray-800/50 rounded-2xl"
+                      className="bg-gray-800/50 p-5 rounded-2xl border border-gray-700/50"
                     >
-                      <div>
-                        <p className="font-black text-white">{order.restaurantName}</p>
-                        <p className="text-gray-400 text-xs">
-                          {order.createdAt
-                            ? new Date(order.createdAt).toLocaleDateString('pt-BR')
-                            : ''}
-                        </p>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-bold text-white">{order.restaurantName}</span>
+                        <span
+                          className={`text-xs font-black uppercase px-3 py-1 rounded-full ${
+                            order.status === OrderStatus.DELIVERED
+                              ? 'bg-green-500/20 text-green-400'
+                              : 'bg-gray-600 text-gray-300'
+                          }`}
+                        >
+                          {order.status}
+                        </span>
                       </div>
-                      <div className="flex gap-1">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            size={16}
-                            className={
-                              i < order.rating!.driverStars
-                                ? 'text-yellow-500 fill-yellow-500'
-                                : 'text-gray-600'
-                            }
-                          />
-                        ))}
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-500">#{order.id.slice(-4)}</span>
+                        <span className="text-green-400 font-bold">
+                          {formatCurrency(order.driverNetEarnings)}
+                        </span>
                       </div>
                     </div>
-                  ))}
-                {!orders.filter(o => o.driverId === currentUserProfile?.id && o.rating).length && (
-                  <p className="text-gray-500 text-center py-4">Nenhuma avaliação ainda</p>
-                )}
-              </div>
+                  ))
+              )}
             </div>
           </div>
         )}
       </main>
+
+      {/* Bottom Navigation */}
+      <nav className="bg-gray-800/80 backdrop-blur-xl border-t border-gray-700/50 px-6 py-3 flex justify-around items-center shrink-0">
+        <button
+          onClick={() => setActiveTab('home')}
+          className={`flex flex-col items-center gap-1 p-3 rounded-2xl transition-all ${activeTab === 'home' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-500'}`}
+        >
+          <Home size={24} />
+          <span className="text-xs font-bold">Início</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('history')}
+          className={`flex flex-col items-center gap-1 p-3 rounded-2xl transition-all ${activeTab === 'history' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-500'}`}
+        >
+          <History size={24} />
+          <span className="text-xs font-bold">Histórico</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('profile')}
+          className={`flex flex-col items-center gap-1 p-3 rounded-2xl transition-all ${activeTab === 'profile' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-500'}`}
+        >
+          <User size={24} />
+          <span className="text-xs font-bold">Perfil</span>
+        </button>
+
+        <button
+          onClick={signOut}
+          className="flex flex-col items-center gap-1 p-3 rounded-2xl text-gray-500 hover:text-red-400 transition-all"
+        >
+          <LogOut size={24} />
+          <span className="text-xs font-bold">Sair</span>
+        </button>
+      </nav>
+
+      {/* Code Input Modal */}
+      {showCodeInput && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
+          <div className="bg-gray-800 p-8 rounded-[3rem] w-full max-w-md animate-in zoom-in-95">
+            <div className="text-center mb-8">
+              <div className="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <KeyRound size={40} className="text-blue-400" />
+              </div>
+              <h3 className="text-2xl font-black text-white">Digite o Código</h3>
+              <p className="text-gray-400 text-sm mt-2">
+                {activeOrder?.status === 'READY'
+                  ? 'Código do pedido no restaurante'
+                  : 'Código de entrega'}
+              </p>
+            </div>
+
+            <input
+              type="text"
+              value={inputCode}
+              onChange={e => setInputCode(e.target.value)}
+              className="w-full p-6 bg-gray-700/50 rounded-2xl text-center text-3xl font-black text-white tracking-[0.5em] border-2 border-gray-600 outline-none focus:border-blue-500 mb-6"
+              placeholder="0000"
+              maxLength={4}
+              autoFocus
+            />
+
+            <div className="flex gap-4">
+              <button
+                onClick={() => {
+                  setShowCodeInput(false);
+                  setInputCode('');
+                }}
+                className="flex-1 py-4 bg-gray-700 text-gray-300 rounded-2xl font-bold"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleVerifyCode}
+                disabled={isVerifying || inputCode.length < 4}
+                className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-bold disabled:opacity-50"
+              >
+                {isVerifying ? <Loader className="animate-spin mx-auto" /> : 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Offline Banner */}
+      {!isOnline && (
+        <div className="fixed bottom-24 left-6 right-6 bg-red-600 text-white py-3 px-6 rounded-2xl flex items-center justify-center gap-3 shadow-xl animate-bounce z-40">
+          <WifiOff size={20} />
+          <span className="font-bold text-sm">Sem conexão - режим офлайн</span>
+        </div>
+      )}
     </div>
   );
 };

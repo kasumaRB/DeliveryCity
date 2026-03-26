@@ -389,6 +389,20 @@ export const AdminView: React.FC = () => {
                         }));
                         try {
                           await updateUserProfile(p.id, { status: status as any });
+                          if (status === 'APPROVED' && p.role === UserRole.RESTAURANT) {
+                            const restaurantId = `rest-${p.id}`;
+                            const { data: existing } = await supabase
+                              .from('restaurants')
+                              .select('id')
+                              .eq('id', restaurantId)
+                              .single();
+                            if (existing) {
+                              await supabase
+                                .from('restaurants')
+                                .update({ is_active: true })
+                                .eq('id', restaurantId);
+                            }
+                          }
                         } catch (err: any) {
                           alert(`Erro ao atualizar parceiro: ${err.message || 'Tente novamente.'}`);
                         } finally {

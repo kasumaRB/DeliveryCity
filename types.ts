@@ -65,6 +65,7 @@ export interface Product {
   price: number;
   ownerPrice?: number;
   image: string;
+  category?: string;
 }
 
 export interface Restaurant {
@@ -136,4 +137,6 @@ export interface Promotion {
   isActive: boolean;
   usageCount?: number;
   maxUsage?: number;
+  type?: 'PRODUCT_SPECIFIC' | 'MULTIPLE_PRODUCTS' | 'COUPON' | 'FREE_DELIVERY';
+  productIds?: string[];
 }

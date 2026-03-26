@@ -51,7 +51,8 @@ interface AppContextType {
     address: string,
     customerName: string,
     paymentId?: string,
-    addressCoords?: { lat: number; lng: number }
+    addressCoords?: { lat: number; lng: number },
+    deliveryFeeOverride?: number
   ) => Promise<void>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   confirmPickup: (orderId: string, code: string) => Promise<boolean>;
@@ -183,14 +184,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const fetchData = async () => {
+  let lastFetchTime = 0;
+  let cachedData: { restaurants?: any[]; orders?: any[]; profiles?: any[] } = {};
+
+  const fetchData = async (force = false) => {
+    const now = Date.now();
+    if (!force && now - lastFetchTime < 2000) return;
+    lastFetchTime = now;
+
     try {
-      const { data: restData } = await supabase
-        .from('restaurants')
-        .select('*')
-        .order('rating', { ascending: false });
-      if (restData) {
-        const mapped = restData.map((r: any) => ({
+      const [restData, orderData, profileData] = await Promise.all([
+        supabase.from('restaurants').select('*').order('rating', { ascending: false }),
+        supabase.from('orders').select('*').order('timestamp', { ascending: false }).limit(100),
+        supabase.from('profiles').select('*'),
+      ]);
+
+      if (restData.data) {
+        const mapped = restData.data.map((r: any) => ({
           ...r,
           ownerId: r.owner_id,
           menu: r.menu || [],
@@ -199,24 +209,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }));
         setRestaurants(mapped);
         localStorage.setItem(STORAGE_KEY_RESTAURANTS, JSON.stringify(mapped));
+        cachedData.restaurants = mapped;
       }
 
-      const { data: orderData } = await supabase
-        .from('orders')
-        .select('*')
-        .order('timestamp', { ascending: false })
-        .limit(100);
-      if (orderData) {
-        const mapped = orderData.map(o => mapOrder(o));
+      if (orderData.data) {
+        const mapped = orderData.data.map(o => mapOrder(o));
         setOrders(mapped);
         localStorage.setItem(STORAGE_KEY_ORDERS, JSON.stringify(mapped));
+        cachedData.orders = mapped;
       }
 
-      const { data: profileData } = await supabase.from('profiles').select('*');
-      if (profileData) {
-        const mapped = profileData.map(p => mapProfile(p));
+      if (profileData.data) {
+        const mapped = profileData.data.map(p => mapProfile(p));
         setProfiles(mapped);
         localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(mapped));
+        cachedData.profiles = mapped;
       }
       setIsSupabaseConnected(true);
     } catch (err) {
@@ -364,7 +371,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     window.addEventListener('online', processSyncQueue);
-    return () => window.removeEventListener('online', processSyncQueue);
+    window.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        fetchData(true);
+      }
+    });
+    return () => {
+      window.removeEventListener('online', processSyncQueue);
+      window.removeEventListener('visibilitychange', () => {});
+    };
   }, [processSyncQueue]);
 
   // Listener Realtime para `profiles`, `orders` e `restaurants` — tempo real para todos os usuários
@@ -503,7 +518,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     address: string,
     customerName: string,
     paymentId?: string,
-    addressCoords?: { lat: number; lng: number }
+    addressCoords?: { lat: number; lng: number },
+    deliveryFeeOverride?: number
   ) => {
     try {
       const restaurant = restaurants.find(r => r.id === restaurantId);
@@ -511,8 +527,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const subtotal = items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
       const platformFee = Math.round(subtotal * 0.15 * 100) / 100;
-      const deliveryFee = 5.0;
+      const deliveryFee = deliveryFeeOverride !== undefined ? deliveryFeeOverride : 5.0;
       const total = subtotal + deliveryFee;
+      const driverEarnings = 4.0;
+      const restaurantNetEarnings = subtotal - platformFee - (deliveryFee === 0 ? 5.0 : 0);
 
       const newOrder = {
         id: `ORD-${Date.now().toString().slice(-6)}`,
@@ -526,8 +544,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         subtotal,
         delivery_fee: deliveryFee,
         platform_fee: platformFee,
-        driver_net_earnings: 4.0,
-        restaurant_net_earnings: subtotal - platformFee,
+        driver_net_earnings: driverEarnings,
+        restaurant_net_earnings: restaurantNetEarnings,
         total,
         payment_method: paymentMethod,
         payment_id: paymentId,
