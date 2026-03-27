@@ -209,17 +209,22 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
 
     setLoading(true);
     try {
+      console.log('Uploading avatar...');
       const resizedFile = await resizeImage(file, 400, 400);
       const fileExt = 'jpg';
       const fileName = `${currentUserProfile.id}-${Date.now()}.${fileExt}`;
       const filePath = `avatars/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
+      const { data, error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, resizedFile);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw new Error(uploadError.message);
+      }
 
+      console.log('Upload success:', data);
       const {
         data: { publicUrl },
       } = supabase.storage.from('avatars').getPublicUrl(filePath);
@@ -228,8 +233,8 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
       setAvatarUrl(publicUrl);
       alert('Foto de perfil atualizada!');
     } catch (error: any) {
-      console.error('Erro ao fazer upload:', error);
-      alert('Erro ao atualizar foto de perfil');
+      console.error('Full error:', error);
+      alert('Erro ao atualizar foto: ' + (error.message || error));
     } finally {
       setLoading(false);
     }

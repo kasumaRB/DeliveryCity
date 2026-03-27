@@ -375,7 +375,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FC] flex flex-col md:flex-row overflow-hidden relative">
+    <div className="min-h-screen bg-[#F8F9FC] flex flex-col md:flex-row overflow-hidden relative safe-area-top safe-area-bottom">
       {/* SIDEBAR DESKTOP */}
       <aside className="hidden md:flex w-72 bg-white border-r flex-col p-8 sticky top-0 h-screen z-30 shadow-xl shadow-gray-100">
         <div className="mb-14 flex flex-col items-center">

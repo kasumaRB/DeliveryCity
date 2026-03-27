@@ -329,7 +329,7 @@ export const DriverView: React.FC = () => {
     );
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col h-screen overflow-hidden">
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col h-screen overflow-hidden safe-area-top safe-area-bottom">
       {/* Top Bar */}
       <header className="bg-gray-800/80 backdrop-blur-xl border-b border-gray-700/50 px-6 py-4 flex justify-between items-center shrink-0">
         <div className="flex items-center gap-3">

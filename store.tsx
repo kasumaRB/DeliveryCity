@@ -719,25 +719,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           await fetchData();
         },
         updateRestaurant: async (id, d) => {
-          await supabase.from('restaurants').update(d).eq('id', id);
+          const { error } = await supabase.from('restaurants').update(d).eq('id', id);
+          if (error) {
+            console.error('Error updating restaurant:', error);
+            throw new Error(`Erro ao atualizar restaurante: ${error.message}`);
+          }
           await fetchData();
         },
         updateMenu: async (rid, p) => {
           const r = restaurants.find(x => x.id === rid);
-          if (r)
-            await supabase
+          if (r) {
+            const { error } = await supabase
               .from('restaurants')
               .update({ menu: [...r.menu, p] })
               .eq('id', rid);
+            if (error) {
+              console.error('Error updating menu:', error);
+              throw new Error(`Erro ao salvar produto: ${error.message}`);
+            }
+          }
           await fetchData();
         },
         updateProduct: async (rid, pid, d) => {
           const r = restaurants.find(x => x.id === rid);
-          if (r)
-            await supabase
+          if (r) {
+            const { error } = await supabase
               .from('restaurants')
               .update({ menu: r.menu.map(p => (p.id === pid ? { ...p, ...d } : p)) })
               .eq('id', rid);
+            if (error) {
+              console.error('Error updating product:', error);
+              throw new Error(`Erro ao atualizar produto: ${error.message}`);
+            }
+          }
           await fetchData();
         },
         deleteProduct: async (rid, pid) => {

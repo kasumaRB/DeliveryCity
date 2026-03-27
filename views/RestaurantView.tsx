@@ -172,13 +172,18 @@ export const RestaurantView: React.FC = () => {
     }
     setIsSaving(true);
     try {
+      console.log('Uploading restaurant image...');
       const resizedFile = await resizeImage(file, 600, 600);
       const fileExt = 'jpg';
       const fileName = `restaurants/${myRestaurant.id}-${Date.now()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage
+      const { data, error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(fileName, resizedFile);
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw new Error(uploadError.message);
+      }
+      console.log('Upload success:', data);
       const {
         data: { publicUrl },
       } = supabase.storage.from('avatars').getPublicUrl(fileName);
@@ -186,7 +191,8 @@ export const RestaurantView: React.FC = () => {
       setRestaurantImage(publicUrl);
       alert('Foto da loja atualizada!');
     } catch (error: any) {
-      alert('Erro ao atualizar foto: ' + error.message);
+      console.error('Full error:', error);
+      alert('Erro ao atualizar foto: ' + (error.message || error));
     } finally {
       setIsSaving(false);
     }
@@ -201,20 +207,34 @@ export const RestaurantView: React.FC = () => {
       alert('Selecione uma imagem válida');
       return;
     }
+    setIsSaving(true);
     try {
+      console.log('Starting image upload...');
       const resizedFile = await resizeImage(file, 400, 400);
+      console.log('Image resized, uploading...');
       const fileExt = 'jpg';
       const fileName = `products/${currentUserProfile?.id}-${Date.now()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage
+
+      const { data, error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(fileName, resizedFile);
-      if (uploadError) throw uploadError;
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw new Error(uploadError.message);
+      }
+
+      console.log('Upload successful:', data);
       const {
         data: { publicUrl },
       } = supabase.storage.from('avatars').getPublicUrl(fileName);
       setItemFormImage(publicUrl);
+      alert('Imagem carregada!');
     } catch (error: any) {
-      alert('Erro ao carregar imagem: ' + error.message);
+      console.error('Full error:', error);
+      alert('Erro ao carregar imagem: ' + (error.message || error));
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -399,7 +419,7 @@ export const RestaurantView: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FB] flex flex-col md:flex-row h-screen overflow-hidden">
+    <div className="min-h-screen bg-[#F8F9FB] flex flex-col md:flex-row h-screen overflow-hidden safe-area-top safe-area-bottom">
       {/* SIDEBAR DESKTOP */}
       <aside className="hidden md:flex w-72 bg-white border-r flex-col p-8 h-full shadow-xl shadow-gray-100">
         <div className="flex flex-col items-center mb-14 gap-3">
