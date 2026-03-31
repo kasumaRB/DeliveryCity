@@ -727,25 +727,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           await fetchData();
         },
         updateMenu: async (rid, p) => {
-          const r = restaurants.find(x => x.id === rid);
-          if (r) {
-            const { error } = await supabase
-              .from('restaurants')
-              .update({ menu: [...r.menu, p] })
-              .eq('id', rid);
-            if (error) {
-              console.error('Error updating menu:', error);
-              throw new Error(`Erro ao salvar produto: ${error.message}`);
-            }
+          const { data } = await supabase.from('restaurants').select('menu').eq('id', rid).single();
+          const currentMenu = data?.menu || [];
+          const { error } = await supabase
+            .from('restaurants')
+            .update({ menu: [...currentMenu, p] })
+            .eq('id', rid);
+          if (error) {
+            console.error('Error updating menu:', error);
+            throw new Error(`Erro ao salvar produto: ${error.message}`);
           }
           await fetchData();
         },
         updateProduct: async (rid, pid, d) => {
-          const r = restaurants.find(x => x.id === rid);
-          if (r) {
+          const { data } = await supabase.from('restaurants').select('menu').eq('id', rid).single();
+          if (data) {
+            const currentMenu = data.menu || [];
             const { error } = await supabase
               .from('restaurants')
-              .update({ menu: r.menu.map(p => (p.id === pid ? { ...p, ...d } : p)) })
+              .update({ menu: currentMenu.map((p: any) => (p.id === pid ? { ...p, ...d } : p)) })
               .eq('id', rid);
             if (error) {
               console.error('Error updating product:', error);
@@ -755,12 +755,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           await fetchData();
         },
         deleteProduct: async (rid, pid) => {
-          const r = restaurants.find(x => x.id === rid);
-          if (r)
+          const { data } = await supabase.from('restaurants').select('menu').eq('id', rid).single();
+          if (data) {
+            const currentMenu = data.menu || [];
             await supabase
               .from('restaurants')
-              .update({ menu: r.menu.filter(p => p.id !== pid) })
+              .update({ menu: currentMenu.filter((p: any) => p.id !== pid) })
               .eq('id', rid);
+          }
           await fetchData();
         },
         addAddress,
