@@ -118,6 +118,7 @@ export const RestaurantView: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [restaurantImage, setRestaurantImage] = useState(myRestaurant?.image || '');
+  const [showProductForm, setShowProductForm] = useState(false);
 
   // Support
   const [supportMessage, setSupportMessage] = useState('');
@@ -245,6 +246,7 @@ export const RestaurantView: React.FC = () => {
     setItemFormDesc('');
     setItemFormImage('');
     setItemFormCategory('');
+    setShowProductForm(false);
   };
 
   const handleEditClick = (product: Product) => {
@@ -255,6 +257,7 @@ export const RestaurantView: React.FC = () => {
     setItemFormDesc(product.description);
     setItemFormImage(product.image);
     setItemFormCategory(product.category || '');
+    setShowProductForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -651,6 +654,7 @@ export const RestaurantView: React.FC = () => {
                 <button
                   onClick={() => {
                     resetMenuForm();
+                    setShowProductForm(true);
                     window.scrollTo(0, 0);
                   }}
                   className="flex items-center gap-3 bg-orange-600 text-white px-8 py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl shadow-orange-100 active:scale-95 transition-all"
@@ -660,15 +664,24 @@ export const RestaurantView: React.FC = () => {
               </header>
 
               <div className="flex flex-col xl:flex-row gap-12 items-start">
-                <div className="w-full xl:w-[450px] bg-white p-10 rounded-[3.5rem] shadow-xl shadow-gray-100 border border-gray-50 sticky top-10 h-fit">
-                  <h3 className="text-2xl font-black text-gray-900 mb-10 flex items-center gap-4">
-                    {editingProduct ? (
-                      <Edit2 size={24} className="text-orange-600" />
-                    ) : (
-                      <Plus size={24} className="text-orange-600" />
-                    )}{' '}
-                    {editingProduct ? 'Editar Item' : 'Novo Item'}
-                  </h3>
+                {showProductForm && (
+                  <div className="w-full xl:w-[450px] bg-white p-10 rounded-[3.5rem] shadow-xl shadow-gray-100 border border-gray-50 sticky top-10 h-fit">
+                    <div className="flex justify-between items-start mb-10">
+                      <h3 className="text-2xl font-black text-gray-900 flex items-center gap-4">
+                        {editingProduct ? (
+                          <Edit2 size={24} className="text-orange-600" />
+                        ) : (
+                          <Plus size={24} className="text-orange-600" />
+                        )}{' '}
+                        {editingProduct ? 'Editar Item' : 'Novo Item'}
+                      </h3>
+                      <button
+                        onClick={resetMenuForm}
+                        className="p-2 bg-gray-50 text-gray-400 rounded-full hover:bg-gray-100 hover:text-gray-600 transition-all"
+                      >
+                        <X size={20} />
+                      </button>
+                    </div>
                   <div className="space-y-8">
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">
@@ -775,7 +788,8 @@ export const RestaurantView: React.FC = () => {
                       </button>
                     )}
                   </div>
-                </div>
+                  </div>
+                )}
                 <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-8">
                   {myRestaurant.menu.map(item => (
                     <div
