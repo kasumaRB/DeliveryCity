@@ -100,7 +100,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [profiles, setProfiles] = useState<UserProfile[]>(() =>
     JSON.parse(localStorage.getItem(STORAGE_KEY_PROFILES) || '[]')
   );
-  const [cart, setCart] = useState<any[]>(() => getCartFromOffline() || []);
+  // 🔒 SEGURANÇA: Só restaura carrinho offline se houver sessão ativa
+  const [cart, setCart] = useState<any[]>([]);
 
   const [currentRole, setCurrentRole] = useState<UserRole | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -312,6 +313,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsLoading(true);
         setSession(newSession);
 
+        // 🔒 SEGURANÇA: Restaura carrinho do storage SOMENTE após sessão confirmada
+        if (newSession?.user) {
+          const savedCart = getCartFromOffline();
+          if (savedCart && savedCart.length > 0) setCart(savedCart);
+        }
+
         // Timeout de segurança: desbloqueia a UI após 8s caso o fetchData trave
         const loadingTimeout = setTimeout(() => {
           setIsLoading(false);
@@ -360,6 +367,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSession(newSession);
         fetchData(); // Silenciosamente, sem bloquear UI
       } else if (event === 'SIGNED_OUT') {
+        // 🔒 SEGURANÇA: Limpa carrinho ao deslogar
+        setCart([]);
+        clearOfflineCart();
         setSession(null);
         setIsLoading(false);
       }
@@ -521,6 +531,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addressCoords?: { lat: number; lng: number },
     deliveryFeeOverride?: number
   ) => {
+    // 🔒 SEGURANÇA: Bloqueia criação de pedido sem sessão válida
+    if (!session?.user?.id) {
+      throw new Error('Você precisa estar logado para realizar um pedido.');
+    }
     try {
       const restaurant = restaurants.find(r => r.id === restaurantId);
       if (!restaurant) throw new Error('Restaurante não encontrado');
@@ -642,6 +656,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Funções do carrinho
   const addToCart = (item: any) => {
+    // 🔒 SEGURANÇA: Bloqueia adição ao carrinho sem sessão
+    if (!session) return;
     setCart(prev => {
       const existingItem = prev.find(i => i.id === item.id);
       if (existingItem) {

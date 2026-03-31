@@ -99,6 +99,18 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     setSelectedCategory('');
   }, [selectedRestaurant?.id]);
 
+  // 🔒 SEGURANÇA: Limpa carrinho local e estado de checkout ao deslogar
+  useEffect(() => {
+    if (!currentUserProfile) {
+      setCart([]);
+      setSelectedRestaurant(null);
+      setIsCheckoutOpen(false);
+      setSelectedAddress(null);
+      setAppliedCoupon(null);
+      setCouponCode('');
+    }
+  }, [currentUserProfile]);
+
   useEffect(() => {
     if (currentUserProfile) {
       const pendingRating = orders.find(
@@ -163,6 +175,11 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
   }, [restaurants, searchQuery]);
 
   const handleAddToCart = (product: Product) => {
+    // 🔒 SEGURANÇA: Exige login antes de adicionar ao carrinho
+    if (!currentUserProfile) {
+      onOpenProfile();
+      return;
+    }
     if (!selectedRestaurant) return;
     const restaurantOfCart =
       cart.length > 0 ? restaurants.find(r => r.menu.some(p => p.id === cart[0].product.id)) : null;
@@ -594,7 +611,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                               onClick={() => handleAddToCart(product)}
                               className="bg-orange-600 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-orange-100 active:scale-95"
                             >
-                              Adicionar
+                              {currentUserProfile ? 'Adicionar' : '🔒 Entrar'}
                             </button>
                           )}
                         </div>
@@ -663,7 +680,14 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
       {cart.length > 0 && !isCheckoutOpen && (
         <div className="fixed bottom-32 left-6 right-6 md:left-auto md:right-12 z-40 animate-in slide-in-from-bottom fade-in duration-500">
           <button
-            onClick={() => setIsCheckoutOpen(true)}
+            onClick={() => {
+              // 🔒 SEGURANÇA: Exige login antes de abrir checkout
+              if (!currentUserProfile) {
+                onOpenProfile();
+                return;
+              }
+              setIsCheckoutOpen(true);
+            }}
             className="w-full md:w-auto bg-orange-600 text-white font-black p-5 md:px-8 md:py-6 rounded-[2.5rem] shadow-2xl shadow-orange-300 flex items-center justify-between md:justify-center gap-5 hover:bg-orange-700 transition-all hover:-translate-y-1 active:scale-90 group"
           >
             <div className="flex items-center gap-4">
