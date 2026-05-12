@@ -49,6 +49,7 @@ const AdminSidebar: React.FC<{
         },
         { id: 'partners', label: 'Parceiros', icon: Store },
         { id: 'support', label: 'Suporte', icon: MessageSquare },
+        { id: 'settings', label: 'Configurações', icon: DollarSign },
         { id: 'system', label: 'Status & Logs', icon: Terminal },
       ].map(item => (
         <button
@@ -92,7 +93,7 @@ export const AdminView: React.FC = () => {
   } = useAppStore();
 
   const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'users' | 'requests' | 'partners' | 'support' | 'system'
+    'dashboard' | 'users' | 'requests' | 'partners' | 'support' | 'settings' | 'system'
   >('dashboard');
   const [userSearch, setUserSearch] = useState('');
   const [viewingUser, setViewingUser] = useState<UserProfile | null>(null);
@@ -646,6 +647,168 @@ export const AdminView: React.FC = () => {
               </div>
             </div>
           )}
+
+          {activeTab === 'settings' && (() => {
+            const [settings, setSettings] = React.useState({
+              platform_fee_pct: 15,
+              driver_fee_pct: 8,
+              restaurant_fee_pct: 8,
+              min_delivery_fee: 4.0,
+              min_order_value: 15.0,
+            });
+            const [settingsLoading, setSettingsLoading] = React.useState(true);
+            const [settingsSaving, setSettingsSaving] = React.useState(false);
+            const [settingsMsg, setSettingsMsg] = React.useState('');
+
+            React.useEffect(() => {
+              supabase.from('platform_settings').select('*').single().then(({ data }) => {
+                if (data) setSettings({
+                  platform_fee_pct: data.platform_fee_pct ?? 15,
+                  driver_fee_pct: data.driver_fee_pct ?? 8,
+                  restaurant_fee_pct: data.restaurant_fee_pct ?? 8,
+                  min_delivery_fee: data.min_delivery_fee ?? 4.0,
+                  min_order_value: data.min_order_value ?? 15.0,
+                });
+                setSettingsLoading(false);
+              });
+            }, []);
+
+            const handleSaveSettings = async () => {
+              setSettingsSaving(true);
+              try {
+                const { error } = await supabase.from('platform_settings').upsert({
+                  id: 1,
+                  ...settings,
+                  updated_at: new Date().toISOString(),
+                });
+                if (error) throw error;
+                setSettingsMsg('✅ Configurações salvas com sucesso!');
+              } catch (e: any) {
+                setSettingsMsg('❌ Erro ao salvar: ' + e.message);
+              } finally {
+                setSettingsSaving(false);
+                setTimeout(() => setSettingsMsg(''), 4000);
+              }
+            };
+
+            const totalPct = settings.driver_fee_pct + settings.restaurant_fee_pct;
+            const platformNet = settings.platform_fee_pct - totalPct;
+
+            return (
+              <div className="max-w-3xl mx-auto animate-in fade-in space-y-8">
+                <div>
+                  <h3 className="text-2xl font-black text-gray-900 tracking-tighter mb-1">Configurações Financeiras</h3>
+                  <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Split de pagamento e limites da plataforma</p>
+                </div>
+
+                {settingsLoading ? (
+                  <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-purple-100 border-t-purple-600 rounded-full animate-spin" /></div>
+                ) : (
+                  <>
+                    {/* Divisão visual do split */}
+                    <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8">
+                      <h4 className="font-black text-gray-700 mb-6 flex items-center gap-2">
+                        <DollarSign size={18} className="text-purple-500" /> Divisão do Pagamento
+                      </h4>
+                      <div className="mb-6">
+                        <div className="flex h-6 rounded-full overflow-hidden gap-0.5">
+                          <div className="bg-orange-500 transition-all flex items-center justify-center text-white text-[9px] font-black" style={{ width: `${settings.restaurant_fee_pct}%` }}>
+                            {settings.restaurant_fee_pct}%
+                          </div>
+                          <div className="bg-green-500 transition-all flex items-center justify-center text-white text-[9px] font-black" style={{ width: `${settings.driver_fee_pct}%` }}>
+                            {settings.driver_fee_pct}%
+                          </div>
+                          <div className="bg-purple-600 transition-all flex items-center justify-center text-white text-[9px] font-black flex-1">
+                            {(100 - settings.restaurant_fee_pct - settings.driver_fee_pct)}%
+                          </div>
+                        </div>
+                        <div className="flex justify-between mt-3 text-[10px] font-black uppercase">
+                          <span className="text-orange-500">Lojista</span>
+                          <span className="text-green-600">Entregador</span>
+                          <span className="text-purple-600">Cliente (paga tudo)</span>
+                        </div>
+                      </div>
+                      <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4 text-sm font-bold text-purple-700">
+                        💡 A taxa da plataforma ({settings.platform_fee_pct}%) é retirada do valor do pedido. Desse valor, {settings.driver_fee_pct}% vai para o entregador e {settings.restaurant_fee_pct}% vai para o lojista.
+                        {platformNet > 0
+                          ? ` A plataforma fica com os ${platformNet}% restantes.`
+                          : platformNet < 0
+                            ? ` ⚠️ Atenção: a soma dos repasses (${totalPct}%) supera a taxa da plataforma (${settings.platform_fee_pct}%)!`
+                            : ' A plataforma não retém nada (repasse 100%).'}
+                      </div>
+                    </div>
+
+                    {/* Campos de configuração */}
+                    <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 space-y-6">
+                      <h4 className="font-black text-gray-700 mb-2">Taxas (%)</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {[
+                          { key: 'platform_fee_pct', label: 'Taxa Plataforma', color: 'purple', help: 'Cobrado sobre o subtotal do pedido' },
+                          { key: 'driver_fee_pct', label: 'Repasse Entregador', color: 'green', help: 'Porcentagem que o entregador recebe' },
+                          { key: 'restaurant_fee_pct', label: 'Repasse Lojista', color: 'orange', help: 'Porcentagem que o lojista recebe' },
+                        ].map(field => (
+                          <div key={field.key}>
+                            <label className={`text-[10px] font-black text-${field.color}-600 uppercase tracking-widest mb-2 block`}>{field.label}</label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.5"
+                                value={(settings as any)[field.key]}
+                                onChange={e => setSettings(s => ({ ...s, [field.key]: parseFloat(e.target.value) || 0 }))}
+                                className="w-full p-4 pr-10 bg-gray-50 rounded-2xl font-black text-xl outline-none border-2 border-transparent focus:border-purple-300 transition-all"
+                              />
+                              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-black">%</span>
+                            </div>
+                            <p className="text-[10px] text-gray-400 mt-1 ml-1">{field.help}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      <h4 className="font-black text-gray-700 pt-4 border-t border-gray-100">Limites Mínimos</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {[
+                          { key: 'min_delivery_fee', label: 'Taxa de Entrega Mínima', help: 'Cobrado do cliente quando não há taxa definida' },
+                          { key: 'min_order_value', label: 'Pedido Mínimo (R$)', help: 'Valor mínimo para realizar um pedido' },
+                        ].map(field => (
+                          <div key={field.key}>
+                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block">{field.label}</label>
+                            <div className="relative">
+                              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-black text-sm">R$</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.5"
+                                value={(settings as any)[field.key]}
+                                onChange={e => setSettings(s => ({ ...s, [field.key]: parseFloat(e.target.value) || 0 }))}
+                                className="w-full p-4 pl-10 bg-gray-50 rounded-2xl font-black outline-none border-2 border-transparent focus:border-purple-300 transition-all"
+                              />
+                            </div>
+                            <p className="text-[10px] text-gray-400 mt-1 ml-1">{field.help}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {settingsMsg && (
+                      <div className={`p-4 rounded-2xl text-sm font-bold text-center ${settingsMsg.startsWith('✅') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                        {settingsMsg}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={handleSaveSettings}
+                      disabled={settingsSaving}
+                      className="w-full py-5 bg-gray-950 text-white rounded-[2rem] font-black uppercase text-sm tracking-widest flex items-center justify-center gap-3 hover:bg-purple-700 transition-all disabled:opacity-50"
+                    >
+                      {settingsSaving ? <><div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Salvando...</> : <><Save size={18} /> Salvar Configurações</>}
+                    </button>
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
           {activeTab === 'system' && (
             <div className="space-y-6 animate-in fade-in">

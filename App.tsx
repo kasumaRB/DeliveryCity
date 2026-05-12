@@ -155,9 +155,14 @@ const AppContent: React.FC = () => {
     }
 
     // Se o status for APPROVED ou for ADMIN, renderiza a view correta para o papel.
-    if (currentRole === UserRole.ADMIN) return <AdminView />;
-    if (currentRole === UserRole.RESTAURANT) return <RestaurantView />;
-    if (currentRole === UserRole.DRIVER) return <DriverView />;
+    // SEGURANÇA: sempre usa currentUserProfile.role (vindo do Supabase) e não currentRole
+    // (que pode estar desatualizado no localStorage). Dupla verificação para ADMIN.
+    const verifiedRole = currentUserProfile.role;
+    if (verifiedRole === UserRole.ADMIN && currentUserProfile.status === 'APPROVED') {
+      return <AdminView />;
+    }
+    if (verifiedRole === UserRole.RESTAURANT) return <RestaurantView />;
+    if (verifiedRole === UserRole.DRIVER) return <DriverView />;
   }
 
   // O fallback final é a ClientView (para usuários com papel CLIENT ou qualquer estado inesperado).

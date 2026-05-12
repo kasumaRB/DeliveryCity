@@ -192,6 +192,10 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [previousMode, setPreviousMode] = useState<AuthMode>('REGISTER_EMAIL');
 
+  // Derivado: verdadeiro quando está completando ou editando perfil existente
+  // CRÍTICO: usado tanto em validateFields() quanto no JSX do botão de submit
+  const isCompletingOrEditing = mode === 'COMPLETE_PROFILE' || mode === 'EDIT_PROFILE';
+
   useEffect(() => {
     if (currentUserProfile?.avatarUrl) {
       setAvatarUrl(currentUserProfile.avatarUrl);
@@ -894,7 +898,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
     );
   }
 
-  const isCompletingOrEditing = mode === 'COMPLETE_PROFILE' || mode === 'EDIT_PROFILE';
   const currentRoleType =
     mode === 'REGISTER_PARTNER' ? partnerType : currentUserProfile?.role || UserRole.CLIENT;
 
