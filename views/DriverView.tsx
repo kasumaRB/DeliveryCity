@@ -421,13 +421,17 @@ export const DriverView: React.FC = () => {
           </div>
         )}
 
-        {/* Available Orders */}
-        {!activeOrder && (
-          <div>
+        {/* Pedidos Disponíveis — visível na home quando não há pedido ativo */}
+        {activeTab === 'home' && !activeOrder && (
+          <div className="animate-in fade-in duration-500">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-black text-white">Pedidos Disponíveis</h2>
-              <span className="bg-blue-500/20 text-blue-400 px-4 py-2 rounded-full text-xs font-bold">
-                {availableOrdersWithScore.length} novos
+              <span className={`px-4 py-2 rounded-full text-xs font-bold ${
+                availableOrdersWithScore.length > 0
+                  ? 'bg-blue-500/20 text-blue-400'
+                  : 'bg-gray-700/50 text-gray-500'
+              }`}>
+                {availableOrdersWithScore.length} {availableOrdersWithScore.length === 1 ? 'novo' : 'novos'}
               </span>
             </div>
 
@@ -436,7 +440,7 @@ export const DriverView: React.FC = () => {
                 <div className="bg-gray-800/50 p-12 rounded-[3rem] text-center border border-gray-700/50">
                   <Bike size={48} className="mx-auto mb-4 text-gray-600" />
                   <p className="text-gray-400 font-bold">Nenhum pedido disponível no momento</p>
-                  <p className="text-gray-500 text-sm mt-2">Aguarde novos pedidos</p>
+                  <p className="text-gray-500 text-sm mt-2">Fique online e aguarde novos pedidos</p>
                 </div>
               ) : (
                 availableOrdersWithScore.map(order => (
@@ -484,39 +488,52 @@ export const DriverView: React.FC = () => {
           </div>
         )}
 
-        {/* History Tab */}
+        {/* Histórico de Entregas */}
         {activeTab === 'history' && (
-          <div>
-            <h2 className="text-2xl font-black text-white mb-4">Histórico</h2>
+          <div className="animate-in fade-in duration-500">
+            <h2 className="text-2xl font-black text-white mb-6">Histórico de Entregas</h2>
             <div className="space-y-3">
               {orders.filter(o => o.driverId === currentUserProfile?.id).length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
+                <div className="text-center py-16 text-gray-500 bg-gray-800/30 rounded-[3rem] border border-gray-700/50">
                   <History size={48} className="mx-auto mb-4 opacity-30" />
-                  <p>Nenhum pedido realizado</p>
+                  <p className="font-bold">Nenhuma entrega realizada ainda</p>
+                  <p className="text-sm mt-1 text-gray-600">Aceite pedidos disponíveis na tela inicial</p>
                 </div>
               ) : (
                 orders
                   .filter(o => o.driverId === currentUserProfile?.id)
-                  .slice(0, 20)
+                  .sort((a, b) => b.timestamp - a.timestamp)
+                  .slice(0, 30)
                   .map(order => (
                     <div
                       key={order.id}
                       className="bg-gray-800/50 p-5 rounded-2xl border border-gray-700/50"
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <span className="font-bold text-white">{order.restaurantName}</span>
+                        <div>
+                          <span className="font-bold text-white">{order.restaurantName}</span>
+                          <p className="text-gray-500 text-xs mt-0.5">
+                            {new Date(order.timestamp).toLocaleDateString('pt-BR', {
+                              day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+                            })}
+                          </p>
+                        </div>
                         <span
-                          className={`text-xs font-black uppercase px-3 py-1 rounded-full ${
+                          className={`text-[9px] font-black uppercase px-3 py-1 rounded-full ${
                             order.status === OrderStatus.DELIVERED
                               ? 'bg-green-500/20 text-green-400'
+                              : order.status === OrderStatus.CANCELLED
+                              ? 'bg-red-500/20 text-red-400'
                               : 'bg-gray-600 text-gray-300'
                           }`}
                         >
-                          {order.status}
+                          {order.status === OrderStatus.DELIVERED ? 'Entregue'
+                            : order.status === OrderStatus.CANCELLED ? 'Cancelado'
+                            : order.status}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500">#{order.id.slice(-4)}</span>
+                      <div className="flex items-center justify-between text-sm pt-2 border-t border-gray-700/50">
+                        <span className="text-gray-500 text-xs">#{order.id.slice(-6)} · {order.customerAddress.split(',')[0]}</span>
                         <span className="text-green-400 font-bold">
                           {formatCurrency(order.driverNetEarnings)}
                         </span>
@@ -616,7 +633,7 @@ export const DriverView: React.FC = () => {
       {!isOnline && (
         <div className="fixed bottom-24 left-6 right-6 bg-red-600 text-white py-3 px-6 rounded-2xl flex items-center justify-center gap-3 shadow-xl animate-bounce z-40">
           <WifiOff size={20} />
-          <span className="font-bold text-sm">Sem conexão - режим офлайн</span>
+          <span className="font-bold text-sm">Sem conexão — modo offline</span>
         </div>
       )}
     </div>

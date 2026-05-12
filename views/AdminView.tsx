@@ -111,11 +111,22 @@ export const AdminView: React.FC = () => {
   }, [activeTab]);
 
   const fetchSupportTickets = async () => {
-    const { data } = await supabase
-      .from('support_tickets')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (data) setSupportTickets(data);
+    console.log('[DEBUG] fetchSupportTickets chamado');
+    try {
+      const { data, error } = await supabase
+        .from('support_tickets')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('[DEBUG] Erro ao buscar tickets de suporte:', error);
+      } else {
+        console.log('[DEBUG] Tickets de suporte encontrados:', data?.length || 0);
+        if (data) setSupportTickets(data);
+      }
+    } catch (err) {
+      console.error('[DEBUG] Erro inesperado ao buscar tickets:', err);
+    }
   };
 
   const handleUpdateDossier = async (e: React.FormEvent) => {
@@ -222,51 +233,138 @@ export const AdminView: React.FC = () => {
         </header>
 
         <div className="flex-1 overflow-y-auto p-6 md:p-8 no-scrollbar pb-32">
-          {activeTab === 'dashboard' && (
-            <div className="space-y-6 animate-in fade-in">
-              <h3 className="text-2xl font-black text-gray-900 tracking-tighter">Resumo da Rede</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex items-center gap-6">
-                  <div className="w-16 h-16 rounded-3xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                    <Users size={28} />
+          {activeTab === 'dashboard' && (() => {
+            const today = new Date(); today.setHours(0,0,0,0);
+            const todayOrders = orders.filter(o => new Date(o.timestamp).getTime() >= today.getTime());
+            const deliveredOrders = orders.filter(o => o.status === 'DELIVERED');
+            const totalRevenue = deliveredOrders.reduce((s, o) => s + o.total, 0);
+            const platformRevenue = deliveredOrders.reduce((s, o) => s + (o.platformFee || 0), 0);
+            const avgTicket = deliveredOrders.length > 0 ? totalRevenue / deliveredOrders.length : 0;
+            const completionRate = orders.length > 0
+              ? Math.round((deliveredOrders.length / orders.length) * 100) : 0;
+            const pendingApprovals = profiles.filter(p => (p.status as any) === 'PENDING').length;
+            const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            return (
+              <div className="space-y-8 animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-2xl font-black text-gray-900 tracking-tighter">Visão Geral</h3>
+                  {pendingApprovals > 0 && (
+                    <button
+                      onClick={() => setActiveTab('users')}
+                      className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest animate-pulse"
+                    >
+                      <span className="w-2 h-2 bg-amber-500 rounded-full" />
+                      {pendingApprovals} aprovação{pendingApprovals > 1 ? 'ões' : ''} pendente{pendingApprovals > 1 ? 's' : ''}
+                    </button>
+                  )}
+                </div>
+
+                {/* KPIs - Linha 1: Contadores */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+                    <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-4">
+                      <Users size={22} />
+                    </div>
+                    <p className="text-3xl font-black text-gray-900">{profiles.length}</p>
+                    <p className="text-xs font-bold text-gray-400 mt-1">Usuários Cadastrados</p>
                   </div>
-                  <div>
-                    <p className="text-4xl font-black">{profiles.length}</p>
-                    <p className="text-sm font-bold text-gray-400">Usuários</p>
+                  <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+                    <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center mb-4">
+                      <Store size={22} />
+                    </div>
+                    <p className="text-3xl font-black text-gray-900">{restaurants.length}</p>
+                    <p className="text-xs font-bold text-gray-400 mt-1">Lojas Ativas</p>
+                  </div>
+                  <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+                    <div className="w-12 h-12 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center mb-4">
+                      <Bike size={22} />
+                    </div>
+                    <p className="text-3xl font-black text-gray-900">{profiles.filter(p => p.role === 'DRIVER').length}</p>
+                    <p className="text-xs font-bold text-gray-400 mt-1">Entregadores</p>
+                  </div>
+                  <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
+                      <LayoutDashboard size={22} />
+                    </div>
+                    <p className="text-3xl font-black text-gray-900">{todayOrders.length}</p>
+                    <p className="text-xs font-bold text-gray-400 mt-1">Pedidos Hoje</p>
                   </div>
                 </div>
-                <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex items-center gap-6">
-                  <div className="w-16 h-16 rounded-3xl bg-orange-50 text-orange-600 flex items-center justify-center">
-                    <Store size={28} />
+
+                {/* KPIs - Linha 2: Financeiro */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-gradient-to-br from-green-500 to-emerald-600 p-8 rounded-[2.5rem] text-white shadow-xl shadow-green-100">
+                    <p className="text-xs font-black uppercase tracking-widest text-green-100 mb-3">GMV Total (Volume)</p>
+                    <p className="text-4xl font-black">{fmt(totalRevenue)}</p>
+                    <p className="text-green-100 text-xs font-bold mt-2">{deliveredOrders.length} pedidos entregues</p>
                   </div>
-                  <div>
-                    <p className="text-4xl font-black">{restaurants.length}</p>
-                    <p className="text-sm font-bold text-gray-400">Lojas</p>
+                  <div className="bg-gradient-to-br from-violet-500 to-purple-600 p-8 rounded-[2.5rem] text-white shadow-xl shadow-purple-100">
+                    <p className="text-xs font-black uppercase tracking-widest text-purple-100 mb-3">Receita Plataforma</p>
+                    <p className="text-4xl font-black">{fmt(platformRevenue)}</p>
+                    <p className="text-purple-100 text-xs font-bold mt-2">Taxa de 15% sobre subtotal</p>
+                  </div>
+                  <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-widest text-gray-400 mb-1">Ticket Médio</p>
+                        <p className="text-3xl font-black text-gray-900">{fmt(avgTicket)}</p>
+                      </div>
+                      <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                        <TrendingUp size={20} />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                      <span className="text-xs font-bold text-gray-400">Taxa de conclusão</span>
+                      <span className={`text-sm font-black ${completionRate >= 80 ? 'text-green-600' : completionRate >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
+                        {completionRate}%
+                      </span>
+                    </div>
+                    <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${completionRate}%` }} />
+                    </div>
                   </div>
                 </div>
-                <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex items-center gap-6">
-                  <div className="w-16 h-16 rounded-3xl bg-green-50 text-green-600 flex items-center justify-center">
-                    <Bike size={28} />
+
+                {/* Pedidos recentes */}
+                <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="p-8 pb-4 flex items-center justify-between">
+                    <h4 className="text-lg font-black text-gray-900">Pedidos Recentes</h4>
+                    <button onClick={() => setActiveTab('orders')} className="text-xs font-black text-orange-600 uppercase tracking-widest hover:underline">
+                      Ver todos →
+                    </button>
                   </div>
-                  <div>
-                    <p className="text-4xl font-black">
-                      {profiles.filter(p => p.role === 'DRIVER').length}
-                    </p>
-                    <p className="text-sm font-bold text-gray-400">Frota</p>
-                  </div>
-                </div>
-                <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex items-center gap-6">
-                  <div className="w-16 h-16 rounded-3xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                    <LayoutDashboard size={28} />
-                  </div>
-                  <div>
-                    <p className="text-4xl font-black">{orders.length}</p>
-                    <p className="text-sm font-bold text-gray-400">Pedidos</p>
+                  <div className="divide-y divide-gray-50">
+                    {orders.slice(0, 6).map(o => {
+                      const statusMap: Record<string,{label:string;color:string}> = {
+                        PENDING: {label:'Aguardando', color:'text-yellow-600 bg-yellow-50'},
+                        PREPARING: {label:'Preparando', color:'text-blue-600 bg-blue-50'},
+                        READY: {label:'Pronto', color:'text-green-600 bg-green-50'},
+                        OUT_FOR_DELIVERY: {label:'Em Entrega', color:'text-purple-600 bg-purple-50'},
+                        DELIVERED: {label:'Entregue', color:'text-gray-600 bg-gray-100'},
+                        CANCELLED: {label:'Cancelado', color:'text-red-600 bg-red-50'},
+                      };
+                      const s = statusMap[o.status] || {label: o.status, color:'text-gray-500 bg-gray-100'};
+                      return (
+                        <div key={o.id} className="px-8 py-4 flex items-center justify-between hover:bg-gray-50/50 transition-colors">
+                          <div>
+                            <p className="font-black text-gray-900 text-sm">{o.restaurantName}</p>
+                            <p className="text-gray-400 text-xs">{o.customerName} • #{o.id.slice(-6)}</p>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-full ${s.color}`}>{s.label}</span>
+                            <span className="font-black text-gray-900 text-sm">{fmt(o.total)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {orders.length === 0 && (
+                      <p className="px-8 py-8 text-gray-400 text-sm font-bold text-center">Nenhum pedido ainda.</p>
+                    )}
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {(activeTab === 'users' || activeTab === 'partners') && (
             <div className="space-y-6 animate-in fade-in">

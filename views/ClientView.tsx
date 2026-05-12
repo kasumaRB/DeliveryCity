@@ -95,6 +95,19 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
   // Search and filter states
   const [selectedCategory, setSelectedCategory] = useState('');
 
+  // Helper: traduz status do pedido para português
+  const traduzirStatus = (status: string): { label: string; color: string } => {
+    const map: Record<string, { label: string; color: string }> = {
+      PENDING:          { label: '\u23f3 Aguardando',    color: 'bg-yellow-100 text-yellow-700' },
+      PREPARING:        { label: '\ud83d\udc68\u200d\ud83c\udf73 Preparando',    color: 'bg-blue-100 text-blue-700' },
+      READY:            { label: '\u2705 Pronto',         color: 'bg-green-100 text-green-700' },
+      OUT_FOR_DELIVERY: { label: '\ud83d\udeb4 Em Entrega',    color: 'bg-purple-100 text-purple-700' },
+      DELIVERED:        { label: '\ud83c\udf89 Entregue',      color: 'bg-gray-100 text-gray-600' },
+      CANCELLED:        { label: '\u274c Cancelado',     color: 'bg-red-100 text-red-700' },
+    };
+    return map[status] || { label: status, color: 'bg-orange-100 text-orange-700' };
+  };
+
   useEffect(() => {
     setSelectedCategory('');
   }, [selectedRestaurant?.id]);
@@ -624,43 +637,88 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
 
           {activeTab === 'orders' && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <h1 className="text-4xl font-black tracking-tighter text-gray-900 mb-8">Pedidos</h1>
-              <div className="space-y-6 max-w-2xl">
+              <h1 className="text-4xl font-black tracking-tighter text-gray-900 mb-8">Meus Pedidos</h1>
+              <div className="space-y-4 max-w-2xl">
                 {orders.filter(o => o.customerId === currentUserProfile?.id).length > 0 ? (
                   orders
                     .filter(o => o.customerId === currentUserProfile?.id)
-                    .map(order => (
-                      <div
-                        key={order.id}
-                        className="bg-white p-6 rounded-[2.5rem] border border-gray-50 shadow-xl shadow-gray-100 flex items-center justify-between group hover:shadow-2xl transition-all"
-                      >
-                        <div className="flex items-center gap-5">
-                          <div className="w-14 h-14 bg-orange-50 rounded-2xl flex items-center justify-center text-orange-600">
-                            <UtensilsCrossed size={24} />
+                    .sort((a, b) => b.timestamp - a.timestamp)
+                    .map(order => {
+                      const statusInfo = traduzirStatus(order.status);
+                      const isActive = !['DELIVERED', 'CANCELLED'].includes(order.status);
+                      return (
+                        <div
+                          key={order.id}
+                          className={`bg-white p-6 rounded-[2.5rem] border shadow-xl transition-all ${
+                            isActive
+                              ? 'border-orange-100 shadow-orange-50 ring-1 ring-orange-100'
+                              : 'border-gray-50 shadow-gray-100'
+                          }`}
+                        >
+                          <div className="flex items-center gap-4 mb-4">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                              isActive ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-400'
+                            }`}>
+                              <UtensilsCrossed size={22} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-black text-gray-900 leading-tight truncate">
+                                {order.restaurantName}
+                              </h3>
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                Pedido #{order.id.slice(-6)} · {new Date(order.timestamp).toLocaleString('pt-BR', {
+                                  day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+                                })}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <h3 className="font-black text-lg text-gray-900 leading-tight">
-                              {order.restaurantName}
-                            </h3>
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                              Pedido #{order.id.slice(-4)}
-                            </p>
+
+                          {/* Itens do pedido */}
+                          <div className="bg-gray-50 rounded-2xl p-4 mb-4 space-y-1">
+                            {order.items.slice(0, 3).map((item, i) => (
+                              <p key={i} className="text-xs font-bold text-gray-600">
+                                {item.quantity}x {item.product.name}
+                              </p>
+                            ))}
+                            {order.items.length > 3 && (
+                              <p className="text-xs text-gray-400">+{order.items.length - 3} item(s)...</p>
+                            )}
                           </div>
+
+                          <div className="flex items-center justify-between">
+                            <span
+                              className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${statusInfo.color}`}
+                            >
+                              {statusInfo.label}
+                            </span>
+                            <span className="font-black text-lg text-gray-900">
+                              R$ {order.total.toFixed(2)}
+                            </span>
+                          </div>
+
+                          {/* Progress bar para pedidos ativos */}
+                          {isActive && (
+                            <div className="mt-4">
+                              <div className="flex justify-between mb-1">
+                                {['PENDING','PREPARING','READY','OUT_FOR_DELIVERY'].map((s, idx) => {
+                                  const steps = ['PENDING','PREPARING','READY','OUT_FOR_DELIVERY'];
+                                  const currentIdx = steps.indexOf(order.status);
+                                  const done = idx <= currentIdx;
+                                  return (
+                                    <div key={s} className={`h-1.5 flex-1 rounded-full mx-0.5 transition-all duration-500 ${
+                                      done ? 'bg-orange-500' : 'bg-gray-200'
+                                    }`} />
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        <div className="text-right">
-                          <span className="font-black text-xl text-gray-900 block mb-1">
-                            R$ {order.total.toFixed(2)}
-                          </span>
-                          <span
-                            className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest shadow-sm ${order.status === OrderStatus.DELIVERED ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}
-                          >
-                            {order.status}
-                          </span>
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                 ) : (
                   <div className="text-center py-20 bg-white rounded-[3rem] shadow-xl border-2 border-dashed border-gray-100">
+                    <UtensilsCrossed size={40} className="mx-auto mb-4 text-gray-200" />
                     <p className="text-gray-400 font-bold mb-6">Nenhum pedido realizado ainda.</p>
                     <button
                       onClick={() => setActiveTab('home')}

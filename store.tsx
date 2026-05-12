@@ -185,6 +185,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Log auxiliar: só exibe em desenvolvimento
+  const isDev = import.meta.env.DEV;
+  const devLog = (...args: any[]) => { if (isDev) console.log(...args); };
+
   let lastFetchTime = 0;
   let cachedData: { restaurants?: any[]; orders?: any[]; profiles?: any[] } = {};
 
@@ -199,6 +203,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         supabase.from('orders').select('*').order('timestamp', { ascending: false }).limit(100),
         supabase.from('profiles').select('*'),
       ]);
+
+      devLog('[DEV] Dados carregados:', {
+        restaurantes: restData.data?.length ?? 0,
+        pedidos: orderData.data?.length ?? 0,
+        perfis: profileData.data?.length ?? 0,
+      });
 
       if (restData.data) {
         const mapped = restData.data.map((r: any) => ({
@@ -228,6 +238,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       setIsSupabaseConnected(true);
     } catch (err) {
+      console.error('Erro ao sincronizar dados:', err);
       setIsSupabaseConnected(false);
     } finally {
       setIsLoading(false);
@@ -454,6 +465,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const registerProfile = async (profile: Partial<UserProfile>) => {
+    devLog('[DEV] registerProfile chamado com role:', profile.role);
+
     // Atualiza localmente imediatamente para resposta visual instantânea
     const localProfile: UserProfile = {
       id: profile.id!,
@@ -484,9 +497,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     const isRestaurant = profile.role === UserRole.RESTAURANT;
+    devLog('[DEV] isRestaurant:', isRestaurant);
 
     // Usa RPC com SECURITY DEFINER para bypassar RLS (inclui criação de restaurante atomicamente)
-    const { error: profileError } = await supabase.rpc('upsert_profile', {
+    const rpcParams = {
       p_id: profile.id,
       p_email: profile.email || '',
       p_name: profile.name || '',
@@ -504,8 +518,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       p_license_plate: profile.licensePlate || '',
       p_saved_addresses: profile.savedAddresses || [],
       p_is_restaurant: isRestaurant,
-    });
-    if (profileError) throw new Error(`Erro ao salvar perfil: ${profileError.message}`);
+    };
+    
+    devLog('[DEV] RPC upsert_profile params:', { role: profile.role, email: profile.email });
+
+    const { error: profileError } = await supabase.rpc('upsert_profile', rpcParams);
+    if (profileError) {
+      console.error('Erro no RPC upsert_profile:', profileError);
+      throw new Error(`Erro ao salvar perfil: ${profileError.message}`);
+    }
+
+    devLog('[DEV] Perfil salvo com sucesso.');
     await fetchData();
   };
 

@@ -1,4 +1,0 @@
-supabase/functions/create-pagseguro-payment/index.ts(1,23): error TS2307: Cannot find module 'https://deno.land/std@0.168.0/http/server.ts' or its corresponding type declarations.
-supabase/functions/create-pagseguro-payment/index.ts(18,29): error TS2304: Cannot find name 'Deno'.
-tests/services/offlineService.test.ts(141,24): error TS2339: Property 'keys' does not exist on type '{ getItem: Mock<any, any, any>; setItem: Mock<any, any, any>; removeItem: Mock<any, any, any>; clear: Mock<any, any, any>; }'.
-tsconfig.json(29,5): error TS5023: Unknown compiler option 'include'.

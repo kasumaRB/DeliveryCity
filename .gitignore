@@ -10,8 +10,35 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+
+# =============================================================
+# SECURITY: Nunca commitar arquivos de ambiente ou segredos
+# =============================================================
+.env
+.env.*
 *.local
-.env.antigravity
+!.env.example
+
+# APK nunca deve ir para o repositório público
+*.apk
+*.aab
+*.ipa
+
+# SQL scripts com dados sensíveis / correções internas
+supabase-corrections*.sql
+supabase-fix*.sql
+supabase-security*.sql
+rls_cleanup.sql
+
+# Logs de build e arquivos de debug
+build_log*.txt
+ts_errors.txt
+nul
+
+# Documentação interna de diagnóstico (não deve ser pública)
+DIAGNOSTICO_*.md
+GUIDA_*.md
+PASSO_A_PASSO_*.md
 
 # Editor directories and files
 .vscode/*
