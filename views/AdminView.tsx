@@ -22,6 +22,11 @@ import {
   Wallet,
   MessageSquare,
   AlertTriangle,
+    TrendingUp,
+    TrendingDown,
+    Award,
+    Filter,
+    Star
 } from 'lucide-react';
 import { UserRole, UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
