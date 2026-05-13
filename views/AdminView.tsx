@@ -136,6 +136,7 @@ export const AdminView: React.FC = () => {
     setIsSaving(true);
     try {
       const formData = new FormData(e.currentTarget as HTMLFormElement);
+      const customFeeRaw = formData.get('customFeePct') as string;
       await updateUserProfile(viewingUser.id, {
         name: formData.get('name') as string,
         cpf: formData.get('cpf') as string,
@@ -148,7 +149,8 @@ export const AdminView: React.FC = () => {
         workingHours: formData.get('workingHours') as string,
         description: formData.get('description') as string,
         pagseguroRecipientId: formData.get('pagseguroRecipientId') as string,
-      });
+        customFeePct: customFeeRaw !== '' && customFeeRaw !== null ? parseFloat(customFeeRaw) : null,
+      } as any);
       alert('Alterações salvas com sucesso!');
       setViewingUser(null);
     } catch (e: any) {
@@ -711,21 +713,30 @@ export const AdminView: React.FC = () => {
                         <DollarSign size={18} className="text-purple-500" /> Divisão do Pagamento
                       </h4>
                       <div className="mb-6">
-                        <div className="flex h-6 rounded-full overflow-hidden gap-0.5">
-                          <div className="bg-orange-500 transition-all flex items-center justify-center text-white text-[9px] font-black" style={{ width: `${settings.restaurant_fee_pct}%` }}>
-                            {settings.restaurant_fee_pct}%
-                          </div>
-                          <div className="bg-green-500 transition-all flex items-center justify-center text-white text-[9px] font-black" style={{ width: `${settings.driver_fee_pct}%` }}>
-                            {settings.driver_fee_pct}%
-                          </div>
-                          <div className="bg-purple-600 transition-all flex items-center justify-center text-white text-[9px] font-black flex-1">
-                            {(100 - settings.restaurant_fee_pct - settings.driver_fee_pct)}%
-                          </div>
-                        </div>
+                        {/* Barra proporcional — escala com base no total, não no 100% fixo */}
+                        {(() => {
+                          const total = Math.max(settings.platform_fee_pct, settings.restaurant_fee_pct + settings.driver_fee_pct, 1);
+                          const restPct  = (settings.restaurant_fee_pct / total) * 100;
+                          const drivPct  = (settings.driver_fee_pct / total) * 100;
+                          const platPct  = Math.max(0, 100 - restPct - drivPct);
+                          return (
+                            <div className="flex h-6 rounded-full overflow-hidden gap-0.5">
+                              <div className="bg-orange-500 transition-all flex items-center justify-center text-white text-[9px] font-black" style={{ width: `${restPct}%` }}>
+                                {settings.restaurant_fee_pct}%
+                              </div>
+                              <div className="bg-green-500 transition-all flex items-center justify-center text-white text-[9px] font-black" style={{ width: `${drivPct}%` }}>
+                                {settings.driver_fee_pct}%
+                              </div>
+                              <div className="bg-purple-600 transition-all flex items-center justify-center text-white text-[9px] font-black" style={{ width: `${platPct}%` }}>
+                                {(settings.platform_fee_pct - settings.driver_fee_pct - settings.restaurant_fee_pct).toFixed(1)}%
+                              </div>
+                            </div>
+                          );
+                        })()}
                         <div className="flex justify-between mt-3 text-[10px] font-black uppercase">
-                          <span className="text-orange-500">Lojista</span>
-                          <span className="text-green-600">Entregador</span>
-                          <span className="text-purple-600">Cliente (paga tudo)</span>
+                          <span className="text-orange-500">🟠 Lojista ({settings.restaurant_fee_pct}%)</span>
+                          <span className="text-green-600">🟢 Entregador ({settings.driver_fee_pct}%)</span>
+                          <span className="text-purple-600">🟣 Plataforma retém</span>
                         </div>
                       </div>
                       <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4 text-sm font-bold text-purple-700">
@@ -753,8 +764,7 @@ export const AdminView: React.FC = () => {
                               <input
                                 type="number"
                                 min="0"
-                                max="100"
-                                step="0.5"
+                                step="0.01"
                                 value={(settings as any)[field.key]}
                                 onChange={e => setSettings(s => ({ ...s, [field.key]: parseFloat(e.target.value) || 0 }))}
                                 className="w-full p-4 pr-10 bg-gray-50 rounded-2xl font-black text-xl outline-none border-2 border-transparent focus:border-purple-300 transition-all"
@@ -961,7 +971,7 @@ export const AdminView: React.FC = () => {
                       className="w-full mt-1 p-4 bg-orange-50 rounded-xl font-black outline-none border-2 border-transparent focus:border-purple-500"
                     />
                   </div>
-                  <div>
+                   <div>
                     <label className="text-[10px] font-bold text-gray-500 uppercase ml-2">
                       Descrição
                     </label>
@@ -970,6 +980,24 @@ export const AdminView: React.FC = () => {
                       defaultValue={viewingUser.description || ''}
                       className="w-full mt-1 p-4 bg-orange-50 rounded-xl font-black outline-none border-2 border-transparent focus:border-purple-500 h-24 resize-none"
                     />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-orange-600 uppercase ml-2 flex items-center gap-2">
+                      <DollarSign size={12} /> Taxa Personalizada do Lojista (%)
+                    </label>
+                    <div className="relative mt-1">
+                      <input
+                        name="customFeePct"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        defaultValue={(viewingUser as any).customFeePct ?? ''}
+                        placeholder="Deixe vazio para usar a taxa global"
+                        className="w-full p-4 pr-10 bg-orange-50 rounded-xl font-black outline-none border-2 border-transparent focus:border-orange-400"
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-orange-500 font-black">%</span>
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1 ml-2">Se preenchido, sobrescreve a taxa global de lojistas para esta loja específica</p>
                   </div>
                 </div>
               )}
@@ -985,6 +1013,24 @@ export const AdminView: React.FC = () => {
                       defaultValue={viewingUser.licensePlate || ''}
                       className="w-full mt-1 p-4 bg-green-50 rounded-xl font-black outline-none border-2 border-transparent focus:border-purple-500 uppercase"
                     />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-green-600 uppercase ml-2 flex items-center gap-2">
+                      <DollarSign size={12} /> Taxa Personalizada do Entregador (%)
+                    </label>
+                    <div className="relative mt-1">
+                      <input
+                        name="customFeePct"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        defaultValue={viewingUser.customFeePct ?? ''}
+                        placeholder="Deixe vazio para usar a taxa global"
+                        className="w-full p-4 pr-10 bg-green-50 rounded-xl font-black outline-none border-2 border-transparent focus:border-green-400"
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-green-500 font-black">%</span>
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1 ml-2">Se preenchido, sobrescreve a taxa global de entregadores para este parceiro</p>
                   </div>
                 </div>
               )}
