@@ -6,7 +6,44 @@ import { DriverView } from './views/DriverView';
 import { AdminView } from './views/AdminView';
 import { AuthView } from './views/AuthView';
 import { UserRole } from './types';
-import { Clock, LogOut, Phone, XCircle } from 'lucide-react';
+import { Clock, LogOut, Phone, XCircle, RefreshCw, AlertTriangle } from 'lucide-react';
+
+// ErrorBoundary: previne tela branca em caso de crash de um componente filho
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: string }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: '' };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error: error.message };
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('[ErrorBoundary]', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="h-screen w-screen flex flex-col items-center justify-center bg-white p-10 text-center">
+          <div className="w-24 h-24 bg-red-50 text-red-500 rounded-[2.5rem] flex items-center justify-center mb-8 mx-auto">
+            <AlertTriangle size={44} />
+          </div>
+          <h1 className="text-2xl font-black text-gray-900 mb-3">Algo deu errado</h1>
+          <p className="text-gray-400 text-sm mb-8 max-w-sm">{this.state.error || 'Erro inesperado na aplicação.'}</p>
+          <button
+            onClick={() => { this.setState({ hasError: false, error: '' }); window.location.reload(); }}
+            className="flex items-center gap-3 px-8 py-4 bg-gray-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest"
+          >
+            <RefreshCw size={16} /> Recarregar
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // Tela para usuários parceiros (Entregador/Lojista) aguardando aprovação.
 const PendingApprovalView: React.FC<{ profile: any; onSignOut: () => void }> = ({
@@ -154,11 +191,9 @@ const AppContent: React.FC = () => {
       return <BlockedView onSignOut={signOut} />;
     }
 
-    // Se o status for APPROVED ou for ADMIN, renderiza a view correta para o papel.
-    // SEGURANÇA: sempre usa currentUserProfile.role (vindo do Supabase) e não currentRole
-    // (que pode estar desatualizado no localStorage). Dupla verificação para ADMIN.
+    // ADMIN: acesso sempre garantido independente de status
     const verifiedRole = currentUserProfile.role;
-    if (verifiedRole === UserRole.ADMIN && currentUserProfile.status === 'APPROVED') {
+    if (verifiedRole === UserRole.ADMIN) {
       return <AdminView />;
     }
     if (verifiedRole === UserRole.RESTAURANT) return <RestaurantView />;
@@ -189,9 +224,13 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <ErrorBoundary>
+          <AppContent />
+        </ErrorBoundary>
+      </AppProvider>
+    </ErrorBoundary>
   );
 };
 
