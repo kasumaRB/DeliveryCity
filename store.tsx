@@ -562,12 +562,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const restaurant = restaurants.find(r => r.id === restaurantId);
       if (!restaurant) throw new Error('Restaurante não encontrado');
 
-      const subtotal = items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
-      const platformFee = Math.round(subtotal * 0.15 * 100) / 100;
-      const deliveryFee = deliveryFeeOverride !== undefined ? deliveryFeeOverride : 5.0;
-      const total = subtotal + deliveryFee;
-      const driverEarnings = 4.0;
-      const restaurantNetEarnings = subtotal - platformFee - (deliveryFee === 0 ? 5.0 : 0);
+      // 💰 Busca taxas dinâmicas do platform_settings (com fallback seguro)
+      let platformFeePct = 0.15;
+      let driverFeePct   = 0.08;
+      let restaurantFeePct = 0.08;
+      let minDeliveryFee = 5.0;
+      try {
+        const { data: cfg } = await supabase
+          .from('platform_settings')
+          .select('platform_fee_pct, driver_fee_pct, restaurant_fee_pct, min_delivery_fee')
+          .single();
+        if (cfg) {
+          platformFeePct   = (cfg.platform_fee_pct   ?? 15) / 100;
+          driverFeePct     = (cfg.driver_fee_pct     ?? 8)  / 100;
+          restaurantFeePct = (cfg.restaurant_fee_pct ?? 8)  / 100;
+          minDeliveryFee   = cfg.min_delivery_fee     ?? 5.0;
+        }
+      } catch { /* mantém fallback */ }
+
+      // Verifica taxa personalizada do parceiro (lojista ou entregador específico)
+      const restaurantOwner = currentUserProfile; // pode ser null neste contexto
+      // (taxa custom por parceiro será aplicada futuramente via edge function)
+
+      const subtotal       = items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
+      const platformFee    = Math.round(subtotal * platformFeePct * 100) / 100;
+      const driverEarnings = Math.round(subtotal * driverFeePct   * 100) / 100;
+      const restaurantNet  = Math.round(subtotal * restaurantFeePct * 100) / 100;
+      const deliveryFee    = deliveryFeeOverride !== undefined ? deliveryFeeOverride : minDeliveryFee;
+      const total          = subtotal + deliveryFee;
+      const restaurantNetEarnings = restaurantNet;
 
       const newOrder = {
         id: `ORD-${Date.now().toString().slice(-6)}`,
