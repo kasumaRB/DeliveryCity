@@ -84,6 +84,10 @@ import {
   DollarSign,
   TrendingUp,
   MessageCircle,
+  Star,
+  Award,
+  TrendingDown,
+  Filter,
 } from 'lucide-react';
 import Logo from '../assets/Logo.png';
 import Nome from '../assets/Nome.png';
@@ -1088,6 +1092,8 @@ export const RestaurantView: React.FC = () => {
             const avgTicket = delivered.length > 0 ? totalGMV / delivered.length : 0;
             const cancelledCount = myOrders.filter(o => o.status === 'CANCELLED').length;
             const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+            // Product sales analytics
             const productSales: Record<string, { name: string; qty: number; revenue: number }> = {};
             myOrders.forEach(o => {
               o.items.forEach((item: any) => {
@@ -1098,8 +1104,17 @@ export const RestaurantView: React.FC = () => {
                 productSales[id].revenue += (item.product?.price || item.price || 0) * item.quantity;
               });
             });
-            const topProducts = Object.values(productSales).sort((a, b) => b.qty - a.qty).slice(0, 5);
+            const allProducts = Object.values(productSales).sort((a, b) => b.qty - a.qty);
+            const topProducts = allProducts.slice(0, 5);
+            const worstProducts = [...allProducts].reverse().slice(0, 3);
             const maxQty = topProducts[0]?.qty || 1;
+
+            // Ratings
+            const ratedOrders = myOrders.filter(o => o.rating);
+            const avgRestRating = ratedOrders.length > 0
+              ? ratedOrders.reduce((s, o) => s + ((o.rating as any)?.restaurantStars || (o.rating as any)?.stars || 0), 0) / ratedOrders.length
+              : 0;
+
             const statusMap: Record<string, { label: string; color: string }> = {
               PENDING: { label: 'Aguardando', color: 'text-yellow-600 bg-yellow-50' },
               PREPARING: { label: 'Preparando', color: 'text-blue-600 bg-blue-50' },
@@ -1108,87 +1123,164 @@ export const RestaurantView: React.FC = () => {
               DELIVERED: { label: 'Entregue', color: 'text-gray-600 bg-gray-100' },
               CANCELLED: { label: 'Cancelado', color: 'text-red-600 bg-red-50' },
             };
+
             return (
-              <div className="animate-in fade-in duration-500 max-w-4xl mx-auto">
-                <header className="mb-10">
-                  <h2 className="text-4xl font-black text-gray-900 tracking-tighter mb-2">Painel de Vendas</h2>
-                  <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest">Desempenho do seu restaurante</p>
+              <div className="animate-in fade-in duration-500 max-w-4xl mx-auto space-y-6">
+                <header>
+                  <h2 className="text-4xl font-black text-gray-900 tracking-tighter mb-1">Painel de Vendas</h2>
+                  <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest">Desempenho completo da sua loja</p>
                 </header>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                  <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Total Pedidos</p>
-                    <p className="text-3xl font-black text-gray-900">{myOrders.length}</p>
-                  </div>
-                  <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Entregues</p>
-                    <p className="text-3xl font-black text-green-600">{delivered.length}</p>
-                  </div>
-                  <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Cancelados</p>
-                    <p className="text-3xl font-black text-red-500">{cancelledCount}</p>
-                  </div>
-                  <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Ticket Médio</p>
-                    <p className="text-2xl font-black text-gray-900">{fmt(avgTicket)}</p>
-                  </div>
+
+                {/* KPI Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[
+                    { label: 'Total Pedidos', value: myOrders.length, color: 'text-gray-900', suffix: '' },
+                    { label: 'Entregues', value: delivered.length, color: 'text-green-600', suffix: '' },
+                    { label: 'Cancelados', value: cancelledCount, color: 'text-red-500', suffix: '' },
+                    { label: 'Avaliação', value: avgRestRating.toFixed(1), color: 'text-amber-500', suffix: '⭐' },
+                  ].map(k => (
+                    <div key={k.label} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{k.label}</p>
+                      <p className={`text-3xl font-black ${k.color}`}>{k.value}{k.suffix}</p>
+                    </div>
+                  ))}
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+
+                {/* Revenue cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-gradient-to-br from-orange-500 to-red-500 p-8 rounded-[2.5rem] text-white shadow-lg shadow-orange-100">
                     <p className="text-xs font-black uppercase tracking-widest text-orange-100 mb-3">Faturamento Líquido</p>
                     <p className="text-4xl font-black">{fmt(totalRevenue)}</p>
-                    <p className="text-orange-100 text-xs font-bold mt-2">Após taxas da plataforma (15%)</p>
+                    <p className="text-orange-100 text-xs font-bold mt-2">Valor que você recebe (após taxa)</p>
                   </div>
                   <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Volume Bruto (GMV)</p>
-                    <p className="text-3xl font-black text-gray-900 mb-4">{fmt(totalGMV)}</p>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-xs font-bold">
-                        <span className="text-gray-500">Taxa plataforma (15%)</span>
-                        <span className="text-red-500">- {fmt(totalGMV - totalRevenue)}</span>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Volume Bruto (GMV)</p>
+                    <p className="text-3xl font-black text-gray-900 mb-3">{fmt(totalGMV)}</p>
+                    <div className="space-y-1.5 text-xs font-bold">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Taxa plataforma</span>
+                        <span className="text-red-400">- {fmt(totalGMV - totalRevenue)}</span>
                       </div>
-                      <div className="flex justify-between text-xs font-bold border-t border-gray-100 pt-2">
-                        <span className="text-gray-700">Seu repasse</span>
-                        <span className="text-green-600 font-black">{fmt(totalRevenue)}</span>
+                      <div className="flex justify-between border-t border-gray-100 pt-1.5">
+                        <span className="text-gray-700">Ticket médio</span>
+                        <span className="font-black text-gray-900">{fmt(avgTicket)}</span>
                       </div>
                     </div>
                   </div>
                 </div>
-                {topProducts.length > 0 && (
-                  <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm mb-8">
-                    <h3 className="text-lg font-black text-gray-900 mb-6">🏆 Produtos Mais Vendidos</h3>
-                    <div className="space-y-4">
-                      {topProducts.map((p, i) => (
-                        <div key={i}>
-                          <div className="flex justify-between mb-1">
-                            <span className="text-sm font-bold text-gray-800">{i + 1}. {p.name}</span>
-                            <span className="text-xs font-black text-gray-400">{p.qty}× · {fmt(p.revenue)}</span>
+
+                {/* Best & Worst sellers */}
+                {allProducts.length > 0 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm">
+                      <h3 className="font-black text-gray-900 mb-5 flex items-center gap-2"><Award size={18} className="text-amber-500" /> Mais Vendidos</h3>
+                      <div className="space-y-4">
+                        {topProducts.map((p, i) => (
+                          <div key={i}>
+                            <div className="flex justify-between mb-1">
+                              <span className="text-sm font-bold text-gray-800">{i+1}. {p.name}</span>
+                              <span className="text-xs font-black text-orange-500">{p.qty}×</span>
+                            </div>
+                            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-gradient-to-r from-orange-400 to-orange-600 rounded-full" style={{ width: `${(p.qty/maxQty)*100}%` }} />
+                            </div>
+                            <p className="text-[10px] text-gray-400 mt-0.5">{fmt(p.revenue)} em receita</p>
                           </div>
-                          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-gradient-to-r from-orange-400 to-orange-600 rounded-full transition-all duration-700" style={{ width: `${(p.qty / maxQty) * 100}%` }} />
-                          </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm">
+                      <h3 className="font-black text-gray-900 mb-5 flex items-center gap-2"><TrendingDown size={18} className="text-red-400" /> Menos Vendidos</h3>
+                      <div className="space-y-4">
+                        {worstProducts.length === 0
+                          ? <p className="text-gray-400 text-sm">Dados insuficientes</p>
+                          : worstProducts.map((p, i) => (
+                            <div key={i} className="flex items-center justify-between p-3 bg-red-50 rounded-2xl">
+                              <span className="text-sm font-bold text-gray-700">{p.name}</span>
+                              <span className="text-xs font-black text-red-400">{p.qty}× vendido(s)</span>
+                            </div>
+                          ))
+                        }
+                        {worstProducts.length > 0 && (
+                          <p className="text-[10px] text-gray-400 italic">💡 Considere promoção nesses itens</p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
+
+                {/* Ratings */}
+                {ratedOrders.length > 0 && (
+                  <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm">
+                    <h3 className="font-black text-gray-900 mb-5 flex items-center gap-2"><Star size={18} className="text-amber-500" /> Avaliações da Loja ({ratedOrders.length})</h3>
+                    <div className="flex items-center gap-6 mb-6">
+                      <span className="text-5xl font-black text-gray-900">{avgRestRating.toFixed(1)}</span>
+                      <div>
+                        <div className="flex gap-1 mb-1">
+                          {[...Array(5)].map((_, i) => <Star key={i} size={18} className={i < Math.round(avgRestRating) ? 'text-amber-400 fill-amber-400' : 'text-gray-200'} />)}
+                        </div>
+                        <p className="text-gray-400 text-xs font-bold">{ratedOrders.length} avaliações</p>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      {ratedOrders.slice(0, 5).map(order => {
+                        const stars = (order.rating as any)?.restaurantStars || (order.rating as any)?.stars || 0;
+                        const comment = (order.rating as any)?.comment || order.feedback || '';
+                        return (
+                          <div key={order.id} className="p-4 bg-amber-50 rounded-2xl">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-bold text-gray-800 text-sm">{order.customerName}</p>
+                                <div className="flex gap-0.5 mt-1">
+                                  {[...Array(5)].map((_, i) => <Star key={i} size={11} className={i < stars ? 'text-amber-400 fill-amber-400' : 'text-gray-300'} />)}
+                                </div>
+                              </div>
+                              <span className="text-gray-400 text-[10px]">{new Date(order.timestamp).toLocaleDateString('pt-BR')}</span>
+                            </div>
+                            {comment && <p className="text-gray-600 text-sm mt-2 italic">"{comment}"</p>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Detailed order history — who bought + who delivered */}
                 <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm">
-                  <h3 className="text-lg font-black text-gray-900 mb-6">Últimos Pedidos</h3>
+                  <h3 className="font-black text-gray-900 mb-6">📋 Registro de Vendas</h3>
                   <div className="space-y-3">
                     {myOrders.length === 0 ? (
                       <p className="text-center py-8 text-gray-400 font-bold">Nenhum pedido ainda.</p>
-                    ) : [...myOrders].sort((a, b) => b.timestamp - a.timestamp).slice(0, 10).map(order => {
+                    ) : [...myOrders].sort((a, b) => b.timestamp - a.timestamp).slice(0, 20).map(order => {
                       const s = statusMap[order.status] || { label: order.status, color: 'text-gray-500 bg-gray-100' };
                       return (
-                        <div key={order.id} className="flex justify-between items-center p-4 bg-gray-50 rounded-2xl">
-                          <div>
-                            <p className="font-black text-gray-900 text-sm">{order.customerName}</p>
-                            <p className="text-gray-500 text-xs">
-                              {order.items.length} item(s) · #{order.id.slice(-6)} · {new Date(order.timestamp).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                            </p>
+                        <div key={order.id} className="p-5 bg-gray-50 rounded-2xl border border-gray-100">
+                          <div className="flex justify-between items-start mb-3">
+                            <div>
+                              <p className="font-black text-gray-900 text-sm">#{order.id.slice(-6)}</p>
+                              <p className="text-gray-400 text-[10px]">{new Date(order.timestamp).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-black text-gray-900 text-sm">{fmt(order.total)}</span>
+                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${s.color}`}>{s.label}</span>
+                            </div>
                           </div>
-                          <div className="text-right flex flex-col items-end gap-1">
-                            <p className="font-black text-gray-900 text-sm">{fmt(order.total)}</p>
-                            <span className={`text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full ${s.color}`}>{s.label}</span>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="bg-white p-2.5 rounded-xl">
+                              <p className="text-gray-400 font-bold uppercase tracking-widest text-[9px] mb-1">🛍️ Cliente</p>
+                              <p className="font-bold text-gray-800">{order.customerName}</p>
+                              <p className="text-gray-400 truncate">{order.customerAddress}</p>
+                            </div>
+                            <div className="bg-white p-2.5 rounded-xl">
+                              <p className="text-gray-400 font-bold uppercase tracking-widest text-[9px] mb-1">🏍️ Entregador</p>
+                              <p className="font-bold text-gray-800">{order.driverName || (order.driverId ? 'Atribuído' : 'Aguardando')}</p>
+                              {order.status === OrderStatus.DELIVERED && <p className="text-green-600 text-[9px] font-black">✓ Entregue</p>}
+                            </div>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {order.items.map((it: any, idx: number) => (
+                              <span key={idx} className="text-[10px] bg-orange-50 text-orange-700 font-bold px-2 py-0.5 rounded-lg">{it.quantity}× {it.product?.name || it.name}</span>
+                            ))}
                           </div>
                         </div>
                       );

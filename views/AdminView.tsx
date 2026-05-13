@@ -48,7 +48,8 @@ const AdminSidebar: React.FC<{
           badge: profiles.filter(p => p.status === 'PENDING').length,
         },
         { id: 'partners', label: 'Parceiros', icon: Store },
-        { id: 'support', label: 'Suporte', icon: MessageSquare },
+        { id: 'support', label: 'Suporte', icon: MessageSquare,
+          badge: profiles.filter(() => true).length > 0 ? undefined : undefined },
         { id: 'settings', label: 'Configurações', icon: DollarSign },
         { id: 'system', label: 'Status & Logs', icon: Terminal },
       ].map(item => (
@@ -100,6 +101,11 @@ export const AdminView: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [supportTickets, setSupportTickets] = useState<any[]>([]);
+  const [supportFilter, setSupportFilter] = useState<'ALL' | 'OPEN' | 'RESOLVED'>('OPEN');
+  const [supportRoleFilter, setSupportRoleFilter] = useState<'ALL' | 'RESTAURANT' | 'DRIVER' | 'CLIENT'>('ALL');
+  const [supportLoading, setSupportLoading] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyNote, setReplyNote] = useState('');
   const [approvalLoading, setApprovalLoading] = useState<
     Record<string, 'approving' | 'blocking' | null>
   >({});
@@ -112,21 +118,17 @@ export const AdminView: React.FC = () => {
   }, [activeTab]);
 
   const fetchSupportTickets = async () => {
-    console.log('[DEBUG] fetchSupportTickets chamado');
+    setSupportLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('support_tickets')
         .select('*')
         .order('created_at', { ascending: false });
-      
-      if (error) {
-        console.error('[DEBUG] Erro ao buscar tickets de suporte:', error);
-      } else {
-        console.log('[DEBUG] Tickets de suporte encontrados:', data?.length || 0);
-        if (data) setSupportTickets(data);
-      }
+      if (data) setSupportTickets(data);
     } catch (err) {
-      console.error('[DEBUG] Erro inesperado ao buscar tickets:', err);
+      console.error('Erro ao buscar tickets:', err);
+    } finally {
+      setSupportLoading(false);
     }
   };
 
@@ -602,53 +604,169 @@ export const AdminView: React.FC = () => {
             </div>
           )}
 
-          {activeTab === 'support' && (
-            <div className="space-y-6 animate-in fade-in">
-              <h3 className="text-2xl font-black text-gray-900 tracking-tighter">
-                Tickets de Suporte
-              </h3>
-              <div className="space-y-4">
-                {supportTickets.map(ticket => (
-                  <div
-                    key={ticket.id}
-                    className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm"
-                  >
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <span className="text-[9px] font-black bg-orange-100 text-orange-600 px-3 py-1 rounded-full uppercase tracking-widest mb-2 inline-block">
-                          {ticket.user_role}
-                        </span>
-                        <h4 className="font-black text-gray-900">{ticket.user_name}</h4>
-                      </div>
-                      <span className="text-[10px] text-gray-400 font-bold">
-                        {new Date(ticket.created_at).toLocaleString()}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-600 font-medium bg-gray-50 p-4 rounded-2xl">
-                      {ticket.message}
+          {activeTab === 'support' && (() => {
+            const openCount = supportTickets.filter(t => t.status === 'OPEN').length;
+            const filtered = supportTickets.filter(t => {
+              const statusOk = supportFilter === 'ALL' || t.status === supportFilter;
+              const roleOk = supportRoleFilter === 'ALL' || t.user_role === supportRoleFilter;
+              return statusOk && roleOk;
+            });
+
+            const resolveTicket = async (id: string) => {
+              await supabase.from('support_tickets').update({
+                status: 'RESOLVED',
+                admin_note: replyNote,
+                resolved_at: new Date().toISOString(),
+              }).eq('id', id);
+              setReplyingTo(null);
+              setReplyNote('');
+              fetchSupportTickets();
+            };
+
+            const deleteTicket = async (id: string) => {
+              if (!window.confirm('Excluir este ticket?')) return;
+              await supabase.from('support_tickets').delete().eq('id', id);
+              fetchSupportTickets();
+            };
+
+            const roleColors: Record<string, string> = {
+              RESTAURANT: 'bg-orange-100 text-orange-600',
+              DRIVER: 'bg-green-100 text-green-600',
+              CLIENT: 'bg-blue-100 text-blue-600',
+              ADMIN: 'bg-purple-100 text-purple-600',
+            };
+
+            return (
+              <div className="space-y-6 animate-in fade-in max-w-4xl mx-auto">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-2xl font-black text-gray-900 tracking-tighter">Tickets de Suporte</h3>
+                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">
+                      {openCount} aberto{openCount !== 1 ? 's' : ''} · {supportTickets.length} total
                     </p>
-                    <div className="mt-4 flex gap-3">
-                      <button
-                        onClick={() => window.open(`https://wa.me/55${ticket.user_id}`, '_blank')}
-                        className="text-[10px] font-black uppercase text-green-600 hover:underline"
-                      >
-                        Responder via WhatsApp
-                      </button>
-                      <button
-                        onClick={async () => {
-                          await supabase.from('support_tickets').delete().eq('id', ticket.id);
-                          fetchSupportTickets();
-                        }}
-                        className="text-[10px] font-black uppercase text-red-400 hover:underline ml-auto"
-                      >
-                        Excluir
-                      </button>
-                    </div>
                   </div>
-                ))}
+                  <button onClick={fetchSupportTickets} className="p-3 bg-gray-100 rounded-2xl hover:bg-gray-200 transition">
+                    <RefreshCw size={16} className={supportLoading ? 'animate-spin' : ''} />
+                  </button>
+                </div>
+
+                {/* Filters */}
+                <div className="flex flex-wrap gap-3">
+                  <div className="flex gap-2">
+                    {(['ALL', 'OPEN', 'RESOLVED'] as const).map(f => (
+                      <button key={f} onClick={() => setSupportFilter(f)}
+                        className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                          supportFilter === f ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                        }`}>
+                        {f === 'ALL' ? 'Todos' : f === 'OPEN' ? 'Abertos' : 'Resolvidos'}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    {(['ALL', 'RESTAURANT', 'DRIVER', 'CLIENT'] as const).map(r => (
+                      <button key={r} onClick={() => setSupportRoleFilter(r)}
+                        className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                          supportRoleFilter === r ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                        }`}>
+                        {r === 'ALL' ? 'Todos os papéis' : r === 'RESTAURANT' ? '🏪 Lojista' : r === 'DRIVER' ? '🏍️ Entregador' : '👤 Cliente'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Ticket list */}
+                {supportLoading ? (
+                  <div className="flex justify-center py-16"><Loader className="animate-spin text-purple-500" size={32} /></div>
+                ) : filtered.length === 0 ? (
+                  <div className="text-center py-20 bg-white rounded-[3rem] border border-gray-100">
+                    <MessageSquare size={48} className="mx-auto mb-4 text-gray-200" />
+                    <p className="font-black text-gray-400">Nenhum ticket encontrado</p>
+                    <p className="text-gray-300 text-sm mt-1">Tudo resolvido por aqui 🎉</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {filtered.map(ticket => (
+                      <div key={ticket.id} className={`bg-white p-6 rounded-[2rem] border shadow-sm transition-all ${
+                        ticket.status === 'OPEN' ? 'border-orange-200 shadow-orange-50' : 'border-gray-100'
+                      }`}>
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex items-center gap-3">
+                            <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${
+                              roleColors[ticket.user_role] || 'bg-gray-100 text-gray-500'
+                            }`}>
+                              {ticket.user_role}
+                            </span>
+                            <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase ${
+                              ticket.status === 'OPEN' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'
+                            }`}>
+                              {ticket.status === 'OPEN' ? '● Aberto' : '✓ Resolvido'}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-gray-400 font-bold">
+                            {new Date(ticket.created_at).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })}
+                          </span>
+                        </div>
+
+                        <div className="mb-3">
+                          <p className="font-black text-gray-900">{ticket.user_name}</p>
+                          {ticket.user_email && <p className="text-xs text-gray-400">{ticket.user_email}</p>}
+                        </div>
+
+                        <p className="text-sm text-gray-700 font-medium bg-gray-50 p-4 rounded-2xl leading-relaxed">
+                          {ticket.message}
+                        </p>
+
+                        {ticket.admin_note && (
+                          <div className="mt-3 bg-purple-50 border border-purple-100 p-4 rounded-2xl">
+                            <p className="text-[10px] font-black text-purple-500 uppercase tracking-widest mb-1">Nota interna</p>
+                            <p className="text-sm text-purple-800 font-medium">{ticket.admin_note}</p>
+                          </div>
+                        )}
+
+                        {replyingTo === ticket.id && (
+                          <div className="mt-3">
+                            <textarea
+                              value={replyNote}
+                              onChange={e => setReplyNote(e.target.value)}
+                              rows={3}
+                              className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-medium outline-none border-2 border-purple-200 focus:border-purple-400 resize-none"
+                              placeholder="Nota interna ou observação sobre a resolução..."
+                            />
+                          </div>
+                        )}
+
+                        <div className="mt-4 flex items-center gap-3">
+                          {ticket.status === 'OPEN' && (
+                            replyingTo === ticket.id ? (
+                              <>
+                                <button
+                                  onClick={() => resolveTicket(ticket.id)}
+                                  className="px-4 py-2 bg-green-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-green-500 transition"
+                                >✓ Confirmar Resolução</button>
+                                <button
+                                  onClick={() => { setReplyingTo(null); setReplyNote(''); }}
+                                  className="px-4 py-2 bg-gray-100 text-gray-500 rounded-xl text-xs font-black uppercase"
+                                >Cancelar</button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => setReplyingTo(ticket.id)}
+                                className="px-4 py-2 bg-purple-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-purple-500 transition"
+                              >Marcar Resolvido</button>
+                            )
+                          )}
+                          <button
+                            onClick={() => deleteTicket(ticket.id)}
+                            className="ml-auto p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition"
+                          ><Trash2 size={16} /></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {activeTab === 'settings' && (() => {
             const [settings, setSettings] = React.useState({
