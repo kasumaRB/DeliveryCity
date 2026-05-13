@@ -57,6 +57,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     recalculateDistances,
     submitRating,
     addAddress,
+    platformSettings,
   } = store || {};
 
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
@@ -351,22 +352,31 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                 capture: true,
                 card: { encrypted: card.encryptedCard },
               },
-              split: {
-                rules: [
-                  {
-                    recipient: selectedRestaurant.pagseguroRecipientId,
-                    liable: true,
-                    charge_processing_fee: true,
-                    amount: { value: Math.round(cartTotal * 100) - 200 },
-                  },
-                  {
-                    recipient: import.meta.env.VITE_PAGSEGURO_PLATFORM_RECIPIENT_ID || '',
-                    liable: false,
-                    charge_processing_fee: false,
-                    amount: { value: 200 },
-                  },
-                ],
-              },
+              split: (() => {
+                const restaurantFeePct = platformSettings?.restaurantFeePct ?? 0.08;
+                const restaurantNetEarnings = cart.reduce((sum, i) => {
+                  const itemNet = i.product.ownerPrice || (i.product.price / (1 + restaurantFeePct));
+                  return sum + (itemNet * i.quantity);
+                }, 0);
+                const platformTotalCut = cartTotal - restaurantNetEarnings;
+
+                return {
+                  rules: [
+                    {
+                      recipient: selectedRestaurant.pagseguroRecipientId,
+                      liable: true,
+                      charge_processing_fee: true,
+                      amount: { value: Math.round(restaurantNetEarnings * 100) },
+                    },
+                    {
+                      recipient: import.meta.env.VITE_PAGSEGURO_PLATFORM_RECIPIENT_ID || '',
+                      liable: false,
+                      charge_processing_fee: false,
+                      amount: { value: Math.round(platformTotalCut * 100) },
+                    },
+                  ],
+                };
+              })(),
             },
           },
         });
