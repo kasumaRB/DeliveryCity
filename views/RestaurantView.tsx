@@ -105,6 +105,7 @@ export const RestaurantView: React.FC = () => {
     signOut,
     updateUserProfile,
     refreshData,
+    platformSettings,
   } = useAppStore();
 
   const myRestaurant = restaurants.find(r => r.ownerId === currentUserProfile?.id);
@@ -138,6 +139,7 @@ export const RestaurantView: React.FC = () => {
   const [respPhone, setRespPhone] = useState(currentUserProfile?.phoneNumber || '');
   const [respCpf, setRespCpf] = useState(currentUserProfile?.cpf || '');
   const [respPix, setRespPix] = useState(currentUserProfile?.pixKey || '');
+  const [respPagseguro, setRespPagseguro] = useState(currentUserProfile?.pagseguroRecipientId || '');
 
   // Promotion states
   const [promoCode, setPromoCode] = useState('');
@@ -163,6 +165,7 @@ export const RestaurantView: React.FC = () => {
       setRespPhone(currentUserProfile.phoneNumber || '');
       setRespCpf(currentUserProfile.cpf || '');
       setRespPix(currentUserProfile.pixKey || '');
+      setRespPagseguro(currentUserProfile.pagseguroRecipientId || '');
     }
   }, [myRestaurant, currentUserProfile]);
 
@@ -253,11 +256,14 @@ export const RestaurantView: React.FC = () => {
     setShowProductForm(false);
   };
 
-  const handleEditClick = (product: Product) => {
+  const handleEditProduct = (product: Product) => {
     setEditingProduct(product);
     setItemFormName(product.name);
-    const basePrice = product.ownerPrice || Math.round((product.price / 1.15) * 100) / 100;
+    
+    const feePct = platformSettings?.restaurantFeePct ?? 0.15;
+    const basePrice = product.ownerPrice || Math.round((product.price / (1 + feePct)) * 100) / 100;
     setItemFormOwnerPrice(basePrice.toFixed(2));
+    
     setItemFormDesc(product.description);
     setItemFormImage(product.image);
     setItemFormCategory(product.category || '');
@@ -268,7 +274,8 @@ export const RestaurantView: React.FC = () => {
   const handleSaveItem = async () => {
     if (!myRestaurant || !itemFormName || !itemFormOwnerPrice) return;
     const ownerPrice = parseFloat(itemFormOwnerPrice);
-    const finalPrice = ownerPrice * 1.15;
+    const feePct = platformSettings?.restaurantFeePct ?? 0.15;
+    const finalPrice = ownerPrice * (1 + feePct);
     const img = itemFormImage || `https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500`;
 
     try {
@@ -309,9 +316,9 @@ export const RestaurantView: React.FC = () => {
         phoneNumber: respPhone,
         cpf: respCpf,
         pixKey: respPix,
+        pagseguroRecipientId: respPagseguro,
         description: storeDescription,
         workingHours: storeWorkingHours,
-        businessName: storeName,
       });
       alert('Perfil da loja atualizado com sucesso!');
       await refreshData();
@@ -782,9 +789,16 @@ export const RestaurantView: React.FC = () => {
                         className="w-full p-5 bg-gray-50 rounded-2xl font-black border-none outline-none focus:ring-2 focus:ring-orange-100 shadow-inner"
                         placeholder="0.00"
                       />
-                      <p className="px-4 text-[9px] text-gray-400 font-bold italic leading-relaxed">
-                        * Adicionamos 15% para a plataforma.
-                      </p>
+                      <div className="px-4 py-2 bg-purple-50 rounded-xl space-y-1">
+                        <p className="text-[10px] text-purple-700 font-bold leading-relaxed flex justify-between">
+                          <span>Comissão da plataforma ({(platformSettings?.restaurantFeePct ?? 0.15) * 100}%):</span>
+                          <span>+ R$ {((parseFloat(itemFormOwnerPrice) || 0) * (platformSettings?.restaurantFeePct ?? 0.15)).toFixed(2)}</span>
+                        </p>
+                        <p className="text-xs text-purple-900 font-black flex justify-between pt-1 border-t border-purple-100">
+                          <span>Preço final para o cliente:</span>
+                          <span>R$ {((parseFloat(itemFormOwnerPrice) || 0) * (1 + (platformSettings?.restaurantFeePct ?? 0.15))).toFixed(2)}</span>
+                        </p>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">
@@ -827,7 +841,7 @@ export const RestaurantView: React.FC = () => {
                         />
                         <div className="absolute top-4 right-4 flex gap-2">
                           <button
-                            onClick={() => handleEditClick(item)}
+                            onClick={() => handleEditProduct(item)}
                             className="p-3 bg-white/95 backdrop-blur-md text-blue-600 rounded-2xl shadow-xl hover:bg-white transition active:scale-90"
                           >
                             <Edit2 size={18} />
@@ -848,9 +862,14 @@ export const RestaurantView: React.FC = () => {
                         <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                           Venda
                         </span>
-                        <span className="font-black text-gray-900 text-2xl tracking-tighter">
-                          R$ {item.price.toFixed(2)}
-                        </span>
+                        <div className="flex justify-between items-end mt-2">
+                          <p className="text-sm font-black text-gray-900">
+                            R$ {item.price.toFixed(2)}
+                          </p>
+                          <p className="text-[9px] text-gray-400 font-bold">
+                            (Sua parte: R$ {(item.ownerPrice || (item.price / (1 + (platformSettings?.restaurantFeePct ?? 0.15)))).toFixed(2)})
+                          </p>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1609,6 +1628,12 @@ export const RestaurantView: React.FC = () => {
                   value={respPix}
                   onChange={e => setRespPix(e.target.value)}
                   placeholder="Chave PIX"
+                  className="w-full p-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-orange-100"
+                />
+                <input
+                  value={respPagseguro}
+                  onChange={e => setRespPagseguro(e.target.value)}
+                  placeholder="ID de Recebedor (PagBank)"
                   className="w-full p-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-orange-100"
                 />
               </div>

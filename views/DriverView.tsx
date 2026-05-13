@@ -40,12 +40,13 @@ import Logo from '../assets/Logo.png';
 import Nome from '../assets/Nome.png';
 
 const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
-  const { currentUserProfile, updateUserProfile, orders } = useAppStore();
+  const { currentUserProfile, updateUserProfile, orders, platformSettings } = useAppStore();
   const [isSaving, setIsSaving] = useState(false);
   const [vehicle, setVehicle] = useState(currentUserProfile?.vehicleType || 'Moto');
   const [plate, setPlate] = useState(currentUserProfile?.licensePlate || '');
   const [phone, setPhone] = useState(currentUserProfile?.phoneNumber || '');
   const [pixKey, setPixKey] = useState(currentUserProfile?.pixKey || '');
+  const [pagseguroId, setPagseguroId] = useState(currentUserProfile?.pagseguroRecipientId || '');
 
   const myRatings = useMemo(() => {
     return orders
@@ -64,9 +65,10 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     setIsSaving(true);
     await updateUserProfile(currentUserProfile.id, {
       vehicleType: vehicle,
-      licensePlate: plate,
+      licensePlate: vehicle !== 'Bicicleta' ? plate : '',
       phoneNumber: phone,
-      pixKey: pixKey,
+      pixKey,
+      pagseguroRecipientId: pagseguroId,
     });
     setIsSaving(false);
     alert('Dados atualizados!');
@@ -143,7 +145,19 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 value={pixKey}
                 onChange={e => setPixKey(e.target.value)}
                 className="w-full p-5 bg-gray-700/50 rounded-2xl font-bold border-2 border-transparent outline-none text-white focus:border-blue-500 transition-all"
-                placeholder="CPF, telefone ou e-mail"
+                placeholder="CPF, E-mail ou Telefone..."
+              />
+            </div>
+
+            <div className="space-y-2 mb-8">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">
+                ID Recebedor (PagBank)
+              </label>
+              <input
+                value={pagseguroId}
+                onChange={e => setPagseguroId(e.target.value)}
+                className="w-full p-5 bg-gray-700/50 rounded-2xl font-bold border-2 border-transparent outline-none text-white focus:border-blue-500 transition-all"
+                placeholder="Ex: re_123456789..."
               />
             </div>
 
@@ -201,16 +215,16 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
 export const DriverView: React.FC = () => {
   const {
+    currentUserProfile,
     orders,
+    restaurants,
     assignDriver,
     confirmPickup,
     confirmDelivery,
     signOut,
-    currentUserProfile,
-    updateUserProfile,
-    calculateDistance,
     processSyncQueue,
-    restaurants,
+    calculateDistance,
+    platformSettings,
   } = useAppStore();
 
   const [activeTab, setActiveTab] = useState<'home' | 'history' | 'earnings' | 'support' | 'profile'>('home');
@@ -295,16 +309,41 @@ export const DriverView: React.FC = () => {
       .filter(o => o.status === OrderStatus.READY && !o.driverId)
       .map(order => {
         const restaurant = restaurants.find(r => r.id === order.restaurantId);
-        if (!restaurant || !currentPos) return { ...order, score: 0, distance: '---' };
-        const distKm = calculateDistance(
+        if (!restaurant || !currentPos) {
+          return { ...order, score: 0, distanceToRest: 0, distanceToCust: 0, totalDist: '---', timeMins: 0 };
+        }
+        
+        const distToRest = calculateDistance(
           currentPos.lat,
           currentPos.lng,
           restaurant.coords.lat,
           restaurant.coords.lng
         );
+        
+        let distToCust = 0;
+        if (order.coords) {
+          distToCust = calculateDistance(
+            restaurant.coords.lat,
+            restaurant.coords.lng,
+            order.coords.lat,
+            order.coords.lng
+          );
+        }
+
+        const totalDist = distToRest + distToCust;
+        const timeMins = Math.round((totalDist / 30) * 60) + 5; // 30km/h + 5 min margin
+
         const rating = currentUserProfile?.averageRating || 5.0;
-        const totalScore = (1 / (distKm + 0.1)) * 6.0 + rating * 0.5;
-        return { ...order, score: totalScore, distance: distKm.toFixed(1) + 'km' };
+        const totalScore = (1 / (totalDist + 0.1)) * 6.0 + rating * 0.5;
+        
+        return { 
+          ...order, 
+          score: totalScore, 
+          distanceToRest: distToRest.toFixed(1),
+          distanceToCust: distToCust.toFixed(1),
+          totalDist: totalDist.toFixed(1) + 'km',
+          timeMins
+        };
       })
       .sort((a, b) => b.score - a.score);
   }, [orders, currentPos, currentUserProfile, calculateDistance, restaurants]);
@@ -494,17 +533,35 @@ export const DriverView: React.FC = () => {
                       </div>
                       <div className="text-right">
                         <p className="text-green-400 font-black text-xl">
-                          {formatCurrency(order.driverNetEarnings)}
+                          {formatCurrency(order.driverNetEarnings || order.deliveryFee * (1 - (platformSettings?.driverFeePct ?? 0.08)))}
                         </p>
                         <p className="text-gray-500 text-xs">Você recebe</p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-4">
-                      <span className="flex items-center gap-2 bg-gray-700/50 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-300">
-                        <MapPin size={14} /> {order.distance}
+                    <div className="bg-gray-700/30 rounded-xl p-3 mb-4 space-y-2">
+                      <div className="flex justify-between text-xs text-gray-300 font-medium">
+                        <span>Taxa de Entrega:</span>
+                        <span>{formatCurrency(order.deliveryFee)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs text-red-400 font-medium">
+                        <span>Comissão ({(platformSettings?.driverFeePct ?? 0.08) * 100}%):</span>
+                        <span>- {formatCurrency(order.deliveryFee * (platformSettings?.driverFeePct ?? 0.08))}</span>
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-300 font-medium pt-2 border-t border-gray-700/50">
+                        <span>Distâncias:</span>
+                        <span>{order.distanceToRest}km (Rest) + {order.distanceToCust}km (Cliente)</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="flex items-center gap-1.5 bg-gray-700/50 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-300">
+                        <MapPin size={14} /> {order.totalDist}
                       </span>
-                      <span className="flex items-center gap-2 bg-gray-700/50 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-300">
+                      <span className="flex items-center gap-1.5 bg-gray-700/50 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-300">
+                        <Clock size={14} className="text-blue-400" /> ~{order.timeMins} min
+                      </span>
+                      <span className="flex items-center gap-1.5 bg-gray-700/50 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-300">
                         <Trophy size={14} className="text-yellow-500" /> {order.score.toFixed(1)}
                       </span>
                       <span className="flex-1"></span>

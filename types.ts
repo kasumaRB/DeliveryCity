@@ -141,3 +141,11 @@ export interface Promotion {
   type?: 'PRODUCT_SPECIFIC' | 'MULTIPLE_PRODUCTS' | 'COUPON' | 'FREE_DELIVERY';
   productIds?: string[];
 }
+
+export interface PlatformSettings {
+  platformFeePct: number;
+  driverFeePct: number;
+  restaurantFeePct: number;
+  minDeliveryFee: number;
+  minOrderValue: number;
+}

@@ -10,6 +10,7 @@ import {
   UserAddress,
   OrderRating,
   OrderItem,
+  PlatformSettings,
 } from './types';
 import { supabase } from './lib/supabase';
 import { Session } from '@supabase/supabase-js';
@@ -86,6 +87,7 @@ interface AppContextType {
     originCoords: { lat: number; lng: number }
   ) => Promise<void>;
   calculateDistance: (lat1: number, lon1: number, lat2: number, lon2: number) => number;
+  platformSettings: PlatformSettings | null;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -108,6 +110,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isLoading, setIsLoading] = useState(true);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState<boolean | null>(null);
   const [realDistances, setRealDistances] = useState<Record<string, any>>({});
+  const [platformSettings, setPlatformSettings] = useState<PlatformSettings | null>(null);
 
   const currentUserProfile = session ? profiles.find(p => p.id === session.user.id) || null : null;
 
@@ -198,10 +201,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     lastFetchTime = now;
 
     try {
-      const [restData, orderData, profileData] = await Promise.all([
+      const [restData, orderData, profileData, settingsData] = await Promise.all([
         supabase.from('restaurants').select('*').order('rating', { ascending: false }),
         supabase.from('orders').select('*').order('timestamp', { ascending: false }).limit(100),
         supabase.from('profiles').select('*'),
+        supabase.from('platform_settings').select('*').maybeSingle(),
       ]);
 
       devLog('[DEV] Dados carregados:', {
@@ -235,6 +239,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setProfiles(mapped);
         localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(mapped));
         cachedData.profiles = mapped;
+      }
+
+      if (settingsData.data) {
+        setPlatformSettings({
+          platformFeePct: (settingsData.data.platform_fee_pct ?? 15) / 100,
+          driverFeePct: (settingsData.data.driver_fee_pct ?? 8) / 100,
+          restaurantFeePct: (settingsData.data.restaurant_fee_pct ?? 8) / 100,
+          minDeliveryFee: settingsData.data.min_delivery_fee ?? 5.0,
+          minOrderValue: settingsData.data.min_order_value ?? 15.0,
+        });
       }
       setIsSupabaseConnected(true);
     } catch (err) {
@@ -585,12 +599,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // (taxa custom por parceiro será aplicada futuramente via edge function)
 
       const subtotal       = items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
-      const platformFee    = Math.round(subtotal * platformFeePct * 100) / 100;
-      const driverEarnings = Math.round(subtotal * driverFeePct   * 100) / 100;
-      const restaurantNet  = Math.round(subtotal * restaurantFeePct * 100) / 100;
+      
+      // Lojista: ganha o ownerPrice (se não tiver, calcula reverso)
+      const restaurantNetEarnings = items.reduce((sum, i) => {
+        const itemNet = i.product.ownerPrice || (i.product.price / (1 + restaurantFeePct));
+        return sum + (itemNet * i.quantity);
+      }, 0);
+      
       const deliveryFee    = deliveryFeeOverride !== undefined ? deliveryFeeOverride : minDeliveryFee;
+      
+      // Entregador: ganha a taxa de entrega menos a comissão da plataforma
+      const driverEarnings = deliveryFee * (1 - driverFeePct);
+      
+      // Plataforma: ganha a comissão sobre os produtos + comissão sobre a entrega
+      const platformFee    = (subtotal - restaurantNetEarnings) + (deliveryFee - driverEarnings);
+      
       const total          = subtotal + deliveryFee;
-      const restaurantNetEarnings = restaurantNet;
 
       const newOrder = {
         id: `ORD-${Date.now().toString().slice(-6)}`,
@@ -862,6 +886,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setRealDistances(d);
         },
         calculateDistance: (lat1, lon1, lat2, lon2) => calculateHaversine(lat1, lon1, lat2, lon2),
+        platformSettings,
         cart,
         addToCart,
         removeFromCart,
