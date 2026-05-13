@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../store';
+import { supabase } from '../lib/supabase';
 import { Order, OrderStatus } from '../types';
 import {
   Navigation,
@@ -212,7 +213,9 @@ export const DriverView: React.FC = () => {
     restaurants,
   } = useAppStore();
 
-  const [activeTab, setActiveTab] = useState<'home' | 'available' | 'history' | 'profile'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'history' | 'earnings' | 'support' | 'profile'>('home');
+  const [supportMessage, setSupportMessage] = useState('');
+  const [supportSending, setSupportSending] = useState(false);
   const [showCodeInput, setShowCodeInput] = useState(false);
   const [inputCode, setInputCode] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
@@ -228,29 +231,64 @@ export const DriverView: React.FC = () => {
     [orders, currentUserProfile]
   );
 
+  const myDelivered = useMemo(() =>
+    orders.filter(o => o.driverId === currentUserProfile?.id && o.status === OrderStatus.DELIVERED),
+    [orders, currentUserProfile]
+  );
+
   const todayEarnings = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return orders
-      .filter(
-        o =>
-          o.driverId === currentUserProfile?.id &&
-          o.status === OrderStatus.DELIVERED &&
-          new Date(o.timestamp).getTime() >= today.getTime()
-      )
-      .reduce((sum, o) => sum + (o.driverNetEarnings || 0), 0);
-  }, [orders, currentUserProfile]);
+    const today = new Date(); today.setHours(0,0,0,0);
+    return myDelivered.filter(o => new Date(o.timestamp).getTime() >= today.getTime())
+      .reduce((s, o) => s + (o.driverNetEarnings || 0), 0);
+  }, [myDelivered]);
 
   const completedToday = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return orders.filter(
-      o =>
-        o.driverId === currentUserProfile?.id &&
-        o.status === OrderStatus.DELIVERED &&
-        new Date(o.timestamp).getTime() >= today.getTime()
-    ).length;
-  }, [orders, currentUserProfile]);
+    const today = new Date(); today.setHours(0,0,0,0);
+    return myDelivered.filter(o => new Date(o.timestamp).getTime() >= today.getTime()).length;
+  }, [myDelivered]);
+
+  const weekEarnings = useMemo(() => {
+    const w = new Date(); w.setDate(w.getDate() - 7); w.setHours(0,0,0,0);
+    return myDelivered.filter(o => new Date(o.timestamp).getTime() >= w.getTime())
+      .reduce((s, o) => s + (o.driverNetEarnings || 0), 0);
+  }, [myDelivered]);
+
+  const monthEarnings = useMemo(() => {
+    const m = new Date(); m.setDate(1); m.setHours(0,0,0,0);
+    return myDelivered.filter(o => new Date(o.timestamp).getTime() >= m.getTime())
+      .reduce((s, o) => s + (o.driverNetEarnings || 0), 0);
+  }, [myDelivered]);
+
+  const myRatings = useMemo(() =>
+    orders.filter(o => o.driverId === currentUserProfile?.id && o.rating)
+      .sort((a, b) => b.timestamp - a.timestamp),
+    [orders, currentUserProfile]
+  );
+
+  const avgRating = useMemo(() => {
+    if (!myRatings.length) return 0;
+    return myRatings.reduce((s, o) => s + ((o.rating as any)?.driverStars || o.rating || 0), 0) / myRatings.length;
+  }, [myRatings]);
+
+  const handleSendSupport = async () => {
+    if (!supportMessage.trim() || !currentUserProfile) return;
+    setSupportSending(true);
+    try {
+      const { error } = await supabase.from('support_tickets').insert({
+        user_id: currentUserProfile.id,
+        user_name: currentUserProfile.name,
+        user_role: currentUserProfile.role,
+        message: supportMessage,
+        status: 'OPEN',
+        created_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+      alert('Mensagem enviada! Retornaremos em breve. ✅');
+      setSupportMessage('');
+      setActiveTab('home');
+    } catch { alert('Erro ao enviar. Tente novamente.'); }
+    finally { setSupportSending(false); }
+  };
 
   const availableOrdersWithScore = useMemo(() => {
     return orders
@@ -493,50 +531,34 @@ export const DriverView: React.FC = () => {
           <div className="animate-in fade-in duration-500">
             <h2 className="text-2xl font-black text-white mb-6">Histórico de Entregas</h2>
             <div className="space-y-3">
-              {orders.filter(o => o.driverId === currentUserProfile?.id).length === 0 ? (
+              {myDelivered.length === 0 ? (
                 <div className="text-center py-16 text-gray-500 bg-gray-800/30 rounded-[3rem] border border-gray-700/50">
                   <History size={48} className="mx-auto mb-4 opacity-30" />
                   <p className="font-bold">Nenhuma entrega realizada ainda</p>
-                  <p className="text-sm mt-1 text-gray-600">Aceite pedidos disponíveis na tela inicial</p>
                 </div>
               ) : (
-                orders
-                  .filter(o => o.driverId === currentUserProfile?.id)
-                  .sort((a, b) => b.timestamp - a.timestamp)
-                  .slice(0, 30)
+                orders.filter(o => o.driverId === currentUserProfile?.id)
+                  .sort((a, b) => b.timestamp - a.timestamp).slice(0, 50)
                   .map(order => (
-                    <div
-                      key={order.id}
-                      className="bg-gray-800/50 p-5 rounded-2xl border border-gray-700/50"
-                    >
+                    <div key={order.id} className="bg-gray-800/50 p-5 rounded-2xl border border-gray-700/50">
                       <div className="flex items-center justify-between mb-2">
                         <div>
                           <span className="font-bold text-white">{order.restaurantName}</span>
                           <p className="text-gray-500 text-xs mt-0.5">
-                            {new Date(order.timestamp).toLocaleDateString('pt-BR', {
-                              day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
-                            })}
+                            {new Date(order.timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </div>
-                        <span
-                          className={`text-[9px] font-black uppercase px-3 py-1 rounded-full ${
-                            order.status === OrderStatus.DELIVERED
-                              ? 'bg-green-500/20 text-green-400'
-                              : order.status === OrderStatus.CANCELLED
-                              ? 'bg-red-500/20 text-red-400'
-                              : 'bg-gray-600 text-gray-300'
-                          }`}
-                        >
-                          {order.status === OrderStatus.DELIVERED ? 'Entregue'
-                            : order.status === OrderStatus.CANCELLED ? 'Cancelado'
-                            : order.status}
+                        <span className={`text-[9px] font-black uppercase px-3 py-1 rounded-full ${
+                          order.status === OrderStatus.DELIVERED ? 'bg-green-500/20 text-green-400'
+                          : order.status === OrderStatus.CANCELLED ? 'bg-red-500/20 text-red-400'
+                          : 'bg-gray-600 text-gray-300'
+                        }`}>
+                          {order.status === OrderStatus.DELIVERED ? 'Entregue' : order.status === OrderStatus.CANCELLED ? 'Cancelado' : order.status}
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-sm pt-2 border-t border-gray-700/50">
-                        <span className="text-gray-500 text-xs">#{order.id.slice(-6)} · {order.customerAddress.split(',')[0]}</span>
-                        <span className="text-green-400 font-bold">
-                          {formatCurrency(order.driverNetEarnings)}
-                        </span>
+                        <span className="text-gray-500 text-xs">#{order.id.slice(-6)} · {order.customerName}</span>
+                        <span className="text-green-400 font-bold">{formatCurrency(order.driverNetEarnings)}</span>
                       </div>
                     </div>
                   ))
@@ -544,40 +566,116 @@ export const DriverView: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Ganhos */}
+        {activeTab === 'earnings' && (
+          <div className="animate-in fade-in duration-500 space-y-6">
+            <h2 className="text-2xl font-black text-white">Meus Ganhos</h2>
+            <div className="grid grid-cols-1 gap-4">
+              {[
+                { label: 'Hoje', value: todayEarnings, color: 'from-green-600 to-green-700', count: completedToday },
+                { label: 'Últimos 7 dias', value: weekEarnings, color: 'from-blue-600 to-blue-700',
+                  count: myDelivered.filter(o => new Date(o.timestamp) >= new Date(Date.now()-7*86400000)).length },
+                { label: 'Este mês', value: monthEarnings, color: 'from-purple-600 to-purple-700',
+                  count: myDelivered.filter(o => new Date(o.timestamp).getMonth() === new Date().getMonth()).length },
+                { label: 'Total acumulado', value: myDelivered.reduce((s,o)=>s+(o.driverNetEarnings||0),0),
+                  color: 'from-amber-500 to-orange-500', count: myDelivered.length },
+              ].map(item => (
+                <div key={item.label} className={`bg-gradient-to-r ${item.color} p-6 rounded-[2rem] shadow-lg`}>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-white/70 text-xs font-bold uppercase tracking-widest mb-1">{item.label}</p>
+                      <p className="text-3xl font-black text-white">{formatCurrency(item.value)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-white/70 text-xs font-bold">Entregas</p>
+                      <p className="text-2xl font-black text-white">{item.count}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-gray-800/50 rounded-[2rem] p-6 border border-gray-700/50">
+              <h3 className="font-black text-white mb-4 flex items-center gap-2"><Star size={18} className="text-amber-400" /> Minhas Avaliações ({myRatings.length})</h3>
+              {myRatings.length === 0 ? (
+                <p className="text-gray-500 text-sm font-medium text-center py-6">Nenhuma avaliação ainda</p>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-4 mb-4 pb-4 border-b border-gray-700/50">
+                    <span className="text-4xl font-black text-white">{avgRating.toFixed(1)}</span>
+                    <div>
+                      <div className="flex gap-1">{[...Array(5)].map((_,i) => <Star key={i} size={14} className={i < Math.round(avgRating) ? 'text-amber-400 fill-amber-400' : 'text-gray-600'} />)}</div>
+                      <p className="text-gray-400 text-xs mt-1">{myRatings.length} avaliações</p>
+                    </div>
+                  </div>
+                  {myRatings.slice(0, 10).map(order => {
+                    const stars = typeof order.rating === 'object' ? (order.rating as any)?.driverStars : order.rating;
+                    return (
+                      <div key={order.id} className="bg-gray-900/40 p-4 rounded-2xl">
+                        <div className="flex justify-between items-start">
+                          <div className="flex gap-1">{[...Array(5)].map((_,i) => <Star key={i} size={12} className={i < (stars||0) ? 'text-amber-400 fill-amber-400' : 'text-gray-600'} />)}</div>
+                          <span className="text-gray-500 text-[10px]">{new Date(order.timestamp).toLocaleDateString('pt-BR')}</span>
+                        </div>
+                        {order.feedback && <p className="text-gray-300 text-sm mt-2 italic">"{order.feedback}"</p>}
+                        <p className="text-gray-500 text-xs mt-1">{order.restaurantName} → {order.customerName}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Suporte */}
+        {activeTab === 'support' && (
+          <div className="animate-in fade-in duration-500 space-y-6">
+            <h2 className="text-2xl font-black text-white">Falar com Suporte</h2>
+            <div className="bg-gray-800/50 rounded-[2.5rem] p-6 border border-gray-700/50">
+              <p className="text-gray-400 text-sm font-medium mb-6">Descreva seu problema ou dúvida. Nossa equipe responderá em breve.</p>
+              <textarea
+                value={supportMessage}
+                onChange={e => setSupportMessage(e.target.value)}
+                rows={6}
+                className="w-full p-5 bg-gray-900/50 rounded-2xl text-white font-medium outline-none border-2 border-gray-700 focus:border-blue-500 transition-all resize-none mb-4"
+                placeholder="Ex: Tive um problema com o pedido #1234..."
+              />
+              <button
+                onClick={handleSendSupport}
+                disabled={supportSending || !supportMessage.trim()}
+                className="w-full py-5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black uppercase text-sm tracking-widest flex items-center justify-center gap-3 transition-all disabled:opacity-50"
+              >
+                {supportSending ? <><div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Enviando...</> : <><MessageCircle size={18} /> Enviar Mensagem</>}
+              </button>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="bg-gray-800/80 backdrop-blur-xl border-t border-gray-700/50 px-6 py-3 flex justify-around items-center shrink-0">
-        <button
-          onClick={() => setActiveTab('home')}
-          className={`flex flex-col items-center gap-1 p-3 rounded-2xl transition-all ${activeTab === 'home' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-500'}`}
-        >
-          <Home size={24} />
-          <span className="text-xs font-bold">Início</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('history')}
-          className={`flex flex-col items-center gap-1 p-3 rounded-2xl transition-all ${activeTab === 'history' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-500'}`}
-        >
-          <History size={24} />
-          <span className="text-xs font-bold">Histórico</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('profile')}
-          className={`flex flex-col items-center gap-1 p-3 rounded-2xl transition-all ${activeTab === 'profile' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-500'}`}
-        >
-          <User size={24} />
-          <span className="text-xs font-bold">Perfil</span>
-        </button>
-
-        <button
-          onClick={signOut}
-          className="flex flex-col items-center gap-1 p-3 rounded-2xl text-gray-500 hover:text-red-400 transition-all"
-        >
-          <LogOut size={24} />
-          <span className="text-xs font-bold">Sair</span>
+      <nav className="bg-gray-800/80 backdrop-blur-xl border-t border-gray-700/50 px-2 py-3 flex justify-around items-center shrink-0">
+        {[
+          { tab: 'home', icon: Home, label: 'Início' },
+          { tab: 'history', icon: History, label: 'Entregas' },
+          { tab: 'earnings', icon: DollarSign, label: 'Ganhos' },
+          { tab: 'support', icon: MessageCircle, label: 'Suporte' },
+          { tab: 'profile', icon: User, label: 'Perfil' },
+        ].map(({ tab, icon: Icon, label }) => (
+          <button
+            key={tab}
+            onClick={() => tab === 'profile' ? setActiveTab('profile') : setActiveTab(tab as any)}
+            className={`flex flex-col items-center gap-1 p-2.5 rounded-2xl transition-all ${
+              activeTab === tab ? 'text-blue-400 bg-blue-500/10' : 'text-gray-500'
+            }`}
+          >
+            <Icon size={22} />
+            <span className="text-[10px] font-bold">{label}</span>
+          </button>
+        ))}
+        <button onClick={signOut} className="flex flex-col items-center gap-1 p-2.5 rounded-2xl text-gray-500 hover:text-red-400 transition-all">
+          <LogOut size={22} />
+          <span className="text-[10px] font-bold">Sair</span>
         </button>
       </nav>
 
