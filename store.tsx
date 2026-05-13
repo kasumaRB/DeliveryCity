@@ -135,7 +135,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     pagseguroRecipientId: p.pagseguro_recipient_id || '',
     phoneNumber: p.phone_number || '',
     savedAddresses: Array.isArray(p.saved_addresses) ? p.saved_addresses : [],
-    commissionBalance: Number(p.balance || 0),
+    commissionBalance: Number(p.commission_balance || 0),
     averageRating: Number(p.average_rating || 0),
     ratingsCount: Number(p.ratings_count || 0),
     createdAt: p.created_at ? new Date(p.created_at).getTime() : Date.now(),
