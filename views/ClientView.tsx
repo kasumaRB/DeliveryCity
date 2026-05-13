@@ -76,6 +76,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
   const [driverStars, setDriverStars] = useState(0);
   const [productOk, setProductOk] = useState<boolean | null>(null);
   const [packagingOk, setPackagingOk] = useState<boolean | null>(null);
+  const [ratingComment, setRatingComment] = useState('');
 
   const [cardNumber, setCardNumber] = useState('');
   const [cardHolder, setCardHolder] = useState('');
@@ -167,9 +168,10 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     if (!ratingOrder || !submitRating) return;
     const finalRating: OrderRating = {
       storeStars,
-      driverStars: driverStars || (productOk ? 5 : 4),
+      driverStars: driverStars || undefined,
       productOk: productOk === true,
       packagingOk: packagingOk === true,
+      comment: ratingComment.trim() || undefined,
     };
     await submitRating(ratingOrder.id, finalRating);
     setRatingOrder(null);
@@ -177,6 +179,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     setDriverStars(0);
     setProductOk(null);
     setPackagingOk(null);
+    setRatingComment('');
   };
 
   const filteredStores = useMemo(() => {
@@ -1135,54 +1138,64 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
               ))}
             </div>
             {storeStars > 0 && (
-              <div className="space-y-8 animate-in slide-in-from-bottom duration-500">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                      Produto OK?
-                    </p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setProductOk(true)}
-                        className={`flex-1 py-4 rounded-2xl transition-all ${productOk === true ? 'bg-green-600 text-white shadow-lg' : 'bg-gray-50 text-gray-400'}`}
-                      >
-                        <ThumbsUp size={18} />
-                      </button>
-                      <button
-                        onClick={() => setProductOk(false)}
-                        className={`flex-1 py-4 rounded-2xl transition-all ${productOk === false ? 'bg-red-600 text-white shadow-lg' : 'bg-gray-50 text-gray-400'}`}
-                      >
-                        <ThumbsDown size={18} />
-                      </button>
+              <div className="space-y-6 animate-in slide-in-from-bottom duration-500">
+                  {/* Driver stars */}
+                  {ratingOrder.driverId && (
+                    <div>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">🏍️ Entregador</p>
+                      <div className="flex justify-center gap-3">
+                        {[1,2,3,4,5].map(star => (
+                          <button key={star} onClick={() => setDriverStars(star)}
+                            className={`transition-all duration-200 transform ${driverStars >= star ? 'scale-125' : 'scale-100 opacity-20 hover:opacity-50'}`}>
+                            <Star size={32} className="fill-blue-500 text-blue-500" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* Product + packaging */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Produto OK?</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => setProductOk(true)}
+                          className={`flex-1 py-4 rounded-2xl transition-all ${productOk === true ? 'bg-green-600 text-white shadow-lg' : 'bg-gray-50 text-gray-400'}`}>
+                          <ThumbsUp size={18} className="mx-auto" />
+                        </button>
+                        <button onClick={() => setProductOk(false)}
+                          className={`flex-1 py-4 rounded-2xl transition-all ${productOk === false ? 'bg-red-600 text-white shadow-lg' : 'bg-gray-50 text-gray-400'}`}>
+                          <ThumbsDown size={18} className="mx-auto" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Embalagem OK?</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => setPackagingOk(true)}
+                          className={`flex-1 py-4 rounded-2xl transition-all ${packagingOk === true ? 'bg-green-600 text-white shadow-lg' : 'bg-gray-50 text-gray-400'}`}>
+                          <ThumbsUp size={18} className="mx-auto" />
+                        </button>
+                        <button onClick={() => setPackagingOk(false)}
+                          className={`flex-1 py-4 rounded-2xl transition-all ${packagingOk === false ? 'bg-red-600 text-white shadow-lg' : 'bg-gray-50 text-gray-400'}`}>
+                          <ThumbsDown size={18} className="mx-auto" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                      Embalagem OK?
-                    </p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setPackagingOk(true)}
-                        className={`flex-1 py-4 rounded-2xl transition-all ${packagingOk === true ? 'bg-green-600 text-white shadow-lg' : 'bg-gray-50 text-gray-400'}`}
-                      >
-                        <ThumbsUp size={18} />
-                      </button>
-                      <button
-                        onClick={() => setPackagingOk(false)}
-                        className={`flex-1 py-4 rounded-2xl transition-all ${packagingOk === false ? 'bg-red-600 text-white shadow-lg' : 'bg-gray-50 text-gray-400'}`}
-                      >
-                        <ThumbsDown size={18} />
-                      </button>
-                    </div>
-                  </div>
+                  {/* Comment */}
+                  <textarea
+                    value={ratingComment}
+                    onChange={e => setRatingComment(e.target.value)}
+                    rows={2}
+                    placeholder="Deixe um comentário (opcional)..."
+                    className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-medium outline-none border-2 border-transparent focus:border-orange-300 resize-none text-gray-700"
+                  />
+                  <button
+                    onClick={handleFinishRating}
+                    className="w-full bg-gray-950 text-white py-6 rounded-[2.5rem] font-black uppercase text-xs tracking-[0.3em] active:scale-95 transition-all shadow-2xl">
+                    Finalizar Feedback
+                  </button>
                 </div>
-                <button
-                  onClick={handleFinishRating}
-                  className="w-full bg-gray-950 text-white py-6 rounded-[2.5rem] font-black uppercase text-xs tracking-[0.3em] active:scale-95 transition-all shadow-2xl"
-                >
-                  Finalizar Feedback
-                </button>
-              </div>
             )}
           </div>
         </div>

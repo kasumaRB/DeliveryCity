@@ -123,6 +123,7 @@ export interface OrderRating {
   driverStars?: number;
   productOk: boolean;
   packagingOk: boolean;
+  comment?: string;
 }
 
 export interface Promotion {
