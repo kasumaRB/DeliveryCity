@@ -781,7 +781,7 @@ export const AdminView: React.FC = () => {
             const [settingsMsg, setSettingsMsg] = React.useState('');
 
             React.useEffect(() => {
-              supabase.from('platform_settings').select('*').single().then(({ data }) => {
+              supabase.from('platform_settings').select('*').maybeSingle().then(({ data }) => {
                 if (data) setSettings({
                   platform_fee_pct: data.platform_fee_pct ?? 15,
                   driver_fee_pct: data.driver_fee_pct ?? 8,
@@ -790,7 +790,7 @@ export const AdminView: React.FC = () => {
                   min_order_value: data.min_order_value ?? 15.0,
                 });
                 setSettingsLoading(false);
-              });
+              }).catch(() => setSettingsLoading(false));
             }, []);
 
             const handleSaveSettings = async () => {

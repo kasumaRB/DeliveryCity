@@ -571,7 +571,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const { data: cfg } = await supabase
           .from('platform_settings')
           .select('platform_fee_pct, driver_fee_pct, restaurant_fee_pct, min_delivery_fee')
-          .single();
+          .maybeSingle();
         if (cfg) {
           platformFeePct   = (cfg.platform_fee_pct   ?? 15) / 100;
           driverFeePct     = (cfg.driver_fee_pct     ?? 8)  / 100;
