@@ -55,9 +55,11 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     currentUserProfile,
     createOrder,
     recalculateDistances,
+    calculateDistance,
     submitRating,
     addAddress,
     platformSettings,
+    profiles,
   } = store || {};
 
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
@@ -239,8 +241,20 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
   const deliveryFee = useMemo(() => {
     if (cartSubtotal === 0) return 0;
     if (appliedCoupon?.isFreeDelivery) return 0;
-    return 5.0;
-  }, [cartSubtotal, appliedCoupon]);
+    
+    let distKm = 0;
+    if (selectedRestaurant && selectedAddress?.coords) {
+      distKm = calculateDistance?.(
+        selectedAddress.coords.lat,
+        selectedAddress.coords.lng,
+        selectedRestaurant.coords.lat,
+        selectedRestaurant.coords.lng
+      ) ?? 0;
+    }
+    
+    // Base $4.00 + $0.50 por km
+    return 4.00 + (distKm * 0.50);
+  }, [cartSubtotal, appliedCoupon, selectedRestaurant, selectedAddress, calculateDistance]);
   const discount = appliedCoupon ? (appliedCoupon.discount > 0 ? appliedCoupon.discount : 0) : 0;
   const cartTotal = Math.max(0, cartSubtotal + deliveryFee - discount);
 
@@ -353,11 +367,18 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                 card: { encrypted: card.encryptedCard },
               },
               split: (() => {
-                const restaurantFeePct = platformSettings?.restaurantFeePct ?? 0.08;
-                const restaurantNetEarnings = cart.reduce((sum, i) => {
-                  const itemNet = i.product.ownerPrice || (i.product.price / (1 + restaurantFeePct));
-                  return sum + (itemNet * i.quantity);
-                }, 0);
+                let restaurantFeePct = platformSettings?.restaurantFeePct ?? 0.08;
+                if (selectedRestaurant) {
+                  const owner = profiles?.find(p => p.id === selectedRestaurant.ownerId);
+                  if (owner && owner.customFeePct !== undefined) {
+                    restaurantFeePct = owner.customFeePct / 100;
+                  }
+                }
+                
+                // O lojista recebe o valor final dos itens - cupom, descontado a taxa da plataforma (8%)
+                const finalProductTotal = Math.max(0, cartSubtotal - discount);
+                const restaurantNetEarnings = finalProductTotal * (1 - restaurantFeePct);
+                
                 const platformTotalCut = cartTotal - restaurantNetEarnings;
 
                 return {
@@ -389,7 +410,8 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
           currentUserProfile.name,
           data.id,
           selectedAddress.coords,
-          deliveryFee
+          deliveryFee,
+          discount
         );
       } else {
         await createOrder(
@@ -400,7 +422,8 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
           currentUserProfile.name,
           undefined,
           selectedAddress.coords,
-          deliveryFee
+          deliveryFee,
+          discount
         );
       }
       setCart([]);

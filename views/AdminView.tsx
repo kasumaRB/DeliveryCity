@@ -37,6 +37,7 @@ import Logo from '../assets/Logo.png';
 // Rules of Hooks (useState/useEffect não podem ficar em IIFEs)
 // ────────────────────────────────────────────────────────────
 const SettingsTab: React.FC = () => {
+  const { profiles, updateUserProfile } = useAppStore();
   const [settings, setSettings] = useState({
     platform_fee_pct: 15,
     driver_fee_pct: 8,
@@ -62,6 +63,22 @@ const SettingsTab: React.FC = () => {
   }, []);
 
   const handleSaveSettings = async () => {
+    const usersWithCustomFee = profiles.filter(p => p.customFeePct !== undefined && p.customFeePct !== null);
+    if (usersWithCustomFee.length > 0) {
+      const resetCustomFees = window.confirm(
+        'Existem usuários com taxas específicas configuradas. Deseja redefinir as taxas deles para o valor geral? (OK = Redefinir todos para o geral, Cancelar = Manter as taxas específicas)'
+      );
+      if (resetCustomFees) {
+        for (const user of usersWithCustomFee) {
+          try {
+            await updateUserProfile(user.id, { customFeePct: null as any });
+          } catch(e) {
+            console.error('Erro ao limpar taxa do user', user.id, e);
+          }
+        }
+      }
+    }
+
     setSettingsSaving(true);
     try {
       const { error } = await supabase.from('platform_settings').upsert({

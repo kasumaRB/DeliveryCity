@@ -145,6 +145,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     description: p.description || '',
     workingHours: p.working_hours || '',
     currentLocation: p.current_location || undefined,
+    customFeePct: p.custom_fee_pct ? Number(p.custom_fee_pct) : undefined,
   });
 
   const mapOrder = (o: any): Order => ({
@@ -566,7 +567,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     customerName: string,
     paymentId?: string,
     addressCoords?: { lat: number; lng: number },
-    deliveryFeeOverride?: number
+    deliveryFeeOverride?: number,
+    discountAmount: number = 0
   ) => {
     // 🔒 SEGURANÇA: Bloqueia criação de pedido sem sessão válida
     if (!session?.user?.id) {
@@ -594,17 +596,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       } catch { /* mantém fallback */ }
 
-      // Verifica taxa personalizada do parceiro (lojista ou entregador específico)
-      const restaurantOwner = currentUserProfile; // pode ser null neste contexto
-      // (taxa custom por parceiro será aplicada futuramente via edge function)
+      // Verifica taxa personalizada do lojista específico
+      const state = get();
+      const restaurantOwner = state.profiles.find(p => p.id === restaurant.ownerId);
+      if (restaurantOwner && restaurantOwner.customFeePct !== undefined) {
+        restaurantFeePct = restaurantOwner.customFeePct / 100;
+      }
 
       const subtotal       = items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
       
-      // Lojista: ganha o ownerPrice (se não tiver, calcula reverso)
-      const restaurantNetEarnings = items.reduce((sum, i) => {
-        const itemNet = i.product.ownerPrice || (i.product.price / (1 + restaurantFeePct));
-        return sum + (itemNet * i.quantity);
-      }, 0);
+      const finalProductTotal = Math.max(0, subtotal - discountAmount);
+      
+      // Lojista: ganha o valor dos itens menos cupom, descontando 8% da plataforma
+      const restaurantNetEarnings = finalProductTotal * (1 - restaurantFeePct);
       
       const deliveryFee    = deliveryFeeOverride !== undefined ? deliveryFeeOverride : minDeliveryFee;
       
@@ -612,9 +616,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const driverEarnings = deliveryFee * (1 - driverFeePct);
       
       // Plataforma: ganha a comissão sobre os produtos + comissão sobre a entrega
-      const platformFee    = (subtotal - restaurantNetEarnings) + (deliveryFee - driverEarnings);
+      const platformFee    = (finalProductTotal - restaurantNetEarnings) + (deliveryFee - driverEarnings);
       
-      const total          = subtotal + deliveryFee;
+      const total          = finalProductTotal + deliveryFee;
 
       const newOrder = {
         id: `ORD-${Date.now().toString().slice(-6)}`,
@@ -665,6 +669,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (data.pagseguroRecipientId !== undefined)
       up.pagseguro_recipient_id = data.pagseguroRecipientId;
     if (data.avatarUrl !== undefined) up.avatar_url = data.avatarUrl;
+    if (data.customFeePct !== undefined) up.custom_fee_pct = data.customFeePct;
     // currentLocation é atualizado silenciosamente (sem fetchData) para não sobrecarregar o banco
     if (data.currentLocation !== undefined) up.current_location = data.currentLocation;
 
@@ -791,9 +796,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           await fetchData();
         },
         assignDriver: async (oid, did) => {
+          const state = get();
+          const driver = state.profiles.find(p => p.id === did);
+          const order = state.orders.find(o => o.id === oid);
+          
+          let updatePayload: any = { driver_id: did, status: OrderStatus.READY };
+          
+          if (driver && order && driver.customFeePct !== undefined) {
+            const driverFeePct = driver.customFeePct / 100;
+            const newDriverEarnings = order.deliveryFee * (1 - driverFeePct);
+            // The platform fee difference needs to be adjusted
+            const diff = newDriverEarnings - order.driverNetEarnings;
+            const newPlatformFee = order.platformFee - diff;
+            
+            updatePayload.driver_net_earnings = newDriverEarnings;
+            updatePayload.platform_fee = newPlatformFee;
+          }
+          
           await supabase
             .from('orders')
-            .update({ driver_id: did, status: OrderStatus.READY })
+            .update(updatePayload)
             .eq('id', oid);
           await fetchData();
         },

@@ -56,6 +56,7 @@ export interface UserProfile {
   ratingsCount?: number;
   commissionBalance?: number;
   avatarUrl?: string;
+  customFeePct?: number;
 }
 
 export interface Product {

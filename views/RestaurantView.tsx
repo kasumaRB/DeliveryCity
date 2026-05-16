@@ -260,8 +260,10 @@ export const RestaurantView: React.FC = () => {
     setEditingProduct(product);
     setItemFormName(product.name);
     
-    const feePct = platformSettings?.restaurantFeePct ?? 0.15;
-    const basePrice = product.ownerPrice || Math.round((product.price / (1 + feePct)) * 100) / 100;
+    const feePct = currentUserProfile?.customFeePct !== undefined 
+      ? currentUserProfile.customFeePct / 100 
+      : (platformSettings?.restaurantFeePct ?? 0.08);
+    const basePrice = product.price || 0;
     setItemFormOwnerPrice(basePrice.toFixed(2));
     
     setItemFormDesc(product.description);
@@ -272,10 +274,12 @@ export const RestaurantView: React.FC = () => {
   };
 
   const handleSaveItem = async () => {
-    if (!myRestaurant || !itemFormName || !itemFormOwnerPrice) return;
-    const ownerPrice = parseFloat(itemFormOwnerPrice);
-    const feePct = platformSettings?.restaurantFeePct ?? 0.15;
-    const finalPrice = ownerPrice * (1 + feePct);
+    const price = parseFloat(itemFormOwnerPrice);
+    const feePct = currentUserProfile?.customFeePct !== undefined 
+      ? currentUserProfile.customFeePct / 100 
+      : (platformSettings?.restaurantFeePct ?? 0.08);
+    const ownerPrice = price * (1 - feePct);
+    const finalPrice = price;
     const img = itemFormImage || `https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500`;
 
     try {
@@ -780,7 +784,7 @@ export const RestaurantView: React.FC = () => {
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">
-                        Preço na sua mão (R$)
+                        Preço de Venda (R$)
                       </label>
                       <input
                         type="number"
@@ -791,12 +795,12 @@ export const RestaurantView: React.FC = () => {
                       />
                       <div className="px-4 py-2 bg-purple-50 rounded-xl space-y-1">
                         <p className="text-[10px] text-purple-700 font-bold leading-relaxed flex justify-between">
-                          <span>Comissão da plataforma ({(platformSettings?.restaurantFeePct ?? 0.15) * 100}%):</span>
-                          <span>+ R$ {((parseFloat(itemFormOwnerPrice) || 0) * (platformSettings?.restaurantFeePct ?? 0.15)).toFixed(2)}</span>
+                          <span>Comissão da plataforma ({(currentUserProfile?.customFeePct ?? (platformSettings?.restaurantFeePct ?? 0.08) * 100)}%):</span>
+                          <span>- R$ {((parseFloat(itemFormOwnerPrice) || 0) * (currentUserProfile?.customFeePct !== undefined ? currentUserProfile.customFeePct / 100 : (platformSettings?.restaurantFeePct ?? 0.08))).toFixed(2)}</span>
                         </p>
                         <p className="text-xs text-purple-900 font-black flex justify-between pt-1 border-t border-purple-100">
-                          <span>Preço final para o cliente:</span>
-                          <span>R$ {((parseFloat(itemFormOwnerPrice) || 0) * (1 + (platformSettings?.restaurantFeePct ?? 0.15))).toFixed(2)}</span>
+                          <span>Preço na sua mão (você recebe):</span>
+                          <span>R$ {((parseFloat(itemFormOwnerPrice) || 0) * (1 - (currentUserProfile?.customFeePct !== undefined ? currentUserProfile.customFeePct / 100 : (platformSettings?.restaurantFeePct ?? 0.08)))).toFixed(2)}</span>
                         </p>
                       </div>
                     </div>
@@ -867,7 +871,7 @@ export const RestaurantView: React.FC = () => {
                             R$ {item.price.toFixed(2)}
                           </p>
                           <p className="text-[9px] text-gray-400 font-bold">
-                            (Sua parte: R$ {(item.ownerPrice || (item.price / (1 + (platformSettings?.restaurantFeePct ?? 0.15)))).toFixed(2)})
+                            (Sua parte: R$ {(item.price * (1 - (currentUserProfile?.customFeePct !== undefined ? currentUserProfile.customFeePct / 100 : (platformSettings?.restaurantFeePct ?? 0.08)))).toFixed(2)})
                           </p>
                         </div>
                       </div>
