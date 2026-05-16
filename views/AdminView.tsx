@@ -96,8 +96,7 @@ const SettingsTab: React.FC = () => {
     }
   };
 
-  const totalPct = settings.driver_fee_pct + settings.restaurant_fee_pct;
-  const platformNet = settings.platform_fee_pct - totalPct;
+  // A plataforma_fee_pct em si não é usada nos cálculos do app, mas a mantemos no estado por compatibilidade com a tabela.
 
   if (settingsLoading) {
     return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-purple-100 border-t-purple-600 rounded-full animate-spin" /></div>;
@@ -107,58 +106,42 @@ const SettingsTab: React.FC = () => {
     <div className="max-w-3xl mx-auto animate-in fade-in space-y-8">
       <div>
         <h3 className="text-2xl font-black text-gray-900 tracking-tighter mb-1">Configurações Financeiras</h3>
-        <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Split de pagamento e limites da plataforma</p>
+        <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Taxas de comissionamento da plataforma</p>
       </div>
 
-      {/* Divisão visual do split */}
+      {/* Como funciona o modelo */}
       <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8">
         <h4 className="font-black text-gray-700 mb-6 flex items-center gap-2">
-          <DollarSign size={18} className="text-purple-500" /> Divisão do Pagamento
+          <DollarSign size={18} className="text-purple-500" /> Como funcionam as comissões?
         </h4>
-        <div className="mb-6">
-          {(() => {
-            const total = Math.max(settings.platform_fee_pct, settings.restaurant_fee_pct + settings.driver_fee_pct, 1);
-            const restPct = (settings.restaurant_fee_pct / total) * 100;
-            const drivPct = (settings.driver_fee_pct / total) * 100;
-            const platPct = Math.max(0, 100 - restPct - drivPct);
-            return (
-              <div className="flex h-6 rounded-full overflow-hidden gap-0.5">
-                <div className="bg-orange-500 transition-all flex items-center justify-center text-white text-[9px] font-black" style={{ width: `${restPct}%` }}>
-                  {settings.restaurant_fee_pct}%
-                </div>
-                <div className="bg-green-500 transition-all flex items-center justify-center text-white text-[9px] font-black" style={{ width: `${drivPct}%` }}>
-                  {settings.driver_fee_pct}%
-                </div>
-                <div className="bg-purple-600 transition-all flex items-center justify-center text-white text-[9px] font-black" style={{ width: `${platPct}%` }}>
-                  {(settings.platform_fee_pct - settings.driver_fee_pct - settings.restaurant_fee_pct).toFixed(1)}%
-                </div>
-              </div>
-            );
-          })()}
-          <div className="flex justify-between mt-3 text-[10px] font-black uppercase">
-            <span className="text-orange-500">🟠 Lojista ({settings.restaurant_fee_pct}%)</span>
-            <span className="text-green-600">🟢 Entregador ({settings.driver_fee_pct}%)</span>
-            <span className="text-purple-600">🟣 Plataforma retém</span>
+        
+        <div className="flex flex-col md:flex-row gap-6 mb-6">
+          <div className="flex-1 bg-orange-50 border border-orange-100 rounded-2xl p-5">
+            <h5 className="font-black text-orange-600 text-sm mb-2 uppercase tracking-widest">🟠 Lojista ({settings.restaurant_fee_pct}%)</h5>
+            <p className="text-xs text-orange-800 font-medium">A plataforma retém <strong>{settings.restaurant_fee_pct}%</strong> sobre o subtotal dos produtos (descontando cupons) como comissão.</p>
+          </div>
+          <div className="flex-1 bg-green-50 border border-green-100 rounded-2xl p-5">
+            <h5 className="font-black text-green-600 text-sm mb-2 uppercase tracking-widest">🟢 Entregador ({settings.driver_fee_pct}%)</h5>
+            <p className="text-xs text-green-800 font-medium">A plataforma retém <strong>{settings.driver_fee_pct}%</strong> sobre o valor da taxa de entrega como comissão.</p>
           </div>
         </div>
-        <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4 text-sm font-bold text-purple-700">
-          💡 A taxa da plataforma ({settings.platform_fee_pct}%) é retirada do valor do pedido. Desse valor, {settings.driver_fee_pct}% vai para o entregador e {settings.restaurant_fee_pct}% vai para o lojista.
-          {platformNet > 0
-            ? ` A plataforma fica com os ${platformNet}% restantes.`
-            : platformNet < 0
-              ? ` ⚠️ Atenção: a soma dos repasses (${totalPct}%) supera a taxa da plataforma (${settings.platform_fee_pct}%)!`
-              : ' A plataforma não retém nada (repasse 100%).'}
+
+        <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4 text-sm font-bold text-purple-700 flex items-start gap-3">
+          <span className="text-xl">💡</span>
+          <p>
+            A receita total da plataforma por pedido é a <strong>soma</strong> dessas duas comissões. <br />
+            Lembrando que é possível configurar uma taxa diferenciada para cada lojista diretamente no perfil dele.
+          </p>
         </div>
       </div>
 
       {/* Campos de configuração */}
       <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 space-y-6">
-        <h4 className="font-black text-gray-700 mb-2">Taxas (%)</h4>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <h4 className="font-black text-gray-700 mb-2">Comissões da Plataforma (%)</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {[
-            { key: 'platform_fee_pct', label: 'Taxa Plataforma', color: 'purple', help: 'Cobrado sobre o subtotal do pedido' },
-            { key: 'driver_fee_pct', label: 'Repasse Entregador', color: 'green', help: 'Porcentagem que o entregador recebe' },
-            { key: 'restaurant_fee_pct', label: 'Repasse Lojista', color: 'orange', help: 'Porcentagem que o lojista recebe' },
+            { key: 'restaurant_fee_pct', label: 'Comissão sobre Lojista', color: 'orange', help: 'Porcentagem cobrada sobre os produtos' },
+            { key: 'driver_fee_pct', label: 'Comissão sobre Entregador', color: 'green', help: 'Porcentagem cobrada sobre a taxa de entrega' },
           ].map(field => (
             <div key={field.key}>
               <label className={`text-[10px] font-black text-${field.color}-600 uppercase tracking-widest mb-2 block`}>{field.label}</label>
