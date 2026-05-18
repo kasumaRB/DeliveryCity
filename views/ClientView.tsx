@@ -31,7 +31,6 @@ import {
   Bike,
   PlusCircle,
   CreditCard,
-  DollarSign,
   Smartphone,
   Loader,
   Tag,
@@ -1037,7 +1036,11 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-3 mb-8">
-                {(['CREDIT_CARD', 'PIX', 'CASH'] as PaymentMethod[]).map(method => (
+                {([
+                  { method: 'CREDIT_CARD', label: 'Crédito', icon: <CreditCard size={18} /> },
+                  { method: 'DEBIT_CARD',  label: 'Débito',  icon: <CreditCard size={18} /> },
+                  { method: 'PIX',         label: 'PIX',     icon: <Smartphone size={18} /> },
+                ] as { method: PaymentMethod; label: string; icon: React.ReactNode }[]).map(({ method, label, icon }) => (
                   <button
                     key={method}
                     onClick={() => setSelectedPayment(method)}
@@ -1046,16 +1049,10 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                     <div
                       className={`p-2 rounded-xl ${selectedPayment === method ? 'bg-orange-600 text-white' : 'bg-gray-50'}`}
                     >
-                      {method === 'CREDIT_CARD' ? (
-                        <CreditCard size={18} />
-                      ) : method === 'PIX' ? (
-                        <Smartphone size={18} />
-                      ) : (
-                        <DollarSign size={18} />
-                      )}
+                      {icon}
                     </div>
                     <span className="text-[9px] font-black uppercase tracking-widest">
-                      {method === 'CREDIT_CARD' ? 'Cartão' : method}
+                      {label}
                     </span>
                   </button>
                 ))}
