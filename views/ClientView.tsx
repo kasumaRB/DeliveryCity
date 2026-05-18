@@ -98,6 +98,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
 
   // Search and filter states
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [productSearch, setProductSearch] = useState('');
 
   // Helper: traduz status do pedido para português
   const traduzirStatus = (status: string): { label: string; color: string } => {
@@ -114,6 +115,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
 
   useEffect(() => {
     setSelectedCategory('');
+    setProductSearch('');
   }, [selectedRestaurant?.id]);
 
   // 🔒 SEGURANÇA: Limpa carrinho local e estado de checkout ao deslogar
@@ -604,9 +606,37 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                 </div>
               )}
 
+              {/* Busca de produtos */}
+              <div className="relative mb-6 max-w-lg">
+                <Search
+                  size={16}
+                  className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300"
+                />
+                <input
+                  type="text"
+                  value={productSearch}
+                  onChange={e => setProductSearch(e.target.value)}
+                  placeholder="Buscar produto..."
+                  className="w-full bg-white border-2 border-transparent p-4 pl-12 rounded-2xl font-bold text-gray-700 outline-none shadow-lg shadow-gray-100 focus:border-orange-200 transition-all"
+                />
+                {productSearch && (
+                  <button
+                    onClick={() => setProductSearch('')}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {selectedRestaurant.menu
                   .filter(p => !selectedCategory || p.category === selectedCategory)
+                  .filter(p =>
+                    !productSearch ||
+                    p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+                    (p.category && p.category.toLowerCase().includes(productSearch.toLowerCase()))
+                  )
                   .map(product => {
                     const cartItem = cart.find(item => item.product.id === product.id);
                     return (
