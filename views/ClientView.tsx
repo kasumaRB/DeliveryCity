@@ -254,23 +254,37 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     () => cart.reduce((total, item) => total + item.product.price * item.quantity, 0),
     [cart]
   );
+
+  // Distância em km entre endereço do cliente e restaurante
+  const distKm = useMemo(() => {
+    if (!selectedRestaurant || !selectedAddress?.coords) return 0;
+    return calculateDistance?.(
+      selectedAddress.coords.lat,
+      selectedAddress.coords.lng,
+      selectedRestaurant.coords.lat,
+      selectedRestaurant.coords.lng
+    ) ?? 0;
+  }, [selectedRestaurant, selectedAddress, calculateDistance]);
+
+  // Taxa de entrega: R$4,00 base + R$0,50 por km
   const deliveryFee = useMemo(() => {
     if (cartSubtotal === 0) return 0;
     if (appliedCoupon?.isFreeDelivery) return 0;
-    
-    let distKm = 0;
-    if (selectedRestaurant && selectedAddress?.coords) {
-      distKm = calculateDistance?.(
-        selectedAddress.coords.lat,
-        selectedAddress.coords.lng,
-        selectedRestaurant.coords.lat,
-        selectedRestaurant.coords.lng
-      ) ?? 0;
-    }
-    
-    // Base $4.00 + $0.50 por km
     return 4.00 + (distKm * 0.50);
-  }, [cartSubtotal, appliedCoupon, selectedRestaurant, selectedAddress, calculateDistance]);
+  }, [cartSubtotal, appliedCoupon, distKm]);
+
+  // Taxa estimada para um restaurante qualquer (sem carrinho aberto)
+  const estimatedDeliveryFee = (restaurant: typeof selectedRestaurant) => {
+    if (!restaurant || !selectedAddress?.coords) return null;
+    const d = calculateDistance?.(
+      selectedAddress.coords.lat,
+      selectedAddress.coords.lng,
+      restaurant!.coords.lat,
+      restaurant!.coords.lng
+    ) ?? 0;
+    return 4.00 + (d * 0.50);
+  };
+
   const discount = appliedCoupon ? (appliedCoupon.discount > 0 ? appliedCoupon.discount : 0) : 0;
   const cartTotal = Math.max(0, cartSubtotal + deliveryFee - discount);
 
@@ -567,27 +581,46 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                 />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredStores.map(restaurant => (
-                  <div
-                    key={restaurant.id}
-                    onClick={() => setSelectedRestaurant(restaurant)}
-                    className="bg-white rounded-[2.5rem] shadow-xl shadow-gray-100 border border-gray-50 overflow-hidden cursor-pointer hover:-translate-y-1 transition-all active:scale-[0.98]"
-                  >
-                    <div className="h-48 relative">
-                      <img src={restaurant.image} className="w-full h-full object-cover" />
-                      <div className="absolute top-4 right-4 bg-white/95 px-2 py-1 rounded-xl text-[10px] font-black flex items-center gap-1 backdrop-blur-sm shadow-sm">
-                        {restaurant.rating.toFixed(1)}{' '}
-                        <Star size={12} className="fill-orange-500 text-orange-500" />
+                {filteredStores.map(restaurant => {
+                  const estFee = estimatedDeliveryFee(restaurant);
+                  return (
+                    <div
+                      key={restaurant.id}
+                      onClick={() => {
+                        setSelectedRestaurant(restaurant);
+                        // Se logado mas sem endereço definido, pede o endereço imediatamente
+                        if (currentUserProfile && !selectedAddress) {
+                          setCheckoutWasOpen(false);
+                          setIsAddressSelectorOpen(true);
+                        }
+                      }}
+                      className="bg-white rounded-[2.5rem] shadow-xl shadow-gray-100 border border-gray-50 overflow-hidden cursor-pointer hover:-translate-y-1 transition-all active:scale-[0.98]"
+                    >
+                      <div className="h-48 relative">
+                        <img src={restaurant.image} className="w-full h-full object-cover" />
+                        <div className="absolute top-4 right-4 bg-white/95 px-2 py-1 rounded-xl text-[10px] font-black flex items-center gap-1 backdrop-blur-sm shadow-sm">
+                          {restaurant.rating.toFixed(1)}{' '}
+                          <Star size={12} className="fill-orange-500 text-orange-500" />
+                        </div>
+                      </div>
+                      <div className="p-6">
+                        <h3 className="font-black text-gray-900 text-lg mb-1">{restaurant.name}</h3>
+                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-2">
+                          {restaurant.category}
+                        </p>
+                        {/* Taxa de entrega estimada */}
+                        <div className="flex items-center gap-2 text-[10px] font-black">
+                          <MapPin size={10} className="text-orange-400" />
+                          <span className="text-gray-500">
+                            {estFee !== null
+                              ? `Entrega ~R$ ${estFee.toFixed(2)}`
+                              : 'Defina seu endereço para ver o frete'}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    <div className="p-6">
-                      <h3 className="font-black text-gray-900 text-lg mb-1">{restaurant.name}</h3>
-                      <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">
-                        {restaurant.category}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -1032,14 +1065,27 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                     {cartSubtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </span>
                 </div>
-                <div className="flex justify-between items-center text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">
-                  <span>Entrega</span>
+                <div className="flex justify-between items-center text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
+                  <span className="flex items-center gap-1">
+                    <MapPin size={10} />
+                    Entrega
+                    {distKm > 0 && (
+                      <span className="text-orange-500 normal-case font-bold">
+                        · {distKm.toFixed(1)} km
+                      </span>
+                    )}
+                  </span>
                   <span className={deliveryFee === 0 ? 'text-green-600' : 'text-gray-900'}>
                     {deliveryFee === 0 && appliedCoupon?.isFreeDelivery
                       ? 'GRÁTIS'
                       : deliveryFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </span>
                 </div>
+                {!selectedAddress?.coords && (
+                  <p className="text-[9px] text-orange-500 font-bold mb-3">
+                    ⚠️ Selecione um endereço com localização no mapa para calcular o frete exato
+                  </p>
+                )}
                 {discount > 0 && (
                   <div className="flex justify-between items-center text-[10px] font-black text-green-600 uppercase tracking-widest mb-4">
                     <span>Desconto</span>
