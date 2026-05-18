@@ -269,6 +269,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setProfiles(mapped);
         localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(mapped));
         cachedData.profiles = mapped;
+      } else if (profileData.error) {
+        console.error('[CRITICAL] Erro ao buscar profiles do Supabase:', profileData.error);
+        if (typeof window !== 'undefined') {
+          (window as any).lastSyncError = 'PROFILE ERROR: ' + profileData.error.message;
+        }
       }
 
       if (settingsData.data) {
