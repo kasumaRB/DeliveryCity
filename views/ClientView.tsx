@@ -367,43 +367,25 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
           throw new Error('Chave do PagSeguro não configurada. Entre em contato com o suporte.');
         }
 
-        // ─── Calcula split ────────────────────────────────────────────
-        const buildSplit = () => {
-          let restaurantFeePct = platformSettings?.restaurantFeePct ?? 0.08;
-          const owner = profiles?.find(p => p.id === selectedRestaurant.ownerId);
-          if (owner?.customFeePct !== undefined) restaurantFeePct = owner.customFeePct / 100;
-          const finalProductTotal = Math.max(0, cartSubtotal - discount);
-          const restaurantNetEarnings = finalProductTotal * (1 - restaurantFeePct);
-          const platformTotalCut = cartTotal - restaurantNetEarnings;
-          return {
-            rules: [
-              { recipient: selectedRestaurant.pagseguroRecipientId, liable: true, charge_processing_fee: true, amount: { value: Math.round(restaurantNetEarnings * 100) } },
-              { recipient: import.meta.env.VITE_PAGSEGURO_PLATFORM_RECIPIENT_ID || '', liable: false, charge_processing_fee: false, amount: { value: Math.round(platformTotalCut * 100) } },
-            ],
-          };
-        };
-
+        // ─── Frontend envia apenas dados brutos — valores calculados no backend ───
         let encryptedCard: string;
         const savedCards = currentUserProfile.savedCards || [];
         const selectedSaved = savedCards.find(c => c.id === selectedSavedCardId);
 
         if (selectedSaved) {
-          // ── Usar cartão salvo: re-encripta com CVV informado ──────────
           if (!savedCardCvv || savedCardCvv.length < 3) {
             throw new Error('Informe o CVV do cartão selecionado.');
           }
           const enc = window.PagSeguro.encryptCard({
             publicKey: pagseguroPublicKey,
             holder: selectedSaved.holderName,
-            number: `000000000000${selectedSaved.last4}`, // placeholder — PagSeguro aceita token diretamente
+            number: `000000000000${selectedSaved.last4}`,
             expMonth: selectedSaved.expiryMonth,
             expYear: `20${selectedSaved.expiryYear}`,
             securityCode: savedCardCvv,
           });
-          // Na prática, usa o token salvo no campo card.token para a API do PagSeguro
           encryptedCard = enc.encryptedCard;
         } else {
-          // ── Novo cartão ───────────────────────────────────────────────
           const [expMonth, expYear] = cardExpiry.split('/');
           const enc = window.PagSeguro.encryptCard({
             publicKey: pagseguroPublicKey,
@@ -417,25 +399,38 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
           encryptedCard = enc.encryptedCard;
         }
 
+        // ── O backend (Edge Function) recebe apenas IDs e calcula o split ──
+        // Nenhum valor financeiro sensível é enviado pelo frontend
         const { data, error } = await supabase.functions.invoke('create-pagseguro-payment', {
           body: {
-            items: cart.map(i => ({ name: i.product.name, quantity: i.quantity, unit_amount: Math.round(i.product.price * 100) })),
-            customer: { name: currentUserProfile.name, email: currentUserProfile.email, tax_id: currentUserProfile.cpf || '' },
-            charge: {
-              reference_id: `order_${Date.now()}`,
-              amount: { value: Math.round(cartTotal * 100), currency: 'BRL' },
-              payment_method: {
-                type: selectedPayment === 'CREDIT_CARD' ? 'CREDIT_CARD' : 'DEBIT_CARD',
-                installments: 1,
-                capture: true,
-                card: selectedSaved
-                  ? { id: selectedSaved.token, security_code: savedCardCvv }
-                  : { encrypted: encryptedCard, store: saveCardForFuture },
-              },
-              split: buildSplit(),
+            // Identificação do pedido — backend busca as taxas no banco
+            restaurantId: selectedRestaurant.id,
+            couponCode: appliedCoupon?.code || null,
+            paymentType: selectedPayment,
+            saveCard: saveCardForFuture && !selectedSaved,
+
+            // Dados do cliente (necessários para o PagBank)
+            customer: {
+              name: currentUserProfile.name,
+              email: currentUserProfile.email,
+              tax_id: currentUserProfile.cpf || '',
             },
+
+            // Itens do carrinho — backend recalcula o total para validar
+            items: cart.map(i => ({
+              productId: i.product.id,
+              name: i.product.name,
+              quantity: i.quantity,
+              unit_amount: Math.round(i.product.price * 100), // backend valida contra o banco
+            })),
+
+            // Apenas o cartão encriptado — sem dados brutos
+            card: selectedSaved
+              ? { savedTokenId: selectedSaved.token, security_code: savedCardCvv }
+              : { encrypted: encryptedCard },
           },
         });
+
         if (error) throw error;
 
         // ── Salvar cartão se o usuário escolheu e é um cartão novo ──
