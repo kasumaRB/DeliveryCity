@@ -1,9 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { UserAddress } from '../types';
 import { MapPin, AlertCircle, Crosshair, Loader, X } from 'lucide-react';
-import { reverseGeocodeDetails, loadGoogleMaps } from '../services/mapsService';
+import { reverseGeocodeDetails } from '../services/mapsService';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
-declare var google: any;
+// Fix Leaflet default marker icons (webpack/vite issue)
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
 
 interface AddressModalProps {
   onClose: () => void;
@@ -23,10 +31,8 @@ export const AddressModal: React.FC<AddressModalProps> = ({
   saveButtonLabel = 'Salvar Endereço',
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
-  const googleMapInstance = useRef<any>(null);
-  const isMapReady = useRef(false);
+  const leafletMap = useRef<L.Map | null>(null);
 
-  // Estados dos campos de endereço
   const [addrLabel] = useState(initialAddress?.label || 'Casa');
   const [addrZip, setAddrZip] = useState(initialAddress?.zipCode || '');
   const [addrStreet, setAddrStreet] = useState(initialAddress?.street || '');
@@ -45,111 +51,96 @@ export const AddressModal: React.FC<AddressModalProps> = ({
   const [isMapDragging, setIsMapDragging] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
 
-  useEffect(() => {
-    initMap();
-  }, []);
-
-  const getCurrentPosition = (): Promise<{ lat: number; lng: number }> => {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject('Geolocation not supported');
-        return;
-      }
+  const getCurrentPosition = (): Promise<{ lat: number; lng: number }> =>
+    new Promise((resolve, reject) => {
+      if (!navigator.geolocation) { reject('Geolocation not supported'); return; }
       navigator.geolocation.getCurrentPosition(
         pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
         err => reject(err),
-        { enableHighAccuracy: true, timeout: 5000 }
+        { enableHighAccuracy: true, timeout: 8000 }
       );
     });
+
+  const onMapMoveEnd = (map: L.Map) => {
+    const center = map.getCenter();
+    const lat = center.lat;
+    const lng = center.lng;
+    setAddrCoords({ lat, lng });
+    setIsMapDragging(false);
+
+    reverseGeocodeDetails(lat, lng).then(details => {
+      if (details.street)        setAddrStreet(details.street);
+      if (details.neighborhood)  setAddrNeighborhood(details.neighborhood);
+      if (details.city)          setAddrCity(details.city);
+      if (details.state)         setAddrState(details.state);
+      if (details.zipCode)       setAddrZip(details.zipCode);
+      if (details.number && !details.number.includes('-')) setAddrNumber(details.number);
+    }).catch(() => {});
   };
 
-  const initMap = async () => {
-    try {
-      await loadGoogleMaps();
-      if (!mapRef.current) return;
-      if (typeof google === 'undefined' || !google.maps) {
-        setMapError('Erro ao carregar serviços de mapa.');
-        return;
-      }
+  useEffect(() => {
+    if (!mapRef.current || leafletMap.current) return;
 
-      let startLocation = addrCoords || APIACAS_CENTER;
-      let initialZoom = 17;
+    const initMap = async () => {
+      try {
+        let startLocation = addrCoords || APIACAS_CENTER;
+        let initialZoom = 17;
 
-      if (!initialAddress && !addrCoords) {
-        try {
-          const gpsPos = await getCurrentPosition();
-          startLocation = gpsPos;
-        } catch (e) {
-          startLocation = APIACAS_CENTER;
-          initialZoom = 14;
+        if (!initialAddress && !addrCoords) {
+          try {
+            startLocation = await getCurrentPosition();
+          } catch {
+            startLocation = APIACAS_CENTER;
+            initialZoom = 14;
+          }
         }
+
+        const map = L.map(mapRef.current!, {
+          center: [startLocation.lat, startLocation.lng],
+          zoom: initialZoom,
+          zoomControl: false,
+          attributionControl: false,
+        });
+
+        // OpenStreetMap tiles — gratuito, sem API key
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+        }).addTo(map);
+
+        // Zoom controls no canto certo
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        map.on('dragstart',  () => setIsMapDragging(true));
+        map.on('moveend',    () => onMapMoveEnd(map));
+
+        leafletMap.current = map;
+        setIsLoadingInitial(false);
+        setAddrCoords({ lat: startLocation.lat, lng: startLocation.lng });
+      } catch (err) {
+        console.error('Erro ao inicializar mapa:', err);
+        setMapError('Não foi possível carregar o mapa.');
+        setIsLoadingInitial(false);
       }
+    };
 
-      const map = new google.maps.Map(mapRef.current, {
-        center: startLocation,
-        zoom: initialZoom,
-        disableDefaultUI: true,
-        zoomControl: false,
-        streetViewControl: false,
-        mapTypeControl: false,
-        fullscreenControl: false,
-        gestureHandling: 'greedy',
-        clickableIcons: false,
-      });
+    initMap();
 
-      googleMapInstance.current = map;
-      isMapReady.current = true;
-      setIsLoadingInitial(false);
-
-      map.addListener('dragstart', () => {
-        setIsMapDragging(true);
-      });
-
-      map.addListener('idle', () => {
-        setIsMapDragging(false);
-        const center = map.getCenter();
-        const lat = center.lat();
-        const lng = center.lng();
-
-        setAddrCoords({ lat, lng });
-
-        reverseGeocodeDetails(lat, lng)
-          .then(details => {
-            if (details) {
-              // Preenchimento Automático Inteligente
-              if (details.street) setAddrStreet(details.street);
-              if (details.neighborhood) setAddrNeighborhood(details.neighborhood);
-              if (details.city) setAddrCity(details.city);
-              if (details.state) setAddrState(details.state);
-              if (details.zipCode) setAddrZip(details.zipCode);
-
-              // Só preenche o número se for um número único real
-              if (details.number && !details.number.includes('-')) {
-                setAddrNumber(details.number);
-              }
-            }
-          })
-          .catch(err => {
-            console.error('Reverse geocode failed', err);
-          });
-      });
-    } catch (error) {
-      console.error('Error initializing map', error);
-      setMapError('Não foi possível carregar o mapa.');
-      setIsLoadingInitial(false);
-    }
-  };
+    return () => {
+      if (leafletMap.current) {
+        leafletMap.current.remove();
+        leafletMap.current = null;
+      }
+    };
+  }, []);
 
   const handleUseCurrentLocation = async () => {
     setIsLoadingLocation(true);
     try {
       const pos = await getCurrentPosition();
-      if (googleMapInstance.current) {
-        googleMapInstance.current.panTo(pos);
-        googleMapInstance.current.setZoom(18);
+      if (leafletMap.current) {
+        leafletMap.current.setView([pos.lat, pos.lng], 18);
       }
-    } catch (error) {
-      console.error('Geolocation failed:', error);
+    } catch {
       alert('Não conseguimos obter sua localização exata.');
     } finally {
       setIsLoadingLocation(false);
@@ -161,7 +152,6 @@ export const AddressModal: React.FC<AddressModalProps> = ({
       alert('Por favor, informe a rua.');
       return;
     }
-
     onSave({
       label: addrLabel,
       street: addrStreet.trim(),
@@ -186,19 +176,16 @@ export const AddressModal: React.FC<AddressModalProps> = ({
               {addrCity}, {addrState}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition"
-          >
+          <button onClick={onClose} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition">
             <X size={20} />
           </button>
         </div>
 
         <div className="space-y-5 pb-6">
-          {/* ÁREA DO MAPA */}
-          <div className="relative w-full h-64 bg-gray-100 rounded-3xl overflow-hidden shadow-inner border border-gray-100 group">
+          {/* MAPA — Leaflet + OpenStreetMap */}
+          <div className="relative w-full h-64 bg-gray-100 rounded-3xl overflow-hidden shadow-inner border border-gray-100">
             {isLoadingInitial && (
-              <div className="absolute inset-0 z-30 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center gap-3 text-center p-4">
+              <div className="absolute inset-0 z-30 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
                 <Loader className="animate-spin text-orange-600" size={32} />
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                   Localizando...
@@ -209,35 +196,29 @@ export const AddressModal: React.FC<AddressModalProps> = ({
             {mapError ? (
               <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center bg-gray-50">
                 <AlertCircle className="text-gray-300 mb-2" size={40} />
-                <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">
-                  {mapError}
-                </p>
+                <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">{mapError}</p>
               </div>
             ) : (
               <div ref={mapRef} className="w-full h-full" />
             )}
 
+            {/* Pino central fixo */}
             {!mapError && !isLoadingInitial && (
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none pb-[34px]">
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[400] pointer-events-none pb-[34px]">
                 <MapPin
                   size={40}
                   className={`drop-shadow-lg transition-all duration-300 ${isMapDragging ? 'text-orange-500 -translate-y-2' : 'text-orange-600'}`}
                 />
-                <div
-                  className={`w-3 h-1.5 bg-black/30 rounded-full mx-auto mt-[-5px] blur-[1px] transition-all duration-300 ${isMapDragging ? 'scale-75 opacity-30' : 'scale-100 opacity-100'}`}
-                ></div>
+                <div className={`w-3 h-1.5 bg-black/30 rounded-full mx-auto mt-[-5px] blur-[1px] transition-all duration-300 ${isMapDragging ? 'scale-75 opacity-30' : 'scale-100 opacity-100'}`} />
               </div>
             )}
 
+            {/* Botão GPS */}
             <button
               onClick={handleUseCurrentLocation}
-              className="absolute bottom-4 right-4 bg-white p-3 rounded-2xl shadow-xl text-orange-600 hover:bg-orange-50 transition z-20 flex items-center justify-center border border-gray-50"
+              className="absolute bottom-4 right-12 bg-white p-3 rounded-2xl shadow-xl text-orange-600 hover:bg-orange-50 transition z-[400] border border-gray-50"
             >
-              {isLoadingLocation ? (
-                <Loader className="animate-spin" size={20} />
-              ) : (
-                <Crosshair size={20} />
-              )}
+              {isLoadingLocation ? <Loader className="animate-spin" size={20} /> : <Crosshair size={20} />}
             </button>
           </div>
 
@@ -245,81 +226,52 @@ export const AddressModal: React.FC<AddressModalProps> = ({
             {isMapDragging ? 'Solte para definir' : 'Arraste o mapa para ajustar o pino'}
           </p>
 
-          {/* CAMPOS DE FORMULÁRIO */}
+          {/* FORMULÁRIO */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-                Rua / Avenida
-              </label>
-              <input
-                value={addrStreet}
-                onChange={e => setAddrStreet(e.target.value)}
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Rua / Avenida</label>
+              <input value={addrStreet} onChange={e => setAddrStreet(e.target.value)}
                 className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:bg-white focus:border-orange-200"
-                placeholder="Nome da rua"
-              />
+                placeholder="Nome da rua" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-                  Número
-                </label>
-                <input
-                  value={addrNumber}
-                  onChange={e => setAddrNumber(e.target.value)}
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Número</label>
+                <input value={addrNumber} onChange={e => setAddrNumber(e.target.value)}
                   className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:bg-white focus:border-orange-200"
-                  placeholder="S/N"
-                />
+                  placeholder="S/N" />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-                  CEP (Sugerido)
-                </label>
-                <input
-                  value={addrZip}
-                  onChange={e => setAddrZip(e.target.value)}
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">CEP</label>
+                <input value={addrZip} onChange={e => setAddrZip(e.target.value)}
                   className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:bg-white focus:border-orange-200"
-                  placeholder="00000-000"
-                />
+                  placeholder="00000-000" />
               </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-                Bairro
-              </label>
-              <input
-                value={addrNeighborhood}
-                onChange={e => setAddrNeighborhood(e.target.value)}
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Bairro</label>
+              <input value={addrNeighborhood} onChange={e => setAddrNeighborhood(e.target.value)}
                 className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:bg-white focus:border-orange-200"
-                placeholder="Ex: Centro"
-              />
+                placeholder="Ex: Centro" />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-                Referência
-              </label>
-              <input
-                value={addrReference}
-                onChange={e => setAddrReference(e.target.value)}
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Referência</label>
+              <input value={addrReference} onChange={e => setAddrReference(e.target.value)}
                 className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:bg-white focus:border-orange-200"
-                placeholder="Ex: Próximo à praça"
-              />
+                placeholder="Ex: Próximo à praça" />
             </div>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 pt-4">
-            <button
-              onClick={onClose}
-              className="flex-1 bg-gray-100 text-gray-500 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition"
-            >
+            <button onClick={onClose}
+              className="flex-1 bg-gray-100 text-gray-500 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition">
               Cancelar
             </button>
-            <button
-              onClick={handleConfirm}
-              className="flex-1 bg-orange-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-orange-700 transition shadow-xl shadow-orange-100"
-            >
+            <button onClick={handleConfirm}
+              className="flex-1 bg-orange-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-orange-700 transition shadow-xl shadow-orange-100">
               {saveButtonLabel}
             </button>
           </div>
