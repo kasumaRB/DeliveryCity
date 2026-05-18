@@ -171,33 +171,45 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // Roteamento baseado no status e papel do usuário
-  if (currentUserProfile && currentUserProfile.role && currentUserProfile.status) {
-    // Se for parceiro (não cliente) e o status for PENDING, mostra a tela de espera.
+  // 🔒 SEGURANÇA: verifica session + perfil + role + status simultaneamente
+  // Mesmo que alguém tente manipular o estado do React via DevTools,
+  // o perfil só existe se session.user.id bater com o ID do banco
+  if (currentUserProfile && session && currentUserProfile.id === session.user.id) {
+    const verifiedRole = currentUserProfile.role;    // vem do banco
+    const verifiedStatus = currentUserProfile.status; // vem do banco
+
+    // Parceiros pendentes de aprovação
     if (
-      currentUserProfile.role !== UserRole.CLIENT &&
-      currentUserProfile.role !== UserRole.ADMIN &&
-      currentUserProfile.status === 'PENDING'
+      verifiedRole !== UserRole.CLIENT &&
+      verifiedRole !== UserRole.ADMIN &&
+      verifiedStatus === 'PENDING'
     ) {
       return <PendingApprovalView profile={currentUserProfile} onSignOut={signOut} />;
     }
 
-    // Se for parceiro (não cliente) e o status for BLOCKED, mostra a tela de bloqueio.
+    // Parceiros bloqueados
     if (
-      currentUserProfile.role !== UserRole.CLIENT &&
-      currentUserProfile.role !== UserRole.ADMIN &&
-      currentUserProfile.status === 'BLOCKED'
+      verifiedRole !== UserRole.CLIENT &&
+      verifiedRole !== UserRole.ADMIN &&
+      verifiedStatus === 'BLOCKED'
     ) {
       return <BlockedView onSignOut={signOut} />;
     }
 
-    // ADMIN: acesso sempre garantido independente de status
-    const verifiedRole = currentUserProfile.role;
-    if (verifiedRole === UserRole.ADMIN) {
+    // ADMIN: exige role ADMIN + status APPROVED
+    if (verifiedRole === UserRole.ADMIN && verifiedStatus === 'APPROVED') {
       return <AdminView />;
     }
-    if (verifiedRole === UserRole.RESTAURANT) return <RestaurantView />;
-    if (verifiedRole === UserRole.DRIVER) return <DriverView />;
+
+    // RESTAURANTE: exige role + status APPROVED
+    if (verifiedRole === UserRole.RESTAURANT && verifiedStatus === 'APPROVED') {
+      return <RestaurantView />;
+    }
+
+    // ENTREGADOR: exige role + status APPROVED
+    if (verifiedRole === UserRole.DRIVER && verifiedStatus === 'APPROVED') {
+      return <DriverView />;
+    }
   }
 
   // O fallback final é a ClientView (para usuários com papel CLIENT ou qualquer estado inesperado).

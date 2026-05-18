@@ -99,9 +99,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [orders, setOrders] = useState<Order[]>(() =>
     JSON.parse(localStorage.getItem(STORAGE_KEY_ORDERS) || '[]')
   );
-  const [profiles, setProfiles] = useState<UserProfile[]>(() =>
-    JSON.parse(localStorage.getItem(STORAGE_KEY_PROFILES) || '[]')
-  );
+  // 🔒 SEGURANÇA: perfis NÃO são inicializados do localStorage
+  // O role/status do usuário é sempre lido do banco após autenticação
+  // Isso impede que alguém edite o localStorage para fingir ser ADMIN
+  const [profiles, setProfiles] = useState<UserProfile[]>([]);
   // 🔒 SEGURANÇA: Só restaura carrinho offline se houver sessão ativa
   const [cart, setCart] = useState<any[]>([]);
 
@@ -112,10 +113,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [realDistances, setRealDistances] = useState<Record<string, any>>({});
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings | null>(null);
 
+  // 🔒 SEGURANÇA: currentUserProfile é derivado da sessão Supabase (JWT)
+  // session.user.id é assinado pelo Supabase — não pode ser forjado pelo cliente
   const currentUserProfile = session ? profiles.find(p => p.id === session.user.id) || null : null;
 
   useEffect(() => {
+    // Role vem do perfil buscado no banco — nunca do localStorage
     if (currentUserProfile) setCurrentRole(currentUserProfile.role);
+    else setCurrentRole(null);
   }, [currentUserProfile]);
 
   useEffect(() => {
