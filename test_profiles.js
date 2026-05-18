@@ -13,3 +13,5 @@ async function checkColumns() {
   }
 }
 checkColumns();
+
+supabase.from('profiles').select('*').then(res => console.log('Anon profiles:', res.data?.length, res.error));

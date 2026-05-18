@@ -226,7 +226,7 @@ const AppContent: React.FC = () => {
           DEBUG WARNING: Sessão existe, mas currentUserProfile é NULL! <br/>
           Session ID: {session.user.id} <br/>
           Profiles in state: {profiles?.length || 'unknown'} <br/>
-          Profile IDs: {profiles?.map((p: any) => p.id).join(', ')} <br/>
+          DB Profile Length: {(typeof window !== 'undefined' && (window as any).debugProfileLength) ?? 'Ainda nao rodou'} <br/>
           <strong>LAST SYNC ERROR: {(typeof window !== 'undefined' && (window as any).lastSyncError) || 'Nenhum erro pego no catch'}</strong> <br/>
           Verifique se você está usando a senha correta para o email. Se a tela estiver presa, um erro no Supabase ocorreu e foi logado no console (pressione F12).
         </div>

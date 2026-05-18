@@ -241,6 +241,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         cachedData.orders = mapped;
       }
 
+      if (typeof window !== 'undefined') {
+        (window as any).debugProfileLength = profileData.data ? profileData.data.length : 'NULL';
+      }
+
       if (profileData.data) {
         let mapped = profileData.data.map(p => mapProfile(p));
         
