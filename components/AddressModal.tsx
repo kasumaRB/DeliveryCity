@@ -2,16 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { UserAddress } from '../types';
 import { MapPin, AlertCircle, Crosshair, Loader, X } from 'lucide-react';
 import { reverseGeocodeDetails } from '../services/mapsService';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-
-// Fix Leaflet default marker icons (webpack/vite issue)
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
 
 interface AddressModalProps {
   onClose: () => void;
@@ -30,26 +20,25 @@ export const AddressModal: React.FC<AddressModalProps> = ({
   title = 'Selecionar Endereço',
   saveButtonLabel = 'Salvar Endereço',
 }) => {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const leafletMap = useRef<L.Map | null>(null);
+  const mapRef        = useRef<HTMLDivElement>(null);
+  const leafletMap    = useRef<any>(null);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMounted     = useRef(false);
 
-  const [addrLabel] = useState(initialAddress?.label || 'Casa');
-  const [addrZip, setAddrZip] = useState(initialAddress?.zipCode || '');
-  const [addrStreet, setAddrStreet] = useState(initialAddress?.street || '');
-  const [addrNumber, setAddrNumber] = useState(initialAddress?.number || '');
+  const [addrLabel]                           = useState(initialAddress?.label || 'Casa');
+  const [addrZip, setAddrZip]                 = useState(initialAddress?.zipCode || '');
+  const [addrStreet, setAddrStreet]           = useState(initialAddress?.street || '');
+  const [addrNumber, setAddrNumber]           = useState(initialAddress?.number || '');
   const [addrNeighborhood, setAddrNeighborhood] = useState(initialAddress?.neighborhood || '');
-  const [addrCity, setAddrCity] = useState(initialAddress?.city || 'Apiacás');
-  const [addrState, setAddrState] = useState(initialAddress?.state || 'MT');
-  const [addrComplement] = useState(initialAddress?.complement || '');
-  const [addrReference, setAddrReference] = useState(initialAddress?.reference || '');
-  const [addrCoords, setAddrCoords] = useState<{ lat: number; lng: number } | undefined>(
-    initialAddress?.coords
-  );
-
+  const [addrCity, setAddrCity]               = useState(initialAddress?.city || 'Apiacás');
+  const [addrState, setAddrState]             = useState(initialAddress?.state || 'MT');
+  const [addrComplement]                      = useState(initialAddress?.complement || '');
+  const [addrReference, setAddrReference]     = useState(initialAddress?.reference || '');
+  const [addrCoords, setAddrCoords]           = useState<{ lat: number; lng: number } | undefined>(initialAddress?.coords);
   const [isLoadingInitial, setIsLoadingInitial] = useState(!initialAddress);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
-  const [isMapDragging, setIsMapDragging] = useState(false);
-  const [mapError, setMapError] = useState<string | null>(null);
+  const [isMapDragging, setIsMapDragging]     = useState(false);
+  const [mapError, setMapError]               = useState<string | null>(null);
 
   const getCurrentPosition = (): Promise<{ lat: number; lng: number }> =>
     new Promise((resolve, reject) => {
@@ -61,61 +50,84 @@ export const AddressModal: React.FC<AddressModalProps> = ({
       );
     });
 
-  const onMapMoveEnd = (map: L.Map) => {
-    const center = map.getCenter();
-    const lat = center.lat;
-    const lng = center.lng;
-    setAddrCoords({ lat, lng });
-    setIsMapDragging(false);
-
-    reverseGeocodeDetails(lat, lng).then(details => {
-      if (details.street)        setAddrStreet(details.street);
-      if (details.neighborhood)  setAddrNeighborhood(details.neighborhood);
-      if (details.city)          setAddrCity(details.city);
-      if (details.state)         setAddrState(details.state);
-      if (details.zipCode)       setAddrZip(details.zipCode);
-      if (details.number && !details.number.includes('-')) setAddrNumber(details.number);
-    }).catch(() => {});
-  };
-
   useEffect(() => {
-    if (!mapRef.current || leafletMap.current) return;
+    // Previne dupla inicialização (React StrictMode)
+    if (isMounted.current) return;
+    isMounted.current = true;
 
     const initMap = async () => {
+      if (!mapRef.current) return;
+
+      // Verifica se Leaflet já inicializou neste elemento
+      if ((mapRef.current as any)._leaflet_id) return;
+
       try {
+        // Import dinâmico do Leaflet e CSS
+        const L = (await import('leaflet')).default;
+        await import('leaflet/dist/leaflet.css');
+
+        // Fix ícones padrão
+        delete (L.Icon.Default.prototype as any)._getIconUrl;
+        L.Icon.Default.mergeOptions({
+          iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+          iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+          shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+        });
+
         let startLocation = addrCoords || APIACAS_CENTER;
-        let initialZoom = 17;
+        let initialZoom   = 17;
 
         if (!initialAddress && !addrCoords) {
           try {
             startLocation = await getCurrentPosition();
           } catch {
             startLocation = APIACAS_CENTER;
-            initialZoom = 14;
+            initialZoom   = 14;
           }
         }
 
-        const map = L.map(mapRef.current!, {
-          center: [startLocation.lat, startLocation.lng],
-          zoom: initialZoom,
-          zoomControl: false,
+        if (!mapRef.current || (mapRef.current as any)._leaflet_id) return;
+
+        const map = L.map(mapRef.current, {
+          center:           [startLocation.lat, startLocation.lng],
+          zoom:             initialZoom,
+          zoomControl:      false,
           attributionControl: false,
         });
 
-        // OpenStreetMap tiles — gratuito, sem API key
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
         }).addTo(map);
 
-        // Zoom controls no canto certo
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        map.on('dragstart',  () => setIsMapDragging(true));
-        map.on('moveend',    () => onMapMoveEnd(map));
+        map.on('dragstart', () => setIsMapDragging(true));
+
+        map.on('moveend', () => {
+          setIsMapDragging(false);
+          const center = map.getCenter();
+          const lat    = center.lat;
+          const lng    = center.lng;
+          setAddrCoords({ lat, lng });
+
+          // Debounce 600ms para não sobrecarregar o Nominatim
+          if (debounceTimer.current) clearTimeout(debounceTimer.current);
+          debounceTimer.current = setTimeout(async () => {
+            try {
+              const details = await reverseGeocodeDetails(lat, lng);
+              if (details.street)       setAddrStreet(details.street);
+              if (details.neighborhood) setAddrNeighborhood(details.neighborhood);
+              if (details.city)         setAddrCity(details.city);
+              if (details.state)        setAddrState(details.state);
+              if (details.zipCode)      setAddrZip(details.zipCode);
+              if (details.number && !details.number.includes('-')) setAddrNumber(details.number);
+            } catch { /* silencioso */ }
+          }, 600);
+        });
 
         leafletMap.current = map;
-        setIsLoadingInitial(false);
         setAddrCoords({ lat: startLocation.lat, lng: startLocation.lng });
+        setIsLoadingInitial(false);
       } catch (err) {
         console.error('Erro ao inicializar mapa:', err);
         setMapError('Não foi possível carregar o mapa.');
@@ -126,6 +138,7 @@ export const AddressModal: React.FC<AddressModalProps> = ({
     initMap();
 
     return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
       if (leafletMap.current) {
         leafletMap.current.remove();
         leafletMap.current = null;
