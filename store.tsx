@@ -242,7 +242,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       if (profileData.data) {
-        const mapped = profileData.data.map(p => mapProfile(p));
+        let mapped = profileData.data.map(p => mapProfile(p));
+        
+        // SELF-HEALING: Se usuário tem sessão, mas não tem perfil (falha na trigger do banco ou conta nova)
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        if (currentSession?.user && !mapped.find(p => p.id === currentSession.user.id)) {
+          devLog('[DEV] Perfil não encontrado! Tentando criar (Self-Healing)...');
+          try {
+            const newProfile = {
+              id: currentSession.user.id,
+              email: currentSession.user.email || '',
+              name: currentSession.user.user_metadata?.full_name || currentSession.user.user_metadata?.name || currentSession.user.email?.split('@')[0] || 'Usuário',
+              role: 'CLIENT',
+              status: 'APPROVED',
+              saved_addresses: []
+            };
+            const { data: insertedProfile, error: insertError } = await supabase.from('profiles').insert([newProfile]).select().single();
+            if (!insertError && insertedProfile) {
+              mapped.push(mapProfile(insertedProfile));
+            } else {
+              console.error('[DEV] Erro no Self-Healing:', insertError);
+            }
+          } catch(e) {}
+        }
+
         setProfiles(mapped);
         localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(mapped));
         cachedData.profiles = mapped;
