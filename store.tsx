@@ -581,60 +581,113 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       throw new Error('Você precisa estar logado para realizar um pedido.');
     }
     try {
-      const restaurant = restaurants.find(r => r.id === restaurantId);
-      if (!restaurant) throw new Error('Restaurante não encontrado');
+      // ═══════════════════════════════════════════════════════
+      // 1. BUSCAR RESTAURANTE DO BANCO — não confiar no estado do React
+      // ═══════════════════════════════════════════════════════
+      const { data: restaurantData, error: restError } = await supabase
+        .from('restaurants')
+        .select('id, name, menu, owner_id, pagseguro_recipient_id')
+        .eq('id', restaurantId)
+        .single();
 
-      // 💰 Busca taxas dinâmicas do platform_settings (com fallback seguro)
-      let platformFeePct = 0.15;
-      let driverFeePct   = 0.08;
-      let restaurantFeePct = 0.08;
-      let minDeliveryFee = 5.0;
-      try {
-        const { data: cfg } = await supabase
-          .from('platform_settings')
-          .select('platform_fee_pct, driver_fee_pct, restaurant_fee_pct, min_delivery_fee')
-          .maybeSingle();
-        if (cfg) {
-          platformFeePct   = (cfg.platform_fee_pct   ?? 15) / 100;
-          driverFeePct     = (cfg.driver_fee_pct     ?? 8)  / 100;
-          restaurantFeePct = (cfg.restaurant_fee_pct ?? 8)  / 100;
-          minDeliveryFee   = cfg.min_delivery_fee     ?? 5.0;
-        }
-      } catch { /* mantém fallback */ }
-
-      // Verifica taxa personalizada do lojista específico
-      const state = get();
-      const restaurantOwner = state.profiles.find(p => p.id === restaurant.ownerId);
-      if (restaurantOwner && restaurantOwner.customFeePct !== undefined) {
-        restaurantFeePct = restaurantOwner.customFeePct / 100;
+      if (restError || !restaurantData) {
+        throw new Error('Restaurante não encontrado ou inativo.');
       }
 
-      const subtotal       = items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
-      
-      const finalProductTotal = Math.max(0, subtotal - discountAmount);
-      
-      // Lojista: ganha o valor dos itens menos cupom, descontando 8% da plataforma
+      // ═══════════════════════════════════════════════════════
+      // 2. VALIDAR PREÇOS CONTRA O BANCO — rejeita se divergir
+      // ═══════════════════════════════════════════════════════
+      let subtotal = 0;
+      const validatedItems: typeof items = [];
+
+      for (const item of items) {
+        const realProduct = (restaurantData.menu as any[])?.find(
+          (p: any) => p.id === item.product.id
+        );
+        if (!realProduct) {
+          throw new Error(
+            `Produto "${item.product.name}" não está disponível neste restaurante.`
+          );
+        }
+        const realPrice = Number(realProduct.price);
+        const frontendPrice = Number(item.product.price);
+
+        // 🔒 Tolerância de R$0,01 para diferenças de arredondamento
+        if (Math.abs(realPrice - frontendPrice) > 0.01) {
+          throw new Error(
+            `Preço do produto "${item.product.name}" foi alterado. Por favor, atualize a página.`
+          );
+        }
+
+        subtotal += realPrice * item.quantity;
+        validatedItems.push({
+          product: { ...item.product, price: realPrice }, // força o preço do banco
+          quantity: item.quantity,
+        });
+      }
+
+      // ═══════════════════════════════════════════════════════
+      // 3. BUSCAR TAXAS DO BANCO — nunca do estado do React
+      // ═══════════════════════════════════════════════════════
+      let platformFeePct   = 0.15;
+      let driverFeePct     = 0.08;
+      let restaurantFeePct = 0.08;
+      let minDeliveryFee   = 5.0;
+      const maxDeliveryFee = 100.0; // limite máximo razoável para detectar manipulação
+
+      const { data: cfg } = await supabase
+        .from('platform_settings')
+        .select('platform_fee_pct, driver_fee_pct, restaurant_fee_pct, min_delivery_fee')
+        .maybeSingle();
+
+      if (cfg) {
+        platformFeePct   = (cfg.platform_fee_pct   ?? 15) / 100;
+        driverFeePct     = (cfg.driver_fee_pct     ?? 8)  / 100;
+        restaurantFeePct = (cfg.restaurant_fee_pct ?? 8)  / 100;
+        minDeliveryFee   = cfg.min_delivery_fee     ?? 5.0;
+      }
+
+      // Taxa personalizada do lojista (buscada do banco via profiles)
+      const { data: ownerData } = await supabase
+        .from('profiles')
+        .select('custom_fee_pct')
+        .eq('id', restaurantData.owner_id)
+        .maybeSingle();
+
+      if (ownerData?.custom_fee_pct !== null && ownerData?.custom_fee_pct !== undefined) {
+        restaurantFeePct = ownerData.custom_fee_pct / 100;
+      }
+
+      // ═══════════════════════════════════════════════════════
+      // 4. VALIDAR TAXA DE ENTREGA — aceita o valor do backend
+      //    mas rejeita valores absurdos (possível manipulação)
+      // ═══════════════════════════════════════════════════════
+      let deliveryFee = minDeliveryFee;
+      if (deliveryFeeOverride !== undefined) {
+        if (deliveryFeeOverride < 0 || deliveryFeeOverride > maxDeliveryFee) {
+          throw new Error('Taxa de entrega inválida. Por favor, tente novamente.');
+        }
+        deliveryFee = deliveryFeeOverride;
+      }
+
+      // ═══════════════════════════════════════════════════════
+      // 5. CALCULAR VALORES FINANCEIROS — todos no servidor
+      // ═══════════════════════════════════════════════════════
+      const finalProductTotal    = Math.max(0, subtotal - discountAmount);
       const restaurantNetEarnings = finalProductTotal * (1 - restaurantFeePct);
-      
-      const deliveryFee    = deliveryFeeOverride !== undefined ? deliveryFeeOverride : minDeliveryFee;
-      
-      // Entregador: ganha a taxa de entrega menos a comissão da plataforma
-      const driverEarnings = deliveryFee * (1 - driverFeePct);
-      
-      // Plataforma: ganha a comissão sobre os produtos + comissão sobre a entrega
-      const platformFee    = (finalProductTotal - restaurantNetEarnings) + (deliveryFee - driverEarnings);
-      
-      const total          = finalProductTotal + deliveryFee;
+      const driverEarnings       = deliveryFee * (1 - driverFeePct);
+      const platformFee          = (finalProductTotal - restaurantNetEarnings) + (deliveryFee - driverEarnings);
+      const total                = finalProductTotal + deliveryFee;
 
       const newOrder = {
         id: `ORD-${Date.now().toString().slice(-6)}`,
         restaurant_id: restaurantId,
-        restaurant_name: restaurant.name,
-        customer_id: session?.user.id,
+        restaurant_name: restaurantData.name,
+        customer_id: session.user.id,
         customer_address: address,
         customer_name: customerName,
         status: OrderStatus.PENDING,
-        items,
+        items: validatedItems,
         subtotal,
         delivery_fee: deliveryFee,
         platform_fee: platformFee,
@@ -657,6 +710,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       throw error;
     }
   };
+
 
   const updateUserProfile = async (id: string, data: Partial<UserProfile>) => {
     const up: any = {};
@@ -803,9 +857,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           await fetchData();
         },
         assignDriver: async (oid, did) => {
-          const state = get();
-          const driver = state.profiles.find(p => p.id === did);
-          const order = state.orders.find(o => o.id === oid);
+          const driver = profiles.find(p => p.id === did);
+          const order = orders.find(o => o.id === oid);
           
           let updatePayload: any = { driver_id: did, status: OrderStatus.READY };
           

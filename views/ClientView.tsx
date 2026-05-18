@@ -452,9 +452,16 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
         await createOrder(
           selectedRestaurant.id, cart, selectedPayment,
           `${selectedAddress.street}, ${selectedAddress.number}`,
-          currentUserProfile.name, data.id, selectedAddress.coords, deliveryFee, discount
+          currentUserProfile.name,
+          data.id,
+          selectedAddress.coords,
+          // 🔒 SEGURANÇA: usa valores calculados pelo backend seguro (Edge Function)
+          // nunca os valores calculados no frontend que podem ter sido manipulados
+          data._meta?.deliveryFeeCents  !== undefined ? data._meta.deliveryFeeCents  / 100 : deliveryFee,
+          data._meta?.discountCents     !== undefined ? data._meta.discountCents     / 100 : discount
         );
       } else {
+        // PIX: sem pagamento imediato, createOrder recalcula tudo internamente via banco
         await createOrder(
           selectedRestaurant.id,
           cart,
@@ -463,8 +470,8 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
           currentUserProfile.name,
           undefined,
           selectedAddress.coords,
-          deliveryFee,
-          discount
+          deliveryFee,   // será revalidado dentro de createOrder
+          discount       // será revalidado dentro de createOrder
         );
       }
       setCart([]);
