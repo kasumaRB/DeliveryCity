@@ -215,6 +215,18 @@ const AppContent: React.FC = () => {
   // O fallback final é a ClientView (para usuários com papel CLIENT ou qualquer estado inesperado).
   return (
     <div className="bg-[#F8F9FC] min-h-screen">
+      {session && currentUserProfile && (
+        <div style={{background: 'red', color: 'white', padding: '20px', zIndex: 99999, position: 'fixed', top: 0, left: 0, right: 0}}>
+          DEBUG WARNING: O app decidiu ir para a ClientView mesmo com sessão ativa! <br/>
+          Role: {currentUserProfile?.role} | Status: {currentUserProfile?.status}
+        </div>
+      )}
+      {session && !currentUserProfile && !isLoading && (
+        <div style={{background: 'orange', color: 'black', padding: '20px', zIndex: 99999, position: 'fixed', top: 0, left: 0, right: 0}}>
+          DEBUG WARNING: Sessão existe, mas currentUserProfile é NULL! <br/>
+          Isso significa que o RLS está bloqueando a leitura do seu perfil, ou o perfil não foi criado!
+        </div>
+      )}
       <ClientView onOpenProfile={() => setShowProfileModal(true)} />
 
       {showProfileModal && (
