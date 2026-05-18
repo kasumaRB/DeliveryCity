@@ -30,6 +30,17 @@ export interface UserAddress {
   coords: { lat: number; lng: number };
 }
 
+// Cartão tokenizado salvo — NUNCA armazena número real, apenas token do PagSeguro
+export interface SavedCard {
+  id: string;           // UUID local para identificar o card salvo
+  token: string;        // Token do PagSeguro (usado para cobrar sem redigitar)
+  last4: string;        // Últimos 4 dígitos (ex: "1234") — só para exibição
+  brand: string;        // Bandeira (ex: "VISA", "MASTER") — só para exibição
+  holderName: string;   // Nome do titular — só para exibição
+  expiryMonth: string;  // Mês de validade — só para exibição
+  expiryYear: string;   // Ano de validade — só para exibição
+}
+
 export interface UserProfile {
   id: string;
   email: string;
@@ -57,6 +68,7 @@ export interface UserProfile {
   commissionBalance?: number;
   avatarUrl?: string;
   customFeePct?: number;
+  savedCards?: SavedCard[];
 }
 
 export interface Product {

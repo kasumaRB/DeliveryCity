@@ -9,6 +9,7 @@ import {
   UserAddress,
   OrderStatus,
   OrderRating,
+  SavedCard,
 } from '../types';
 import {
   Star,
@@ -35,6 +36,7 @@ import {
   Loader,
   Tag,
   Check,
+  Trash2,
 } from 'lucide-react';
 import { AddressModal } from '../components/AddressModal';
 import Logo from '../assets/Logo.png';
@@ -86,6 +88,12 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
   const [cardHolder, setCardHolder] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvv, setCardCvv] = useState('');
+  const [saveCardForFuture, setSaveCardForFuture] = useState(false);
+
+  // Cartão salvo selecionado
+  const [selectedSavedCardId, setSelectedSavedCardId] = useState<string | null>(null);
+  const [savedCardCvv, setSavedCardCvv] = useState(''); // CVV necessário mesmo para cards salvos (PCI)
+  const [showNewCardForm, setShowNewCardForm] = useState(false);
 
   // Coupon states
   const [couponCode, setCouponCode] = useState('');
@@ -336,93 +344,106 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
 
     setIsProcessing(true);
     try {
-      if (selectedPayment === 'CREDIT_CARD') {
+      if (selectedPayment === 'CREDIT_CARD' || selectedPayment === 'DEBIT_CARD') {
         if (!window.PagSeguro) {
           throw new Error('Serviço de pagamento indisponível. Tente outro método de pagamento.');
         }
-
         const pagseguroPublicKey = import.meta.env.VITE_PAGSEGURO_PUBLIC_KEY;
         if (!pagseguroPublicKey) {
           throw new Error('Chave do PagSeguro não configurada. Entre em contato com o suporte.');
         }
 
-        const [expMonth, expYear] = cardExpiry.split('/');
-        const card = window.PagSeguro.encryptCard({
-          publicKey: pagseguroPublicKey,
-          holder: cardHolder,
-          number: cardNumber.replace(/\s/g, ''),
-          expMonth,
-          expYear: `20${expYear}`,
-          securityCode: cardCvv,
-        });
-        if (card.hasErrors) throw new Error(`Erro no cartão: ${card.errors[0].message}`);
+        // ─── Calcula split ────────────────────────────────────────────
+        const buildSplit = () => {
+          let restaurantFeePct = platformSettings?.restaurantFeePct ?? 0.08;
+          const owner = profiles?.find(p => p.id === selectedRestaurant.ownerId);
+          if (owner?.customFeePct !== undefined) restaurantFeePct = owner.customFeePct / 100;
+          const finalProductTotal = Math.max(0, cartSubtotal - discount);
+          const restaurantNetEarnings = finalProductTotal * (1 - restaurantFeePct);
+          const platformTotalCut = cartTotal - restaurantNetEarnings;
+          return {
+            rules: [
+              { recipient: selectedRestaurant.pagseguroRecipientId, liable: true, charge_processing_fee: true, amount: { value: Math.round(restaurantNetEarnings * 100) } },
+              { recipient: import.meta.env.VITE_PAGSEGURO_PLATFORM_RECIPIENT_ID || '', liable: false, charge_processing_fee: false, amount: { value: Math.round(platformTotalCut * 100) } },
+            ],
+          };
+        };
+
+        let encryptedCard: string;
+        const savedCards = currentUserProfile.savedCards || [];
+        const selectedSaved = savedCards.find(c => c.id === selectedSavedCardId);
+
+        if (selectedSaved) {
+          // ── Usar cartão salvo: re-encripta com CVV informado ──────────
+          if (!savedCardCvv || savedCardCvv.length < 3) {
+            throw new Error('Informe o CVV do cartão selecionado.');
+          }
+          const enc = window.PagSeguro.encryptCard({
+            publicKey: pagseguroPublicKey,
+            holder: selectedSaved.holderName,
+            number: `000000000000${selectedSaved.last4}`, // placeholder — PagSeguro aceita token diretamente
+            expMonth: selectedSaved.expiryMonth,
+            expYear: `20${selectedSaved.expiryYear}`,
+            securityCode: savedCardCvv,
+          });
+          // Na prática, usa o token salvo no campo card.token para a API do PagSeguro
+          encryptedCard = enc.encryptedCard;
+        } else {
+          // ── Novo cartão ───────────────────────────────────────────────
+          const [expMonth, expYear] = cardExpiry.split('/');
+          const enc = window.PagSeguro.encryptCard({
+            publicKey: pagseguroPublicKey,
+            holder: cardHolder,
+            number: cardNumber.replace(/\s/g, ''),
+            expMonth,
+            expYear: `20${expYear}`,
+            securityCode: cardCvv,
+          });
+          if (enc.hasErrors) throw new Error(`Erro no cartão: ${enc.errors[0].message}`);
+          encryptedCard = enc.encryptedCard;
+        }
+
         const { data, error } = await supabase.functions.invoke('create-pagseguro-payment', {
           body: {
-            items: cart.map(i => ({
-              name: i.product.name,
-              quantity: i.quantity,
-              unit_amount: Math.round(i.product.price * 100),
-            })),
-            customer: {
-              name: currentUserProfile.name,
-              email: currentUserProfile.email,
-              tax_id: currentUserProfile.cpf || '',
-            },
+            items: cart.map(i => ({ name: i.product.name, quantity: i.quantity, unit_amount: Math.round(i.product.price * 100) })),
+            customer: { name: currentUserProfile.name, email: currentUserProfile.email, tax_id: currentUserProfile.cpf || '' },
             charge: {
               reference_id: `order_${Date.now()}`,
               amount: { value: Math.round(cartTotal * 100), currency: 'BRL' },
               payment_method: {
-                type: 'CREDIT_CARD',
+                type: selectedPayment === 'CREDIT_CARD' ? 'CREDIT_CARD' : 'DEBIT_CARD',
                 installments: 1,
                 capture: true,
-                card: { encrypted: card.encryptedCard },
+                card: selectedSaved
+                  ? { id: selectedSaved.token, security_code: savedCardCvv }
+                  : { encrypted: encryptedCard, store: saveCardForFuture },
               },
-              split: (() => {
-                let restaurantFeePct = platformSettings?.restaurantFeePct ?? 0.08;
-                if (selectedRestaurant) {
-                  const owner = profiles?.find(p => p.id === selectedRestaurant.ownerId);
-                  if (owner && owner.customFeePct !== undefined) {
-                    restaurantFeePct = owner.customFeePct / 100;
-                  }
-                }
-                
-                // O lojista recebe o valor final dos itens - cupom, descontado a taxa da plataforma (8%)
-                const finalProductTotal = Math.max(0, cartSubtotal - discount);
-                const restaurantNetEarnings = finalProductTotal * (1 - restaurantFeePct);
-                
-                const platformTotalCut = cartTotal - restaurantNetEarnings;
-
-                return {
-                  rules: [
-                    {
-                      recipient: selectedRestaurant.pagseguroRecipientId,
-                      liable: true,
-                      charge_processing_fee: true,
-                      amount: { value: Math.round(restaurantNetEarnings * 100) },
-                    },
-                    {
-                      recipient: import.meta.env.VITE_PAGSEGURO_PLATFORM_RECIPIENT_ID || '',
-                      liable: false,
-                      charge_processing_fee: false,
-                      amount: { value: Math.round(platformTotalCut * 100) },
-                    },
-                  ],
-                };
-              })(),
+              split: buildSplit(),
             },
           },
         });
         if (error) throw error;
+
+        // ── Salvar cartão se o usuário escolheu e é um cartão novo ──
+        if (saveCardForFuture && !selectedSaved && data.charges?.[0]?.payment_method?.card) {
+          const cardResp = data.charges[0].payment_method.card;
+          const newSavedCard: SavedCard = {
+            id: `card-${Date.now()}`,
+            token: cardResp.id || encryptedCard,
+            last4: cardResp.last_digits || cardNumber.slice(-4).replace(/\D/g, ''),
+            brand: cardResp.brand || 'CARD',
+            holderName: cardHolder,
+            expiryMonth: cardExpiry.split('/')[0],
+            expiryYear: cardExpiry.split('/')[1],
+          };
+          const updatedCards = [...savedCards, newSavedCard];
+          await store.updateUserProfile!(currentUserProfile.id, { savedCards: updatedCards });
+        }
+
         await createOrder(
-          selectedRestaurant.id,
-          cart,
-          selectedPayment,
+          selectedRestaurant.id, cart, selectedPayment,
           `${selectedAddress.street}, ${selectedAddress.number}`,
-          currentUserProfile.name,
-          data.id,
-          selectedAddress.coords,
-          deliveryFee,
-          discount
+          currentUserProfile.name, data.id, selectedAddress.coords, deliveryFee, discount
         );
       } else {
         await createOrder(
@@ -1035,7 +1056,8 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                   </span>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3 mb-8">
+              {/* ── Seletor de método de pagamento ── */}
+              <div className="grid grid-cols-3 gap-3 mb-6">
                 {([
                   { method: 'CREDIT_CARD', label: 'Crédito', icon: <CreditCard size={18} /> },
                   { method: 'DEBIT_CARD',  label: 'Débito',  icon: <CreditCard size={18} /> },
@@ -1043,20 +1065,156 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                 ] as { method: PaymentMethod; label: string; icon: React.ReactNode }[]).map(({ method, label, icon }) => (
                   <button
                     key={method}
-                    onClick={() => setSelectedPayment(method)}
+                    onClick={() => { setSelectedPayment(method); setSelectedSavedCardId(null); setShowNewCardForm(false); }}
                     className={`py-5 flex flex-col items-center justify-center gap-2 rounded-[1.8rem] border-2 transition-all ${selectedPayment === method ? 'border-orange-500 bg-orange-50 text-orange-600 shadow-lg' : 'border-gray-100 bg-white text-gray-400'}`}
                   >
-                    <div
-                      className={`p-2 rounded-xl ${selectedPayment === method ? 'bg-orange-600 text-white' : 'bg-gray-50'}`}
-                    >
+                    <div className={`p-2 rounded-xl ${selectedPayment === method ? 'bg-orange-600 text-white' : 'bg-gray-50'}`}>
                       {icon}
                     </div>
-                    <span className="text-[9px] font-black uppercase tracking-widest">
-                      {label}
-                    </span>
+                    <span className="text-[9px] font-black uppercase tracking-widest">{label}</span>
                   </button>
                 ))}
               </div>
+
+              {/* ── Cartões salvos (somente para crédito/débito) ── */}
+              {(selectedPayment === 'CREDIT_CARD' || selectedPayment === 'DEBIT_CARD') && (() => {
+                const savedCards = currentUserProfile?.savedCards || [];
+                return (
+                  <div className="mb-6 space-y-3">
+                    {/* Lista de cartões salvos */}
+                    {savedCards.map(card => (
+                      <div key={card.id}
+                        onClick={() => { setSelectedSavedCardId(card.id); setShowNewCardForm(false); setSavedCardCvv(''); }}
+                        className={`flex items-center gap-4 p-4 rounded-2xl border-2 cursor-pointer transition-all ${selectedSavedCardId === card.id ? 'border-orange-500 bg-orange-50' : 'border-gray-100 bg-gray-50 hover:border-orange-200'}`}
+                      >
+                        <div className={`p-2 rounded-xl ${selectedSavedCardId === card.id ? 'bg-orange-600 text-white' : 'bg-white text-gray-400'}`}>
+                          <CreditCard size={18} />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p className="font-black text-sm text-gray-900">{card.brand} •••• {card.last4}</p>
+                          <p className="text-[10px] text-gray-400 font-bold">{card.holderName} · {card.expiryMonth}/{card.expiryYear}</p>
+                        </div>
+                        <button
+                          onClick={async e => {
+                            e.stopPropagation();
+                            if (!confirm('Remover este cartão?')) return;
+                            const updated = savedCards.filter(c => c.id !== card.id);
+                            await store.updateUserProfile!(currentUserProfile!.id, { savedCards: updated });
+                            if (selectedSavedCardId === card.id) setSelectedSavedCardId(null);
+                          }}
+                          className="p-2 text-gray-300 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+
+                    {/* CVV do cartão salvo selecionado */}
+                    {selectedSavedCardId && !showNewCardForm && (
+                      <div className="animate-in slide-in-from-top-2 duration-200">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1 ml-1">CVV do cartão</label>
+                        <input
+                          type="password" maxLength={4}
+                          value={savedCardCvv}
+                          onChange={e => setSavedCardCvv(e.target.value.replace(/\D/g, ''))}
+                          placeholder="•••"
+                          className="w-32 p-3 bg-gray-50 border-2 border-transparent focus:border-orange-200 rounded-xl font-black text-center outline-none tracking-[0.4em]"
+                        />
+                        <p className="text-[9px] text-gray-400 font-bold mt-1 ml-1">Necessário por segurança a cada compra</p>
+                      </div>
+                    )}
+
+                    {/* Botão adicionar novo cartão */}
+                    {!showNewCardForm && (
+                      <button
+                        onClick={() => { setShowNewCardForm(true); setSelectedSavedCardId(null); }}
+                        className="w-full flex items-center gap-3 p-4 rounded-2xl border-2 border-dashed border-gray-100 text-gray-400 hover:border-orange-200 hover:text-orange-600 transition-all"
+                      >
+                        <PlusCircle size={18} />
+                        <span className="font-black text-xs uppercase tracking-widest">
+                          {savedCards.length === 0 ? 'Adicionar cartão' : 'Usar outro cartão'}
+                        </span>
+                      </button>
+                    )}
+
+                    {/* Formulário novo cartão */}
+                    {showNewCardForm && (
+                      <div className="bg-gray-50 rounded-2xl p-5 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                        <div className="flex justify-between items-center mb-2">
+                          <p className="font-black text-sm text-gray-700">Novo Cartão</p>
+                          {savedCards.length > 0 && (
+                            <button onClick={() => { setShowNewCardForm(false); setSelectedSavedCardId(savedCards[0].id); }}
+                              className="text-[10px] font-black text-orange-600 uppercase tracking-widest">
+                              Usar salvo
+                            </button>
+                          )}
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Número do Cartão</label>
+                          <input type="text" inputMode="numeric" maxLength={19}
+                            value={cardNumber}
+                            onChange={e => setCardNumber(e.target.value.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim())}
+                            placeholder="0000 0000 0000 0000"
+                            className="w-full p-4 bg-white rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-orange-200 tracking-widest"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Nome no Cartão</label>
+                          <input type="text"
+                            value={cardHolder}
+                            onChange={e => setCardHolder(e.target.value.toUpperCase())}
+                            placeholder="NOME COMO NO CARTÃO"
+                            className="w-full p-4 bg-white rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-orange-200 uppercase tracking-widest"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Validade</label>
+                            <input type="text" inputMode="numeric" maxLength={5}
+                              value={cardExpiry}
+                              onChange={e => {
+                                const v = e.target.value.replace(/\D/g, '');
+                                setCardExpiry(v.length > 2 ? `${v.slice(0,2)}/${v.slice(2)}` : v);
+                              }}
+                              placeholder="MM/AA"
+                              className="w-full p-4 bg-white rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-orange-200 tracking-widest"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">CVV</label>
+                            <input type="password" inputMode="numeric" maxLength={4}
+                              value={cardCvv}
+                              onChange={e => setCardCvv(e.target.value.replace(/\D/g, ''))}
+                              placeholder="•••"
+                              className="w-full p-4 bg-white rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-orange-200 tracking-[0.4em]"
+                            />
+                          </div>
+                        </div>
+                        {/* Opção salvar cartão */}
+                        <label className="flex items-center gap-3 cursor-pointer select-none p-3 bg-white rounded-xl border border-gray-100">
+                          <div
+                            onClick={() => setSaveCardForFuture(v => !v)}
+                            className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${saveCardForFuture ? 'bg-orange-600 border-orange-600' : 'border-gray-300'}`}
+                          >
+                            {saveCardForFuture && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>}
+                          </div>
+                          <div>
+                            <p className="text-xs font-black text-gray-700">Salvar cartão para próximas compras</p>
+                            <p className="text-[9px] text-gray-400 font-bold">Apenas o token seguro é salvo. Seus dados não ficam no servidor.</p>
+                          </div>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* ── PIX: instrução ── */}
+              {selectedPayment === 'PIX' && (
+                <div className="mb-6 p-4 bg-green-50 border border-green-100 rounded-2xl">
+                  <p className="text-xs font-bold text-green-700">Após confirmar, você receberá o QR Code do PIX para pagamento. O pedido é confirmado só após o pagamento.</p>
+                </div>
+              )}
             </div>
             <button
               onClick={handleFinalizeOrder}

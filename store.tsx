@@ -146,6 +146,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     workingHours: p.working_hours || '',
     currentLocation: p.current_location || undefined,
     customFeePct: p.custom_fee_pct ? Number(p.custom_fee_pct) : undefined,
+    savedCards: Array.isArray(p.saved_cards) ? p.saved_cards : [],
   });
 
   const mapOrder = (o: any): Order => ({
@@ -670,6 +671,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       up.pagseguro_recipient_id = data.pagseguroRecipientId;
     if (data.avatarUrl !== undefined) up.avatar_url = data.avatarUrl;
     if (data.customFeePct !== undefined) up.custom_fee_pct = data.customFeePct;
+    if (data.savedCards !== undefined) up.saved_cards = data.savedCards;
     // currentLocation é atualizado silenciosamente (sem fetchData) para não sobrecarregar o banco
     if (data.currentLocation !== undefined) up.current_location = data.currentLocation;
 
