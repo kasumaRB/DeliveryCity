@@ -177,7 +177,7 @@ export const AddressModal: React.FC<AddressModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[70] bg-black/60 flex items-end md:items-center justify-center p-0 md:p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[120] bg-black/60 flex items-end md:items-center justify-center p-0 md:p-4 backdrop-blur-sm">
       <div className="bg-white w-full md:max-w-xl md:rounded-[2.5rem] rounded-t-[3rem] p-6 h-[92vh] md:h-auto overflow-y-auto no-scrollbar animate-in slide-in-from-bottom duration-300 relative shadow-2xl">
         <div className="flex justify-between items-center mb-6">
           <div>

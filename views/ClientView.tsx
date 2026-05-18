@@ -73,6 +73,8 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [showOrderSuccess, setShowOrderSuccess] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  // Rastreia se o checkout estava aberto quando o seletor de endereço foi ativado
+  const [checkoutWasOpen, setCheckoutWasOpen] = useState(false);
 
   const [ratingOrder, setRatingOrder] = useState<Order | null>(null);
   const [storeStars, setStoreStars] = useState(0);
@@ -167,6 +169,11 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     }
     setIsAddressModalOpen(false);
     setIsAddressSelectorOpen(false);
+    // Se o checkout estava aberto antes de entrar no fluxo de endereço, reabre
+    if (checkoutWasOpen) {
+      setIsCheckoutOpen(true);
+      setCheckoutWasOpen(false);
+    }
   };
 
   const handleFinishRating = async () => {
@@ -320,6 +327,9 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     }
 
     if (!selectedAddress) {
+      // Fecha checkout temporariamente para o seletor de endereço ficar visível
+      setCheckoutWasOpen(true);
+      setIsCheckoutOpen(false);
       setIsAddressSelectorOpen(true);
       return;
     }
@@ -1102,8 +1112,15 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
       {/* ENDEREÇO E AVALIAÇÃO */}
       {isAddressSelectorOpen && (
         <div
-          className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-6 animate-in fade-in duration-300"
-          onClick={() => setIsAddressSelectorOpen(false)}
+          className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-6 animate-in fade-in duration-300"
+          onClick={() => {
+            setIsAddressSelectorOpen(false);
+            // Se checkout estava aberto antes, reabre
+            if (checkoutWasOpen) {
+              setIsCheckoutOpen(true);
+              setCheckoutWasOpen(false);
+            }
+          }}
         >
           <div
             className="bg-white w-full md:max-w-xl rounded-t-[3.5rem] md:rounded-[3.5rem] p-10 shadow-2xl animate-in slide-in-from-bottom duration-500 max-h-[80vh] flex flex-col"
@@ -1153,6 +1170,11 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
               <button
                 onClick={() => {
                   setIsAddressSelectorOpen(false);
+                  // Se checkout estava aberto, fecha-o para o AddressModal ficar visível
+                  if (isCheckoutOpen) {
+                    setCheckoutWasOpen(true);
+                    setIsCheckoutOpen(false);
+                  }
                   setIsAddressModalOpen(true);
                 }}
                 className="w-full flex items-center gap-5 p-5 rounded-[2rem] border-2 border-dashed border-gray-100 text-gray-400 hover:border-orange-200 hover:text-orange-600 transition-all active:scale-[0.98] group"
