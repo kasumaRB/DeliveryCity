@@ -281,8 +281,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
       }
       setIsSupabaseConnected(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao sincronizar dados:', err);
+      if (typeof window !== 'undefined') {
+        (window as any).lastSyncError = err?.message || String(err);
+      }
       setIsSupabaseConnected(false);
     } finally {
       setIsLoading(false);
