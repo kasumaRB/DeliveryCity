@@ -348,6 +348,41 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
     if (!validateFields()) return;
     setLoading(true);
     try {
+      const cleanCpf   = cpf.replace(/\D/g, '');
+      const cleanPhone = phone.trim();
+      const SUPPORT    = import.meta.env.VITE_SUPPORT_PHONE || '(66) 98419-9198';
+
+      // 🔒 VERIFICAÇÃO 1: CPF já vinculado a outra conta?
+      if (cleanCpf && cleanCpf.length === 11) {
+        const { data: cpfRow } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('cpf', cleanCpf)
+          .maybeSingle();
+        if (cpfRow) {
+          throw new Error(
+            `CPF já cadastrado em outra conta.\n` +
+            `Se perdeu o acesso, fale com o suporte: ${SUPPORT}`
+          );
+        }
+      }
+
+      // 🔒 VERIFICAÇÃO 2: Telefone já vinculado a outra conta?
+      if (cleanPhone) {
+        const { data: phoneRow } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('phone_number', cleanPhone)
+          .maybeSingle();
+        if (phoneRow) {
+          throw new Error(
+            `WhatsApp já cadastrado em outra conta.\n` +
+            `Se perdeu o acesso, fale com o suporte: ${SUPPORT}`
+          );
+        }
+      }
+
+      // Criar conta no Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -371,12 +406,12 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
         name,
         businessName,
         role: roleToSet,
-        cpf: cpf.replace(/\D/g, ''),
+        cpf: cleanCpf,
         cnpj: cnpj.replace(/\D/g, ''),
         birthDate,
         vehicleType: partnerType === UserRole.DRIVER ? vehicleType : undefined,
         licensePlate: partnerType === UserRole.DRIVER ? licensePlate : undefined,
-        phoneNumber: phone,
+        phoneNumber: cleanPhone,
         pixKey,
         status: mode === 'REGISTER_PARTNER' ? 'PENDING' : 'APPROVED',
         description,
@@ -412,6 +447,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
       setLoading(false);
     }
   };
+
 
   const handleUpdateProfile = async () => {
     if (!validateFields() || !currentUserProfile) return;
