@@ -125,7 +125,7 @@ const BlockedView: React.FC<{ onSignOut: () => void }> = ({ onSignOut }) => {
 };
 
 const AppContent: React.FC = () => {
-  const { currentRole, isLoading, currentUserProfile, signOut, session } = useAppStore();
+  const { currentRole, isLoading, currentUserProfile, signOut, session, profiles } = useAppStore();
   const [showProfileModal, setShowProfileModal] = useState(false);
 
   // Se não há sessão e o app não está carregando, o usuário não está logado.
@@ -224,7 +224,9 @@ const AppContent: React.FC = () => {
       {session && !currentUserProfile && !isLoading && (
         <div style={{background: 'orange', color: 'black', padding: '20px', zIndex: 99999, position: 'fixed', top: 0, left: 0, right: 0}}>
           DEBUG WARNING: Sessão existe, mas currentUserProfile é NULL! <br/>
-          Isso significa que o RLS está bloqueando a leitura do seu perfil, ou o perfil não foi criado!
+          Session ID: {session.user.id} <br/>
+          Profiles in state: {profiles?.length || 'unknown'} <br/>
+          Profile IDs: {profiles?.map((p: any) => p.id).join(', ')}
         </div>
       )}
       <ClientView onOpenProfile={() => setShowProfileModal(true)} />
