@@ -113,15 +113,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [realDistances, setRealDistances] = useState<Record<string, any>>({});
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings | null>(null);
 
-  // 🔒 SEGURANÇA: currentUserProfile é derivado da sessão Supabase (JWT)
-  // session.user.id é assinado pelo Supabase — não pode ser forjado pelo cliente
-  const currentUserProfile = session ? profiles.find(p => p.id === session.user.id) || null : null;
+  // 🔒 SEGURANÇA: currentUserProfile agora tem estado próprio para evitar race condition
+  // onde profiles.find() roda ANTES de setProfiles() ser commitado pelo React
+  const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
-    // Role vem do perfil buscado no banco — nunca do localStorage
+    // Role vem do perfil buscado no banco - nunca do localStorage
     if (currentUserProfile) setCurrentRole(currentUserProfile.role);
     else setCurrentRole(null);
   }, [currentUserProfile]);
+
+  // Sync: se a sessão mudar sem fetchData (ex: logout), limpa o perfil
+  useEffect(() => {
+    if (!session) setCurrentUserProfile(null);
+  }, [session]);
 
   useEffect(() => {
     saveCartToOffline(cart);
@@ -273,6 +278,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setProfiles(mapped);
         localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(mapped));
         cachedData.profiles = mapped;
+
+        // ✅ FIX CRÍTICO: Atualiza currentUserProfile DIRETAMENTE aqui, no mesmo ciclo,
+        // evitando race condition onde profiles.find() roda antes do setProfiles() ser commitado.
+        if (currentSession?.user) {
+          const myProfile = mapped.find(p => p.id === currentSession.user.id) || null;
+          setCurrentUserProfile(myProfile);
+          devLog('[DEV] currentUserProfile setado diretamente:', myProfile?.role, myProfile?.status);
+        }
       } else if (profileData.error) {
         console.error('[CRITICAL] Erro ao buscar profiles do Supabase:', profileData.error);
         if (typeof window !== 'undefined') {
