@@ -125,7 +125,7 @@ const BlockedView: React.FC<{ onSignOut: () => void }> = ({ onSignOut }) => {
 };
 
 const AppContent: React.FC = () => {
-  const { currentRole, isLoading, currentUserProfile, signOut, session, profiles } = useAppStore();
+  const { currentRole, isLoading, currentUserProfile, signOut, session } = useAppStore();
   const [showProfileModal, setShowProfileModal] = useState(false);
 
   // Se não há sessão e o app não está carregando, o usuário não está logado.
@@ -215,22 +215,6 @@ const AppContent: React.FC = () => {
   // O fallback final é a ClientView (para usuários com papel CLIENT ou qualquer estado inesperado).
   return (
     <div className="bg-[#F8F9FC] min-h-screen">
-      {session && currentUserProfile && (
-        <div style={{background: 'red', color: 'white', padding: '20px', zIndex: 99999, position: 'fixed', top: 0, left: 0, right: 0}}>
-          DEBUG WARNING: O app decidiu ir para a ClientView mesmo com sessão ativa! <br/>
-          Role: {currentUserProfile?.role} | Status: {currentUserProfile?.status}
-        </div>
-      )}
-      {session && !currentUserProfile && !isLoading && (
-        <div style={{background: 'orange', color: 'black', padding: '20px', zIndex: 99999, position: 'fixed', top: 0, left: 0, right: 0}}>
-          DEBUG WARNING: Sessão existe, mas currentUserProfile é NULL! <br/>
-          Session ID: {session.user.id} <br/>
-          Profiles in state: {profiles?.length || 'unknown'} <br/>
-          DB Profile Length: {(typeof window !== 'undefined' && (window as any).debugProfileLength) ?? 'Ainda nao rodou'} <br/>
-          <strong>LAST SYNC ERROR: {(typeof window !== 'undefined' && (window as any).lastSyncError) || 'Nenhum erro pego no catch'}</strong> <br/>
-          Verifique se você está usando a senha correta para o email. Se a tela estiver presa, um erro no Supabase ocorreu e foi logado no console (pressione F12).
-        </div>
-      )}
       <ClientView onOpenProfile={() => setShowProfileModal(true)} />
 
       {showProfileModal && (
