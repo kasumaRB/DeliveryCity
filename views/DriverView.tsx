@@ -225,6 +225,7 @@ export const DriverView: React.FC = () => {
     processSyncQueue,
     calculateDistance,
     platformSettings,
+    updateUserProfile,
   } = useAppStore();
 
   const [activeTab, setActiveTab] = useState<'home' | 'history' | 'earnings' | 'support' | 'profile'>('home');
