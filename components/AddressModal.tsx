@@ -161,21 +161,29 @@ export const AddressModal: React.FC<AddressModalProps> = ({
   };
 
   const handleConfirm = () => {
-    if (!addrStreet.trim()) {
-      alert('Por favor, informe a rua.');
-      return;
-    }
+    // Coords são obrigatórias — garantidas pelo mapa
+    const finalCoords = addrCoords || APIACAS_CENTER;
+
+    // Em cidades sem endereços mapeados, o sistema funciona por coordenadas.
+    // Se não houver rua (Nominatim não retornou nada), usamos referência ou
+    // a descrição de coordenadas como identificador de exibição.
+    const finalStreet =
+      addrStreet.trim() ||
+      addrReference.trim() ||
+      addrNeighborhood.trim() ||
+      `${finalCoords.lat.toFixed(5)}, ${finalCoords.lng.toFixed(5)}`;
+
     onSave({
       label: addrLabel,
-      street: addrStreet.trim(),
-      number: addrNumber.trim() || 'S/N',
-      neighborhood: addrNeighborhood.trim() || 'Centro',
-      city: addrCity,
-      state: addrState,
+      street: finalStreet,
+      number: addrNumber.trim() || '',
+      neighborhood: addrNeighborhood.trim() || '',
+      city: addrCity || 'Apiacás',
+      state: addrState || 'MT',
       zipCode: addrZip,
       complement: addrComplement,
       reference: addrReference,
-      coords: addrCoords || APIACAS_CENTER,
+      coords: finalCoords,
     });
   };
 
@@ -215,28 +223,53 @@ export const AddressModal: React.FC<AddressModalProps> = ({
               <div ref={mapRef} className="w-full h-full" />
             )}
 
+            {/* Banner de instrução no topo do mapa */}
+            {!mapError && !isLoadingInitial && (
+              <div className={`absolute top-3 left-1/2 -translate-x-1/2 z-[400] pointer-events-none transition-all duration-300 ${isMapDragging ? 'opacity-0 -translate-y-1' : 'opacity-100'}`}>
+                <div className="bg-black/60 backdrop-blur-sm text-white text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full whitespace-nowrap">
+                  👆 Arraste o mapa para posicionar o pino
+                </div>
+              </div>
+            )}
+
             {/* Pino central fixo */}
             {!mapError && !isLoadingInitial && (
               <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[400] pointer-events-none pb-[34px]">
+                {/* Anel pulsante quando parado */}
+                {!isMapDragging && (
+                  <>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[calc(50%+17px)] w-12 h-12 rounded-full border-2 border-orange-400 opacity-60 animate-ping" />
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[calc(50%+17px)] w-8 h-8 rounded-full border-2 border-orange-300 opacity-40 animate-ping [animation-delay:0.3s]" />
+                  </>
+                )}
                 <MapPin
-                  size={40}
-                  className={`drop-shadow-lg transition-all duration-300 ${isMapDragging ? 'text-orange-500 -translate-y-2' : 'text-orange-600'}`}
+                  size={44}
+                  className={`drop-shadow-xl transition-all duration-200 ${isMapDragging ? 'text-orange-400 -translate-y-4 scale-110' : 'text-orange-600'}`}
                 />
-                <div className={`w-3 h-1.5 bg-black/30 rounded-full mx-auto mt-[-5px] blur-[1px] transition-all duration-300 ${isMapDragging ? 'scale-75 opacity-30' : 'scale-100 opacity-100'}`} />
+                <div className={`w-4 h-2 bg-black/30 rounded-full mx-auto mt-[-6px] blur-[2px] transition-all duration-200 ${isMapDragging ? 'scale-50 opacity-20' : 'scale-100 opacity-80'}`} />
+              </div>
+            )}
+
+            {/* Banner "Solte para confirmar" durante o arraste */}
+            {!mapError && !isLoadingInitial && isMapDragging && (
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[400] pointer-events-none">
+                <div className="bg-orange-600 text-white text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full whitespace-nowrap shadow-lg">
+                  ✋ Solte para definir o ponto
+                </div>
               </div>
             )}
 
             {/* Botão GPS */}
             <button
               onClick={handleUseCurrentLocation}
-              className="absolute bottom-4 right-12 bg-white p-3 rounded-2xl shadow-xl text-orange-600 hover:bg-orange-50 transition z-[400] border border-gray-50"
+              className="absolute bottom-4 right-3 bg-white p-3 rounded-2xl shadow-xl text-orange-600 hover:bg-orange-50 transition z-[400] border border-gray-100"
             >
               {isLoadingLocation ? <Loader className="animate-spin" size={20} /> : <Crosshair size={20} />}
             </button>
           </div>
 
           <p className="text-center text-[9px] text-gray-400 font-black uppercase tracking-widest">
-            {isMapDragging ? 'Solte para definir' : 'Arraste o mapa para ajustar o pino'}
+            {addrCoords ? `📍 ${addrCoords.lat.toFixed(5)}, ${addrCoords.lng.toFixed(5)}` : 'Aguardando localização...'}
           </p>
 
           {/* FORMULÁRIO */}

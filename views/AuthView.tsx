@@ -423,16 +423,19 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
       });
 
       if (mode === 'REGISTER_PARTNER' && partnerType === UserRole.RESTAURANT) {
-        await supabase.from('restaurants').insert({
+        // Usa upsert para garantir que sobrescreve o registro criado pelo upsert_profile RPC
+        // e salva as coords do endereço cadastrado pelo lojista
+        await supabase.from('restaurants').upsert({
           id: `rest-${userId}`,
           owner_id: userId,
           name: businessName || name,
-          address: regAddress ? regAddress.address : '',
+          address: regAddress ? `${regAddress.street}, ${regAddress.number} - ${regAddress.city}` : '',
           description: description || '',
           working_hours: workingHours || '',
+          coords: regAddress?.coords ?? null,
           menu: [],
           is_active: true,
-        });
+        }, { onConflict: 'id' });
       }
 
       const msg =

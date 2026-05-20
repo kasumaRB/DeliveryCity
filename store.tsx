@@ -53,7 +53,8 @@ interface AppContextType {
     customerName: string,
     paymentId?: string,
     addressCoords?: { lat: number; lng: number },
-    deliveryFeeOverride?: number
+    deliveryFeeOverride?: number,
+    discountAmount?: number
   ) => Promise<void>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   confirmPickup: (orderId: string, code: string) => Promise<boolean>;
@@ -233,6 +234,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           menu: r.menu || [],
           rating: Number(r.rating || 0),
           pagseguroRecipientId: r.pagseguro_recipient_id,
+          // Protege contra coords null — evita crash em cálculos de distância
+          coords: r.coords ?? { lat: -9.5422, lng: -57.4486 },
         }));
         setRestaurants(mapped);
         localStorage.setItem(STORAGE_KEY_RESTAURANTS, JSON.stringify(mapped));
@@ -907,24 +910,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         assignDriver: async (oid, did) => {
           const driver = profiles.find(p => p.id === did);
           const order = orders.find(o => o.id === oid);
-          
+
           let updatePayload: any = { driver_id: did, status: OrderStatus.READY };
-          
+
           if (driver && order && driver.customFeePct !== undefined) {
             const driverFeePct = driver.customFeePct / 100;
             const newDriverEarnings = order.deliveryFee * (1 - driverFeePct);
-            // The platform fee difference needs to be adjusted
             const diff = newDriverEarnings - order.driverNetEarnings;
             const newPlatformFee = order.platformFee - diff;
-            
+
             updatePayload.driver_net_earnings = newDriverEarnings;
             updatePayload.platform_fee = newPlatformFee;
           }
-          
-          await supabase
+
+          // 🔒 Anti-race condition: só atualiza se driver_id ainda for null
+          // Evita que dois entregadores aceitem o mesmo pedido simultaneamente
+          const { data: updated, error } = await supabase
             .from('orders')
             .update(updatePayload)
-            .eq('id', oid);
+            .eq('id', oid)
+            .is('driver_id', null)
+            .select('id')
+            .maybeSingle();
+
+          if (error) throw new Error(`Erro ao aceitar pedido: ${error.message}`);
+          if (!updated) throw new Error('Este pedido já foi aceito por outro entregador.');
+
           await fetchData();
         },
         registerProfile,

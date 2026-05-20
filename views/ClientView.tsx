@@ -153,6 +153,16 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     }
   }, [orders, currentUserProfile]);
 
+  // Formata endereço para exibição — funciona mesmo sem rua cadastrada (só coords)
+  const formatAddressDisplay = (addr: UserAddress): string => {
+    if (addr.street && !addr.street.includes(',')) return addr.number ? `${addr.street}, ${addr.number}` : addr.street;
+    if (addr.street) return addr.street; // já tem tudo junto (ex: coordenadas)
+    if (addr.reference) return addr.reference;
+    if (addr.neighborhood) return addr.neighborhood;
+    if (addr.coords) return `📍 ${addr.coords.lat.toFixed(4)}, ${addr.coords.lng.toFixed(4)}`;
+    return addr.city || 'Local definido';
+  };
+
   const handleAddressButtonClick = () => {
     if (currentUserProfile) {
       setIsAddressSelectorOpen(true);
@@ -356,6 +366,22 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     }
     if (!selectedRestaurant || cart.length === 0 || !createOrder) return;
 
+    // Valida restaurante ainda aberto (pode ter fechado enquanto o carrinho estava montado)
+    if (selectedRestaurant.isOpen === false) {
+      alert('Este restaurante está fechado no momento. Por favor, escolha outro.');
+      setIsCheckoutOpen(false);
+      setSelectedRestaurant(null);
+      setCart([]);
+      return;
+    }
+
+    // Valida valor mínimo do pedido
+    const minOrderValue = platformSettings?.minOrderValue ?? 15;
+    if (cartSubtotal < minOrderValue) {
+      alert(`Pedido mínimo é R$ ${minOrderValue.toFixed(2)}. Adicione mais itens ao carrinho.`);
+      return;
+    }
+
     setIsProcessing(true);
     try {
       if (selectedPayment === 'CREDIT_CARD' || selectedPayment === 'DEBIT_CARD') {
@@ -451,7 +477,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
 
         await createOrder(
           selectedRestaurant.id, cart, selectedPayment,
-          `${selectedAddress.street}, ${selectedAddress.number}`,
+          formatAddressDisplay(selectedAddress),
           currentUserProfile.name,
           data.id,
           selectedAddress.coords,
@@ -466,7 +492,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
           selectedRestaurant.id,
           cart,
           selectedPayment,
-          `${selectedAddress.street}, ${selectedAddress.number}`,
+          formatAddressDisplay(selectedAddress),
           currentUserProfile.name,
           undefined,
           selectedAddress.coords,
@@ -553,7 +579,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
               </span>
               <span className="truncate text-[11px] font-black text-gray-900">
                 {selectedAddress
-                  ? `${selectedAddress.street}, ${selectedAddress.number}`
+                  ? formatAddressDisplay(selectedAddress)
                   : currentUserProfile
                     ? 'Defina seu endereço'
                     : 'Olá! Faça login para pedir'}
@@ -585,10 +611,12 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {filteredStores.map(restaurant => {
                   const estFee = estimatedDeliveryFee(restaurant);
+                  const isClosed = restaurant.isOpen === false;
                   return (
                     <div
                       key={restaurant.id}
                       onClick={() => {
+                        if (isClosed) return; // bloqueia clique em restaurante fechado
                         setSelectedRestaurant(restaurant);
                         // Se logado mas sem endereço definido, pede o endereço imediatamente
                         if (currentUserProfile && !selectedAddress) {
@@ -596,14 +624,21 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                           setIsAddressSelectorOpen(true);
                         }
                       }}
-                      className="bg-white rounded-[2.5rem] shadow-xl shadow-gray-100 border border-gray-50 overflow-hidden cursor-pointer hover:-translate-y-1 transition-all active:scale-[0.98]"
+                      className={`bg-white rounded-[2.5rem] shadow-xl shadow-gray-100 border border-gray-50 overflow-hidden transition-all ${isClosed ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:-translate-y-1 active:scale-[0.98]'}`}
                     >
                       <div className="h-48 relative">
-                        <img src={restaurant.image} className="w-full h-full object-cover" />
+                        <img src={restaurant.image} className={`w-full h-full object-cover ${isClosed ? 'grayscale' : ''}`} />
                         <div className="absolute top-4 right-4 bg-white/95 px-2 py-1 rounded-xl text-[10px] font-black flex items-center gap-1 backdrop-blur-sm shadow-sm">
                           {restaurant.rating.toFixed(1)}{' '}
                           <Star size={12} className="fill-orange-500 text-orange-500" />
                         </div>
+                        {isClosed && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="bg-black/70 text-white text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full">
+                              Fechado
+                            </span>
+                          </div>
+                        )}
                       </div>
                       <div className="p-6">
                         <h3 className="font-black text-gray-900 text-lg mb-1">{restaurant.name}</h3>
@@ -614,9 +649,11 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                         <div className="flex items-center gap-2 text-[10px] font-black">
                           <MapPin size={10} className="text-orange-400" />
                           <span className="text-gray-500">
-                            {estFee !== null
-                              ? `Entrega ~R$ ${estFee.toFixed(2)}`
-                              : 'Defina seu endereço para ver o frete'}
+                            {isClosed
+                              ? 'Estabelecimento fechado'
+                              : estFee !== null
+                                ? `Entrega ~R$ ${estFee.toFixed(2)}`
+                                : 'Defina seu endereço para ver o frete'}
                           </span>
                         </div>
                       </div>
@@ -844,6 +881,68 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                               </div>
                             </div>
                           )}
+
+                          {/* Rastreamento do entregador em tempo real */}
+                          {order.status === OrderStatus.OUT_FOR_DELIVERY && order.driverId && (() => {
+                            const driver = profiles.find(p => p.id === order.driverId);
+                            const driverLoc = driver?.currentLocation;
+                            const custCoords = order.coords;
+                            const distMeters = (driverLoc && custCoords)
+                              ? calculateDistance(driverLoc.lat, driverLoc.lng, custCoords.lat, custCoords.lng) * 1000
+                              : null;
+                            const etaMins = distMeters !== null ? Math.max(1, Math.round(distMeters / 350)) : null; // ~21km/h moto urbana
+
+                            return (
+                              <div className="mt-4 bg-purple-50 border border-purple-100 rounded-2xl p-4 animate-in fade-in duration-500">
+                                <div className="flex items-center gap-3 mb-3">
+                                  <div className="bg-purple-600 p-2 rounded-xl shrink-0">
+                                    <Bike size={18} className="text-white" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-black text-purple-900 truncate">
+                                      {driver?.name || 'Entregador'} está a caminho
+                                    </p>
+                                    <p className="text-[10px] text-purple-500 font-bold uppercase tracking-widest">
+                                      {driver?.vehicleType || 'Veículo'} {driver?.licensePlate ? `· ${driver.licensePlate}` : ''}
+                                    </p>
+                                  </div>
+                                  {driver?.phoneNumber && (
+                                    <a
+                                      href={`https://wa.me/55${driver.phoneNumber.replace(/\D/g, '')}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="bg-green-100 text-green-700 p-2 rounded-xl hover:bg-green-200 transition shrink-0"
+                                      onClick={e => e.stopPropagation()}
+                                    >
+                                      <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                                      </svg>
+                                    </a>
+                                  )}
+                                </div>
+                                {distMeters !== null ? (
+                                  <div className="flex items-center gap-3 bg-white rounded-xl p-3">
+                                    <MapPin size={14} className="text-purple-500 shrink-0" />
+                                    <div>
+                                      <p className="text-xs font-black text-gray-800">
+                                        {distMeters < 1000
+                                          ? `${Math.round(distMeters)}m de você`
+                                          : `${(distMeters / 1000).toFixed(1)}km de você`}
+                                      </p>
+                                      <p className="text-[10px] text-gray-400 font-bold">
+                                        Previsão: ~{etaMins} min
+                                      </p>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2 text-[10px] text-purple-400 font-bold">
+                                    <Loader size={12} className="animate-spin" />
+                                    Aguardando localização do entregador...
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     })

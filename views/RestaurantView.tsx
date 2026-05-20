@@ -511,19 +511,19 @@ export const RestaurantView: React.FC = () => {
                   </div>
                   <button
                     onClick={async () => {
-                      const next = !(myRestaurant as any).isOpen;
-                      await updateRestaurant(myRestaurant.id, { isOpen: next } as any);
+                      const next = !myRestaurant.isOpen;
+                      await updateRestaurant(myRestaurant.id, { isOpen: next });
                     }}
                     className={`flex items-center gap-3 px-6 py-3 rounded-[2rem] font-black text-sm uppercase tracking-wider transition-all shrink-0 shadow-sm ${
-                      (myRestaurant as any).isOpen !== false
+                      myRestaurant.isOpen !== false
                         ? 'bg-green-500 text-white shadow-green-100'
                         : 'bg-red-100 text-red-600 hover:bg-red-200'
                     }`}
                   >
                     <span className={`w-3 h-3 rounded-full ${
-                      (myRestaurant as any).isOpen !== false ? 'bg-white animate-pulse' : 'bg-red-400'
+                      myRestaurant.isOpen !== false ? 'bg-white animate-pulse' : 'bg-red-400'
                     }`} />
-                    {(myRestaurant as any).isOpen !== false ? 'Aberta' : 'Fechada'}
+                    {myRestaurant.isOpen !== false ? 'Aberta' : 'Fechada'}
                   </button>
                 </div>
               </header>

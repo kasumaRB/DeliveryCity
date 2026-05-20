@@ -370,8 +370,11 @@ export const DriverView: React.FC = () => {
             updateUserProfile(currentUserProfile.id, { currentLocation: newPos });
           }
         },
-        null,
-        { enableHighAccuracy: true }
+        (err) => {
+          // GPS negado ou indisponível — usa última posição conhecida sem travar o app
+          console.warn('[GPS] Erro ao obter localização:', err.message);
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
       );
     }
     return () => {
@@ -525,7 +528,14 @@ export const DriverView: React.FC = () => {
                   <div
                     key={order.id}
                     className="bg-gray-800/50 p-6 rounded-[2.5rem] border border-gray-700/50 hover:border-blue-500/50 transition-all cursor-pointer active:scale-[0.98]"
-                    onClick={() => isOnline && assignDriver(order.id, currentUserProfile?.id!)}
+                    onClick={async () => {
+                      if (!isOnline) return;
+                      try {
+                        await assignDriver(order.id, currentUserProfile?.id!);
+                      } catch (e: any) {
+                        alert(e.message || 'Não foi possível aceitar este pedido.');
+                      }
+                    }}
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div>
@@ -567,9 +577,14 @@ export const DriverView: React.FC = () => {
                       </span>
                       <span className="flex-1"></span>
                       <button
-                        onClick={e => {
+                        onClick={async e => {
                           e.stopPropagation();
-                          isOnline ? assignDriver(order.id, currentUserProfile?.id!) : null;
+                          if (!isOnline) return;
+                          try {
+                            await assignDriver(order.id, currentUserProfile?.id!);
+                          } catch (e: any) {
+                            alert(e.message || 'Não foi possível aceitar este pedido.');
+                          }
                         }}
                         disabled={!isOnline}
                         className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-xl font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
