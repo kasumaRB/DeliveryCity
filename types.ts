@@ -6,6 +6,7 @@ export enum UserRole {
 }
 
 export enum OrderStatus {
+  PENDING_PAYMENT = 'PENDING_PAYMENT', // PIX gerado, aguardando pagamento
   PENDING = 'PENDING',
   PREPARING = 'PREPARING',
   READY = 'READY',
@@ -30,12 +31,12 @@ export interface UserAddress {
   coords: { lat: number; lng: number };
 }
 
-// Cartão tokenizado salvo — NUNCA armazena número real, apenas token do PagSeguro
+// Cartão tokenizado salvo — NUNCA armazena número real, apenas token do Asaas
 export interface SavedCard {
   id: string;           // UUID local para identificar o card salvo
-  token: string;        // Token do PagSeguro (usado para cobrar sem redigitar)
-  last4: string;        // Últimos 4 dígitos (ex: "1234") — só para exibição
-  brand: string;        // Bandeira (ex: "VISA", "MASTER") — só para exibição
+  token: string;        // Token do Asaas (creditCardToken)
+  last4: string;        // Últimos 4 dígitos — só para exibição
+  brand: string;        // Bandeira (ex: "VISA", "MASTERCARD") — só para exibição
   holderName: string;   // Nome do titular — só para exibição
   expiryMonth: string;  // Mês de validade — só para exibição
   expiryYear: string;   // Ano de validade — só para exibição
@@ -55,7 +56,8 @@ export interface UserProfile {
   pixKey?: string;
   description?: string;
   workingHours?: string;
-  pagseguroRecipientId?: string;
+  asaasAccountId?: string;    // ID da subconta Asaas (parceiros: lojista/entregador)
+  asaasCustomerId?: string;   // ID do customer Asaas (clientes pagadores)
   pushToken?: string;
   status: 'PENDING' | 'APPROVED' | 'BLOCKED';
   phoneNumber?: string;
@@ -93,7 +95,7 @@ export interface Restaurant {
   address?: string;
   coords: { lat: number; lng: number };
   menu: Product[];
-  pagseguroRecipientId?: string;
+  asaasAccountId?: string;    // ID da subconta Asaas do lojista
   deliveryFee?: number;
   minOrder?: number;
   isOpen?: boolean;
@@ -118,7 +120,10 @@ export interface Order {
   total: number;
   paymentMethod: PaymentMethod;
   changeFor?: number;
-  paymentId?: string;
+  paymentId?: string;          // ID legado / referência interna
+  asaasPaymentId?: string;     // ID da cobrança no Asaas
+  pixQrCode?: string;          // Código Pix copia-e-cola
+  pixQrCodeImage?: string;     // QR code em base64
   status: OrderStatus;
   customerAddress: string;
   customerName: string;

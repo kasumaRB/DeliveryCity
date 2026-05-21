@@ -326,7 +326,7 @@ export const AdminView: React.FC = () => {
         businessName: formData.get('businessName') as string,
         workingHours: formData.get('workingHours') as string,
         description: formData.get('description') as string,
-        pagseguroRecipientId: formData.get('pagseguroRecipientId') as string,
+        asaasAccountId: formData.get('asaasAccountId') as string,
         customFeePct: customFeeRaw !== '' && customFeeRaw !== null ? parseFloat(customFeeRaw) : null,
       } as any);
       alert('Alterações salvas com sucesso!');
@@ -1032,12 +1032,14 @@ export const AdminView: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="text-[10px] font-bold text-gray-500 uppercase ml-2 flex items-center gap-2">
-                    <DollarSign size={12} /> ID PagSeguro
+                    <DollarSign size={12} /> ID Subconta Asaas
                   </label>
                   <input
-                    name="pagseguroRecipientId"
-                    defaultValue={viewingUser.pagseguroRecipientId || ''}
+                    name="asaasAccountId"
+                    defaultValue={viewingUser.asaasAccountId || ''}
                     className="w-full mt-1 p-4 bg-gray-50 rounded-xl font-bold outline-none border-2 border-transparent focus:border-purple-500"
+                    readOnly
+                    placeholder="Gerado automaticamente"
                   />
                 </div>
                 <div>

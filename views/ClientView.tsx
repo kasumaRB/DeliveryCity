@@ -37,16 +37,13 @@ import {
   Tag,
   Check,
   Trash2,
+  Wallet,
 } from 'lucide-react';
 import { AddressModal } from '../components/AddressModal';
 import Logo from '../assets/Logo.png';
 import Nome from '../assets/Nome.png';
 
-declare global {
-  interface Window {
-    PagSeguro: any;
-  }
-}
+// PagSeguro removido — pagamentos agora processados via Asaas (Edge Functions)
 
 export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProfile }) => {
   const store = useAppStore();
@@ -95,6 +92,13 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
   const [savedCardCvv, setSavedCardCvv] = useState(''); // CVV necessário mesmo para cards salvos (PCI)
   const [showNewCardForm, setShowNewCardForm] = useState(false);
 
+  // PIX modal — exibido após criação da cobrança Asaas
+  const [pixModal, setPixModal] = useState<{
+    qrCode: string;
+    qrCodeImage: string | null;
+    asaasPaymentId: string;
+  } | null>(null);
+
   // Coupon states
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<{
@@ -112,6 +116,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
   // Helper: traduz status do pedido para português
   const traduzirStatus = (status: string): { label: string; color: string } => {
     const map: Record<string, { label: string; color: string }> = {
+      PENDING_PAYMENT:  { label: '\u23f3 Aguard. Pgto',    color: 'bg-orange-100 text-orange-700' },
       PENDING:          { label: '\u23f3 Aguardando',    color: 'bg-yellow-100 text-yellow-700' },
       PREPARING:        { label: '\ud83d\udc68\u200d\ud83c\udf73 Preparando',    color: 'bg-blue-100 text-blue-700' },
       READY:            { label: '\u2705 Pronto',         color: 'bg-green-100 text-green-700' },
@@ -384,89 +389,84 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
 
     setIsProcessing(true);
     try {
-      if (selectedPayment === 'CREDIT_CARD' || selectedPayment === 'DEBIT_CARD') {
-        if (!window.PagSeguro) {
-          throw new Error('Serviço de pagamento indisponível. Tente outro método de pagamento.');
-        }
-        const pagseguroPublicKey = import.meta.env.VITE_PAGSEGURO_PUBLIC_KEY;
-        if (!pagseguroPublicKey) {
-          throw new Error('Chave do PagSeguro não configurada. Entre em contato com o suporte.');
-        }
+      const savedCards = currentUserProfile.savedCards || [];
+      const selectedSaved = savedCards.find(c => c.id === selectedSavedCardId);
 
-        // ─── Frontend envia apenas dados brutos — valores calculados no backend ───
-        let encryptedCard: string;
-        const savedCards = currentUserProfile.savedCards || [];
-        const selectedSaved = savedCards.find(c => c.id === selectedSavedCardId);
+      // ── 1. Criar o pedido no banco (status PENDING_PAYMENT ou PENDING para dinheiro) ──
+      await createOrder(
+        selectedRestaurant.id,
+        cart,
+        selectedPayment,
+        formatAddressDisplay(selectedAddress),
+        currentUserProfile.name,
+        undefined, // paymentId — preenchido após cobrança Asaas
+        selectedAddress.coords,
+        deliveryFee,
+        discount
+      );
 
-        if (selectedSaved) {
-          if (!savedCardCvv || savedCardCvv.length < 3) {
-            throw new Error('Informe o CVV do cartão selecionado.');
-          }
-          const enc = window.PagSeguro.encryptCard({
-            publicKey: pagseguroPublicKey,
-            holder: selectedSaved.holderName,
-            number: `000000000000${selectedSaved.last4}`,
-            expMonth: selectedSaved.expiryMonth,
-            expYear: `20${selectedSaved.expiryYear}`,
-            securityCode: savedCardCvv,
-          });
-          encryptedCard = enc.encryptedCard;
-        } else {
-          const [expMonth, expYear] = cardExpiry.split('/');
-          const enc = window.PagSeguro.encryptCard({
-            publicKey: pagseguroPublicKey,
-            holder: cardHolder,
-            number: cardNumber.replace(/\s/g, ''),
-            expMonth,
-            expYear: `20${expYear}`,
-            securityCode: cardCvv,
-          });
-          if (enc.hasErrors) throw new Error(`Erro no cartão: ${enc.errors[0].message}`);
-          encryptedCard = enc.encryptedCard;
-        }
+      // ── 2. Para CREDIT_CARD ou PIX — chamar Edge Function create-asaas-payment ──
+      if (selectedPayment === 'CREDIT_CARD' || selectedPayment === 'PIX') {
+        // Buscar o pedido recém-criado (último da lista do restaurante)
+        const { data: newOrders } = await supabase
+          .from('orders')
+          .select('id')
+          .eq('restaurant_id', selectedRestaurant.id)
+          .eq('customer_id', currentUserProfile.id)
+          .order('timestamp', { ascending: false })
+          .limit(1);
 
-        // ── O backend (Edge Function) recebe apenas IDs e calcula o split ──
-        // Nenhum valor financeiro sensível é enviado pelo frontend
-        const { data, error } = await supabase.functions.invoke('create-pagseguro-payment', {
-          body: {
-            // Identificação do pedido — backend busca as taxas no banco
-            restaurantId: selectedRestaurant.id,
-            couponCode: appliedCoupon?.code || null,
-            paymentType: selectedPayment,
-            saveCard: saveCardForFuture && !selectedSaved,
+        const newOrderId = newOrders?.[0]?.id;
+        if (!newOrderId) throw new Error('Pedido criado mas ID não encontrado.');
 
-            // Dados do cliente (necessários para o PagBank)
-            customer: {
+        const paymentBody: Record<string, any> = {
+          orderId: newOrderId,
+          billingType: selectedPayment === 'CREDIT_CARD' ? 'CREDIT_CARD' : 'PIX',
+        };
+
+        // Dados de cartão
+        if (selectedPayment === 'CREDIT_CARD') {
+          if (selectedSaved?.token) {
+            // Cartão tokenizado (token Asaas salvo no perfil)
+            paymentBody.creditCardToken = selectedSaved.token;
+          } else {
+            // Cartão novo — dados enviados para tokenização no Asaas
+            const [expMonth, expYear] = cardExpiry.split('/');
+            if (!cardNumber || !cardHolder || !expMonth || !expYear || !cardCvv) {
+              throw new Error('Preencha todos os dados do cartão.');
+            }
+            paymentBody.creditCard = {
+              holderName: cardHolder,
+              number: cardNumber.replace(/\s/g, ''),
+              expiryMonth: expMonth.trim(),
+              expiryYear: `20${expYear.trim()}`,
+              ccv: cardCvv,
+            };
+            paymentBody.creditCardHolderInfo = {
               name: currentUserProfile.name,
               email: currentUserProfile.email,
-              tax_id: currentUserProfile.cpf || '',
-            },
+              cpfCnpj: currentUserProfile.cpf?.replace(/\D/g, '') || '',
+              postalCode: selectedAddress.zipCode?.replace(/\D/g, '') || '78580000',
+              addressNumber: selectedAddress.number || 's/n',
+              phone: currentUserProfile.phoneNumber?.replace(/\D/g, '') || '',
+            };
+          }
+        }
 
-            // Itens do carrinho — backend recalcula o total para validar
-            items: cart.map(i => ({
-              productId: i.product.id,
-              name: i.product.name,
-              quantity: i.quantity,
-              unit_amount: Math.round(i.product.price * 100), // backend valida contra o banco
-            })),
-
-            // Apenas o cartão encriptado — sem dados brutos
-            card: selectedSaved
-              ? { savedTokenId: selectedSaved.token, security_code: savedCardCvv }
-              : { encrypted: encryptedCard },
-          },
+        const { data: pmData, error: pmError } = await supabase.functions.invoke('create-asaas-payment', {
+          body: paymentBody,
         });
 
-        if (error) throw error;
+        if (pmError) throw pmError;
+        if (!pmData?.asaasPaymentId) throw new Error('Falha ao criar cobrança Asaas.');
 
-        // ── Salvar cartão se o usuário escolheu e é um cartão novo ──
-        if (saveCardForFuture && !selectedSaved && data.charges?.[0]?.payment_method?.card) {
-          const cardResp = data.charges[0].payment_method.card;
+        // ── Salvar token do cartão para uso futuro ──
+        if (selectedPayment === 'CREDIT_CARD' && saveCardForFuture && !selectedSaved && pmData.creditCardToken) {
           const newSavedCard: SavedCard = {
             id: `card-${Date.now()}`,
-            token: cardResp.id || encryptedCard,
-            last4: cardResp.last_digits || cardNumber.slice(-4).replace(/\D/g, ''),
-            brand: cardResp.brand || 'CARD',
+            token: pmData.creditCardToken,
+            last4: cardNumber.slice(-4).replace(/\D/g, ''),
+            brand: pmData.creditCardBrand || 'CARD',
             holderName: cardHolder,
             expiryMonth: cardExpiry.split('/')[0],
             expiryYear: cardExpiry.split('/')[1],
@@ -475,31 +475,24 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
           await store.updateUserProfile!(currentUserProfile.id, { savedCards: updatedCards });
         }
 
-        await createOrder(
-          selectedRestaurant.id, cart, selectedPayment,
-          formatAddressDisplay(selectedAddress),
-          currentUserProfile.name,
-          data.id,
-          selectedAddress.coords,
-          // 🔒 SEGURANÇA: usa valores calculados pelo backend seguro (Edge Function)
-          // nunca os valores calculados no frontend que podem ter sido manipulados
-          data._meta?.deliveryFeeCents  !== undefined ? data._meta.deliveryFeeCents  / 100 : deliveryFee,
-          data._meta?.discountCents     !== undefined ? data._meta.discountCents     / 100 : discount
-        );
-      } else {
-        // PIX: sem pagamento imediato, createOrder recalcula tudo internamente via banco
-        await createOrder(
-          selectedRestaurant.id,
-          cart,
-          selectedPayment,
-          formatAddressDisplay(selectedAddress),
-          currentUserProfile.name,
-          undefined,
-          selectedAddress.coords,
-          deliveryFee,   // será revalidado dentro de createOrder
-          discount       // será revalidado dentro de createOrder
-        );
+        // ── Para PIX: exibir modal com QR code ──
+        if (selectedPayment === 'PIX' && pmData.pixQrCode) {
+          setCart([]);
+          setCardNumber('');
+          setCardHolder('');
+          setCardExpiry('');
+          setCardCvv('');
+          setIsCheckoutOpen(false);
+          setPixModal({
+            qrCode: pmData.pixQrCode,
+            qrCodeImage: pmData.pixQrCodeImage || null,
+            asaasPaymentId: pmData.asaasPaymentId,
+          });
+          return; // não mostra "pedido confirmado" ainda — aguarda pagamento via webhook
+        }
       }
+
+      // ── 3. Limpar e confirmar ──
       setCart([]);
       setCardNumber('');
       setCardHolder('');
@@ -1406,6 +1399,62 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
               className="w-full bg-gray-950 text-white py-6 rounded-[2rem] font-black uppercase text-xs tracking-[0.3em] active:scale-95 transition-all shadow-xl"
             >
               Acompanhar Entrega
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PIX — aguardando pagamento */}
+      {pixModal && (
+        <div className="fixed inset-0 z-[130] bg-gray-950/95 backdrop-blur-2xl flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-md rounded-[3rem] p-10 text-center shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-2 bg-orange-500"></div>
+            <h2 className="text-2xl font-black text-gray-900 tracking-tighter mb-2">
+              Pague com PIX
+            </h2>
+            <p className="text-gray-400 font-medium mb-6 text-sm">
+              Escaneie o QR code ou copie o código abaixo. O pedido será confirmado automaticamente após o pagamento.
+            </p>
+
+            {pixModal.qrCodeImage ? (
+              <img
+                src={`data:image/png;base64,${pixModal.qrCodeImage}`}
+                alt="QR Code PIX"
+                className="w-56 h-56 mx-auto mb-6 rounded-2xl border-4 border-orange-100"
+              />
+            ) : (
+              <div className="w-56 h-56 mx-auto mb-6 bg-orange-50 rounded-2xl flex items-center justify-center">
+                <Wallet size={64} className="text-orange-300" />
+              </div>
+            )}
+
+            <div className="bg-gray-50 rounded-2xl p-4 mb-6">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                Código PIX Copia e Cola
+              </p>
+              <p className="text-xs font-mono text-gray-700 break-all leading-relaxed">
+                {pixModal.qrCode}
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(pixModal.qrCode).catch(() => {});
+                alert('Código PIX copiado!');
+              }}
+              className="w-full bg-orange-500 hover:bg-orange-400 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest mb-3 transition-all active:scale-95"
+            >
+              Copiar Código PIX
+            </button>
+
+            <button
+              onClick={() => {
+                setPixModal(null);
+                setActiveTab('orders');
+              }}
+              className="w-full bg-gray-100 text-gray-700 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all active:scale-95"
+            >
+              Ver Meus Pedidos
             </button>
           </div>
         </div>

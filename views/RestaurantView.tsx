@@ -139,7 +139,7 @@ export const RestaurantView: React.FC = () => {
   const [respPhone, setRespPhone] = useState(currentUserProfile?.phoneNumber || '');
   const [respCpf, setRespCpf] = useState(currentUserProfile?.cpf || '');
   const [respPix, setRespPix] = useState(currentUserProfile?.pixKey || '');
-  const [respPagseguro, setRespPagseguro] = useState(currentUserProfile?.pagseguroRecipientId || '');
+  const [respAsaasId, setRespAsaasId] = useState(currentUserProfile?.asaasAccountId || '');
 
   // Promotion states
   const [promoCode, setPromoCode] = useState('');
@@ -169,7 +169,7 @@ export const RestaurantView: React.FC = () => {
       setRespPhone(currentUserProfile.phoneNumber || '');
       setRespCpf(currentUserProfile.cpf || '');
       setRespPix(currentUserProfile.pixKey || '');
-      setRespPagseguro(currentUserProfile.pagseguroRecipientId || '');
+      setRespAsaasId(currentUserProfile.asaasAccountId || '');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showEditModal]);
@@ -326,7 +326,7 @@ export const RestaurantView: React.FC = () => {
           phoneNumber: respPhone,
           cpf: respCpf,
           pixKey: respPix,
-          pagseguroRecipientId: respPagseguro,
+          asaasAccountId: respAsaasId,
           description: storeDescription,
           workingHours: storeWorkingHours,
         }),
@@ -1641,10 +1641,11 @@ export const RestaurantView: React.FC = () => {
                   className="w-full p-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-orange-100"
                 />
                 <input
-                  value={respPagseguro}
-                  onChange={e => setRespPagseguro(e.target.value)}
-                  placeholder="ID de Recebedor (PagBank)"
-                  className="w-full p-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-orange-100"
+                  value={respAsaasId}
+                  onChange={e => setRespAsaasId(e.target.value)}
+                  placeholder="ID Subconta Asaas (gerado automaticamente)"
+                  readOnly
+                  className="w-full p-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-orange-100 opacity-60 cursor-default"
                 />
               </div>
             </div>
@@ -1652,4 +1653,14 @@ export const RestaurantView: React.FC = () => {
             <button
               onClick={handleUpdateStoreProfile}
               disabled={isSaving}
-   
+              className="w-full bg-orange-600 text-white py-6 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+            >
+              {isSaving ? <Loader className="animate-spin" size={20} /> : <Save size={20} />} Salvar
+              Alterações
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

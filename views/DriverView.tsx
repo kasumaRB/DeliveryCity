@@ -46,7 +46,7 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [plate, setPlate] = useState(currentUserProfile?.licensePlate || '');
   const [phone, setPhone] = useState(currentUserProfile?.phoneNumber || '');
   const [pixKey, setPixKey] = useState(currentUserProfile?.pixKey || '');
-  const [pagseguroId, setPagseguroId] = useState(currentUserProfile?.pagseguroRecipientId || '');
+  const [asaasAccountId, setAsaasAccountId] = useState(currentUserProfile?.asaasAccountId || '');
 
   const myRatings = useMemo(() => {
     return orders
@@ -69,7 +69,7 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         licensePlate: vehicle !== 'Bicicleta' ? plate : '',
         phoneNumber: phone,
         pixKey,
-        pagseguroRecipientId: pagseguroId,
+        asaasAccountId,
       });
       alert('Dados atualizados!');
       onBack();
@@ -156,13 +156,14 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
             <div className="space-y-2 mb-8">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">
-                ID Recebedor (PagBank)
+                ID Subconta Asaas
               </label>
               <input
-                value={pagseguroId}
-                onChange={e => setPagseguroId(e.target.value)}
+                value={asaasAccountId}
+                onChange={e => setAsaasAccountId(e.target.value)}
                 className="w-full p-5 bg-gray-700/50 rounded-2xl font-bold border-2 border-transparent outline-none text-white focus:border-blue-500 transition-all"
-                placeholder="Ex: re_123456789..."
+                placeholder="Gerado automaticamente ao cadastrar..."
+                readOnly
               />
             </div>
 
@@ -808,4 +809,10 @@ export const DriverView: React.FC = () => {
       {/* Offline Banner */}
       {!isOnline && (
         <div className="fixed bottom-24 left-6 right-6 bg-red-600 text-white py-3 px-6 rounded-2xl flex items-center justify-center gap-3 shadow-xl animate-bounce z-40">
-          <Wif
+          <WifiOff size={20} />
+          <span className="font-bold text-sm">Sem conexão — modo offline</span>
+        </div>
+      )}
+    </div>
+  );
+};

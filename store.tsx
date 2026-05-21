@@ -146,7 +146,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     vehicleType: p.vehicle_type || '',
     licensePlate: p.license_plate || '',
     pixKey: p.pix_key || '',
-    pagseguroRecipientId: p.pagseguro_recipient_id || '',
+    asaasAccountId: p.asaas_account_id || '',
+    asaasCustomerId: p.asaas_customer_id || '',
     phoneNumber: p.phone_number || '',
     savedAddresses: Array.isArray(p.saved_addresses) ? p.saved_addresses : [],
     commissionBalance: Number(p.commission_balance || 0),
@@ -182,6 +183,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     deliveryCode: o.delivery_code,
     rating: o.rating,
     paymentId: o.payment_id,
+    asaasPaymentId: o.asaas_payment_id,
+    pixQrCode: o.pix_qr_code,
+    pixQrCodeImage: o.pix_qr_code_image,
     coords: o.coords,
   });
 
@@ -233,7 +237,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ownerId: r.owner_id,
           menu: r.menu || [],
           rating: Number(r.rating || 0),
-          pagseguroRecipientId: r.pagseguro_recipient_id,
+          asaasAccountId: r.asaas_account_id,
           // Protege contra coords null — evita crash em cálculos de distância
           coords: r.coords ?? { lat: -9.5422, lng: -57.4486 },
         }));
@@ -523,7 +527,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ownerId: r.owner_id,
           menu: r.menu || [],
           rating: Number(r.rating || 0),
-          pagseguroRecipientId: r.pagseguro_recipient_id,
+          asaasAccountId: r.asaas_account_id,
         });
         if (payload.eventType === 'INSERT') {
           const novo = mapRest(payload.new);
@@ -645,7 +649,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // ═══════════════════════════════════════════════════════
       const { data: restaurantData, error: restError } = await supabase
         .from('restaurants')
-        .select('id, name, menu, owner_id, pagseguro_recipient_id')
+        .select('id, name, menu, owner_id, asaas_account_id')
         .eq('id', restaurantId)
         .single();
 
@@ -785,8 +789,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (data.licensePlate !== undefined) up.license_plate = data.licensePlate;
     if (data.vehicleType !== undefined) up.vehicle_type = data.vehicleType;
     if (data.businessName !== undefined) up.business_name = data.businessName;
-    if (data.pagseguroRecipientId !== undefined)
-      up.pagseguro_recipient_id = data.pagseguroRecipientId;
+    if (data.asaasAccountId !== undefined) up.asaas_account_id = data.asaasAccountId;
+    if (data.asaasCustomerId !== undefined) up.asaas_customer_id = data.asaasCustomerId;
     if (data.avatarUrl !== undefined) up.avatar_url = data.avatarUrl;
     if (data.customFeePct !== undefined) up.custom_fee_pct = data.customFeePct;
     if (data.savedCards !== undefined) up.saved_cards = data.savedCards;
@@ -944,6 +948,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (error) throw new Error(`Erro ao aceitar pedido: ${error.message}`);
           if (!updated) throw new Error('Este pedido já foi aceito por outro entregador.');
 
+          // ── Repasse assíncrono para a subconta do entregador (Asaas) ──
+          // Best-effort: falha não impede a aceitação do pedido
+          if (order?.asaasPaymentId) {
+            supabase.functions.invoke('release-driver-split', {
+              body: { orderId: oid, driverId: did },
+            }).catch(err => devLog('[store] Falha no release-driver-split (não fatal):', err));
+          }
+
           await fetchData();
         },
         registerProfile,
@@ -1029,4 +1041,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         recalculateDistances: async (addr, coords) => {
           const d = await getRealDistances(
             addr,
-            restaurants.map(r => ({ id: r.id, lat: r.coords
+            restaurants.map(r => ({ id: r.id, lat: r.coords.lat, lng: r.coords.lng })),
+            coords
+          );
+          setRealDistances(d);
+        },
+        calculateDistance: (lat1, lon1, lat2, lon2) => calculateHaversine(lat1, lon1, lat2, lon2),
+        platformSettings,
+        cart,
+        addToCart,
+        removeFromCart,
+        updateCartItemQuantity,
+        clearCart,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+export const useAppStore = () => {
+  const context = useContext(AppContext);
+  if (!context) throw new Error('useAppStore deve ser usado dentro de AppProvider');
+  return context;
+};
