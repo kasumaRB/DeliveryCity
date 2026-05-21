@@ -469,16 +469,15 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
         description,
         workingHours,
       });
-      // Chama onClose() ao invés de setMode('HUB') para evitar que o useEffect re-abra o
-      // formulário de COMPLETE_PROFILE antes do fetchData retornar com dados atualizados.
+      // Em ambos os casos fecha o modal — updateUserProfile já chama fetchData internamente,
+      // então o store já está atualizado. setMode('HUB') causava uma "tela de confirmação
+      // estranha" que confundia o usuário após salvar.
       if (mode === 'COMPLETE_PROFILE') {
         alert('Perfil completado com sucesso!');
-        onClose();
       } else {
         alert('Perfil atualizado com sucesso!');
-        await refreshData();
-        setMode('HUB');
       }
+      onClose();
     } catch (e: any) {
       setErrors({ auth: e.message });
     } finally {
@@ -1436,5 +1435,3 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
         />
       )}
     </div>
-  );
-};

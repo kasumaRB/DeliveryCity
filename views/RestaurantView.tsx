@@ -155,8 +155,12 @@ export const RestaurantView: React.FC = () => {
   const [promoProductIds, setPromoProductIds] = useState<string[]>([]);
   const [promoMaxUsage, setPromoMaxUsage] = useState('');
 
+  // Sincroniza os campos do formulário APENAS quando o modal de edição é ABERTO.
+  // NÃO depende de myRestaurant/currentUserProfile para evitar que atualizações
+  // do Realtime (que criam novas referências de objeto no store) resetem os campos
+  // enquanto o usuário está editando.
   useEffect(() => {
-    if (myRestaurant && currentUserProfile) {
+    if (showEditModal && myRestaurant && currentUserProfile) {
       setStoreName(myRestaurant.name);
       setStoreAddress(myRestaurant.address || '');
       setStoreDescription(currentUserProfile.description || '');
@@ -167,7 +171,8 @@ export const RestaurantView: React.FC = () => {
       setRespPix(currentUserProfile.pixKey || '');
       setRespPagseguro(currentUserProfile.pagseguroRecipientId || '');
     }
-  }, [myRestaurant, currentUserProfile]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showEditModal]);
 
   const restaurantImageInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -313,22 +318,23 @@ export const RestaurantView: React.FC = () => {
     if (!myRestaurant || !currentUserProfile) return;
     setIsSaving(true);
     try {
-      // Update both restaurant and user profile tables
-      await updateRestaurant(myRestaurant.id, { name: storeName, address: storeAddress });
-      await updateUserProfile(currentUserProfile.id, {
-        name: respName,
-        phoneNumber: respPhone,
-        cpf: respCpf,
-        pixKey: respPix,
-        pagseguroRecipientId: respPagseguro,
-        description: storeDescription,
-        workingHours: storeWorkingHours,
-      });
-      alert('Perfil da loja atualizado com sucesso!');
-      await refreshData();
+      // Salva dados do restaurante e do perfil do responsável em paralelo
+      await Promise.all([
+        updateRestaurant(myRestaurant.id, { name: storeName, address: storeAddress }),
+        updateUserProfile(currentUserProfile.id, {
+          name: respName,
+          phoneNumber: respPhone,
+          cpf: respCpf,
+          pixKey: respPix,
+          pagseguroRecipientId: respPagseguro,
+          description: storeDescription,
+          workingHours: storeWorkingHours,
+        }),
+      ]);
       setShowEditModal(false);
+      alert('Perfil da loja atualizado com sucesso!');
     } catch (e: any) {
-      alert(e.message);
+      alert('Erro ao salvar: ' + (e?.message || 'Tente novamente'));
     } finally {
       setIsSaving(false);
     }
@@ -1646,14 +1652,4 @@ export const RestaurantView: React.FC = () => {
             <button
               onClick={handleUpdateStoreProfile}
               disabled={isSaving}
-              className="w-full bg-orange-600 text-white py-6 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
-            >
-              {isSaving ? <Loader className="animate-spin" size={20} /> : <Save size={20} />} Salvar
-              Alterações
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+   

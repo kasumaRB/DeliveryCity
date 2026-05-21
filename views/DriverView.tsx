@@ -63,16 +63,21 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const handleSave = async () => {
     if (!currentUserProfile) return;
     setIsSaving(true);
-    await updateUserProfile(currentUserProfile.id, {
-      vehicleType: vehicle,
-      licensePlate: vehicle !== 'Bicicleta' ? plate : '',
-      phoneNumber: phone,
-      pixKey,
-      pagseguroRecipientId: pagseguroId,
-    });
-    setIsSaving(false);
-    alert('Dados atualizados!');
-    onBack();
+    try {
+      await updateUserProfile(currentUserProfile.id, {
+        vehicleType: vehicle,
+        licensePlate: vehicle !== 'Bicicleta' ? plate : '',
+        phoneNumber: phone,
+        pixKey,
+        pagseguroRecipientId: pagseguroId,
+      });
+      alert('Dados atualizados!');
+      onBack();
+    } catch (e: any) {
+      alert('Erro ao salvar: ' + (e?.message || 'Tente novamente'));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -803,10 +808,4 @@ export const DriverView: React.FC = () => {
       {/* Offline Banner */}
       {!isOnline && (
         <div className="fixed bottom-24 left-6 right-6 bg-red-600 text-white py-3 px-6 rounded-2xl flex items-center justify-center gap-3 shadow-xl animate-bounce z-40">
-          <WifiOff size={20} />
-          <span className="font-bold text-sm">Sem conexão — modo offline</span>
-        </div>
-      )}
-    </div>
-  );
-};
+          <Wif
