@@ -256,26 +256,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (profileData.data) {
         let mapped = profileData.data.map(p => mapProfile(p));
         
-        // SELF-HEALING: Se usuário tem sessão, mas não tem perfil (falha na trigger do banco ou conta nova)
+        // SELF-HEALING: Se usuário tem sessão mas não tem perfil (OAuth sem trigger, etc.)
+        // ⚠️  NÃO roda se a conta tem menos de 60 s — evita criar CLIENT/APPROVED durante
+        //     o cadastro de parceiros (race condition com o RPC upsert_profile).
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         if (currentSession?.user && !mapped.find(p => p.id === currentSession.user.id)) {
-          devLog('[DEV] Perfil não encontrado! Tentando criar (Self-Healing)...');
-          try {
-            const newProfile = {
-              id: currentSession.user.id,
-              email: currentSession.user.email || '',
-              name: currentSession.user.user_metadata?.full_name || currentSession.user.user_metadata?.name || currentSession.user.email?.split('@')[0] || 'Usuário',
-              role: 'CLIENT',
-              status: 'APPROVED',
-              saved_addresses: []
-            };
-            const { data: insertedProfile, error: insertError } = await supabase.from('profiles').insert([newProfile]).select().single();
-            if (!insertError && insertedProfile) {
-              mapped.push(mapProfile(insertedProfile));
-            } else {
-              console.error('[DEV] Erro no Self-Healing:', insertError);
-            }
-          } catch(e) {}
+          const accountAgeSec = (Date.now() - new Date(currentSession.user.created_at).getTime()) / 1000;
+          const isJustCreated = accountAgeSec < 60; // dentro do janela de cadastro
+          if (isJustCreated) {
+            devLog('[DEV] Self-Healing IGNORADO — conta criada há', Math.round(accountAgeSec), 's (cadastro em andamento)');
+          } else {
+            devLog('[DEV] Perfil não encontrado! Tentando Self-Healing (conta existente)...');
+            try {
+              const newProfile = {
+                id: currentSession.user.id,
+                email: currentSession.user.email || '',
+                name: currentSession.user.user_metadata?.full_name || currentSession.user.user_metadata?.name || currentSession.user.email?.split('@')[0] || 'Usuário',
+                role: 'CLIENT',
+                status: 'APPROVED',
+                saved_addresses: []
+              };
+              const { data: insertedProfile, error: insertError } = await supabase.from('profiles').insert([newProfile]).select().single();
+              if (!insertError && insertedProfile) {
+                mapped.push(mapProfile(insertedProfile));
+              } else {
+                console.error('[DEV] Erro no Self-Healing:', insertError);
+              }
+            } catch(e) {}
+          }
         }
 
         setProfiles(mapped);
@@ -1021,27 +1029,4 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         recalculateDistances: async (addr, coords) => {
           const d = await getRealDistances(
             addr,
-            restaurants.map(r => ({ id: r.id, lat: r.coords.lat, lng: r.coords.lng })),
-            coords
-          );
-          setRealDistances(d);
-        },
-        calculateDistance: (lat1, lon1, lat2, lon2) => calculateHaversine(lat1, lon1, lat2, lon2),
-        platformSettings,
-        cart,
-        addToCart,
-        removeFromCart,
-        updateCartItemQuantity,
-        clearCart,
-      }}
-    >
-      {children}
-    </AppContext.Provider>
-  );
-};
-
-export const useAppStore = () => {
-  const context = useContext(AppContext);
-  if (!context) throw new Error('useAppStore deve ser usado dentro de AppProvider');
-  return context;
-};
+            restaurants.map(r => ({ id: r.id, lat: r.coords

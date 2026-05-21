@@ -438,10 +438,15 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
         }, { onConflict: 'id' });
       }
 
+      // Garante que o perfil foi carregado no store antes de fechar o modal.
+      // Sem isso, pode haver race condition: onAuthStateChange(SIGNED_IN) dispara
+      // fetchData() concorrentemente e o app fecha sem currentUserProfile definido.
+      await refreshData();
+
       const msg =
         mode === 'REGISTER_PARTNER'
-          ? 'Cadastro enviado! Aguarde a aprovação da equipe. Verifique também seu e-mail para confirmar a conta.'
-          : 'Conta criada! Verifique seu e-mail para confirmar a conta.';
+          ? 'Cadastro enviado! Aguarde a aprovação da equipe.'
+          : 'Conta criada com sucesso!';
       alert(msg);
       onClose();
     } catch (e: any) {
@@ -1427,11 +1432,4 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
       </div>
       {showAddressModal && (
         <AddressModal
-          onSave={addr => {
-            setRegAddress(addr);
-            setShowAddressModal(false);
-          }}
-          onClose={() => setShowAddressModal(false)}
-        />
-      )}
-    </div>
+          o
