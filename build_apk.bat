@@ -1,13 +1,13 @@
 @echo off
-echo === Compilando APK DeliveryCity ===
-cd /d "%~dp0android"
-call gradlew.bat assembleDebug
-if %ERRORLEVEL% == 0 (
-    echo.
-    echo === APK compilado com sucesso! ===
-    echo Arquivo: app\build\outputs\apk\debug\app-debug.apk
-) else (
-    echo.
-    echo === ERRO na compilacao ===
-)
-pause
+echo.
+echo ============================================
+echo   DeliveryCity - Build Completo APK
+echo ============================================
+echo.
+
+cd /d "%~dp0"
+
+echo [1/4] Gerando build web (React/Vite)...
+call npm run build
+if %ERRORLEVEL% NEQ 0 (
+    echo ERRO: npm run build falhou!
