@@ -1215,7 +1215,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
                       </p>
                     )}
                   </div>
-                  {mode !== 'LOGIN_EMAIL' && (
+                  {(mode as AuthMode) !== 'LOGIN_EMAIL' && (
                     <div>
                       <div className="relative">
                         <input
@@ -1392,7 +1392,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
             </div>
           )}
 
-          {!isCompletingOrEditing && mode !== 'LOGIN_EMAIL' && (
+          {!isCompletingOrEditing && (mode as AuthMode) !== 'LOGIN_EMAIL' && (
             <div>
               <div
                 className={`flex items-center gap-4 px-4 py-2 bg-gray-50 rounded-[1.5rem] border ${errors.terms ? 'border-red-200' : 'border-gray-100'}`}
@@ -1431,18 +1431,18 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
 
         <button
           onClick={
-            mode === 'LOGIN_EMAIL'
+            (mode as AuthMode) === 'LOGIN_EMAIL'
               ? handleEmailLogin
               : isCompletingOrEditing
                 ? handleUpdateProfile
                 : handleRegister
           }
           disabled={loading}
-          className={`w-full py-7 rounded-[2.5rem] font-black uppercase text-xs tracking-[0.3em] shadow-2xl flex items-center justify-center gap-4 active:scale-95 transition-all disabled:opacity-50 ${mode === 'LOGIN_EMAIL' || mode === 'REGISTER_EMAIL' || mode === 'COMPLETE_PROFILE' || mode === 'EDIT_PROFILE' ? 'bg-orange-600 text-white shadow-orange-900/20' : partnerType === UserRole.DRIVER ? 'bg-green-600 text-white shadow-green-900/20' : 'bg-gray-950 text-white shadow-black/20'}`}
+          className={`w-full py-7 rounded-[2.5rem] font-black uppercase text-xs tracking-[0.3em] shadow-2xl flex items-center justify-center gap-4 active:scale-95 transition-all disabled:opacity-50 ${(mode as AuthMode) === 'LOGIN_EMAIL' || mode === 'REGISTER_EMAIL' || mode === 'COMPLETE_PROFILE' || mode === 'EDIT_PROFILE' ? 'bg-orange-600 text-white shadow-orange-900/20' : partnerType === UserRole.DRIVER ? 'bg-green-600 text-white shadow-green-900/20' : 'bg-gray-950 text-white shadow-black/20'}`}
         >
           {loading ? (
             <Loader className="animate-spin" size={24} />
-          ) : mode === 'LOGIN_EMAIL' ? (
+          ) : (mode as AuthMode) === 'LOGIN_EMAIL' ? (
             'Entrar no App'
           ) : isCompletingOrEditing ? (
             'Atualizar meu Perfil'

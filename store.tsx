@@ -475,15 +475,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') fetchData(true);
+    };
     window.addEventListener('online', processSyncQueue);
-    window.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        fetchData(true);
-      }
-    });
+    window.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       window.removeEventListener('online', processSyncQueue);
-      window.removeEventListener('visibilitychange', () => {});
+      window.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [processSyncQueue]);
 
@@ -749,7 +748,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         customer_id: session.user.id,
         customer_address: address,
         customer_name: customerName,
-        status: OrderStatus.PENDING,
+        // PIX e Cartão de crédito começam como PENDING_PAYMENT até o webhook confirmar
+        // Dinheiro e débito (offline) vão direto para PENDING
+        status: (paymentMethod === 'PIX' || paymentMethod === 'CREDIT_CARD')
+          ? OrderStatus.PENDING_PAYMENT
+          : OrderStatus.PENDING,
         items: validatedItems,
         subtotal,
         delivery_fee: deliveryFee,
@@ -1064,4 +1067,4 @@ export const useAppStore = () => {
   const context = useContext(AppContext);
   if (!context) throw new Error('useAppStore deve ser usado dentro de AppProvider');
   return context;
-};
+}

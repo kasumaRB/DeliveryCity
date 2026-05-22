@@ -50,16 +50,22 @@ const SettingsTab: React.FC = () => {
   const [settingsMsg, setSettingsMsg] = useState('');
 
   useEffect(() => {
-    supabase.from('platform_settings').select('*').maybeSingle().then(({ data }) => {
-      if (data) setSettings({
-        platform_fee_pct: data.platform_fee_pct ?? 15,
-        driver_fee_pct: data.driver_fee_pct ?? 8,
-        restaurant_fee_pct: data.restaurant_fee_pct ?? 8,
-        min_delivery_fee: data.min_delivery_fee ?? 4.0,
-        min_order_value: data.min_order_value ?? 15.0,
-      });
-      setSettingsLoading(false);
-    }).catch(() => setSettingsLoading(false));
+    (async () => {
+      try {
+        const { data } = await supabase.from('platform_settings').select('*').maybeSingle();
+        if (data) setSettings({
+          platform_fee_pct: data.platform_fee_pct ?? 15,
+          driver_fee_pct: data.driver_fee_pct ?? 8,
+          restaurant_fee_pct: data.restaurant_fee_pct ?? 8,
+          min_delivery_fee: data.min_delivery_fee ?? 4.0,
+          min_order_value: data.min_order_value ?? 15.0,
+        });
+      } catch {
+        // falha silenciosa — usa valores padrão
+      } finally {
+        setSettingsLoading(false);
+      }
+    })();
   }, []);
 
   const handleSaveSettings = async () => {
@@ -270,7 +276,7 @@ export const AdminView: React.FC = () => {
   } = useAppStore();
 
   const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'users' | 'requests' | 'partners' | 'support' | 'settings' | 'system'
+    'dashboard' | 'users' | 'requests' | 'partners' | 'support' | 'settings' | 'system' | 'orders'
   >('dashboard');
   const [userSearch, setUserSearch] = useState('');
   const [viewingUser, setViewingUser] = useState<UserProfile | null>(null);

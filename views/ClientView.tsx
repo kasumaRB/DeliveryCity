@@ -66,7 +66,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
 
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
   const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
-  const [activeTab, setActiveTab] = useState<'home' | 'orders'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'orders' | 'profile'>('home');
   const [searchQuery, setSearchQuery] = useState('');
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('CREDIT_CARD');

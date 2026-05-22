@@ -138,7 +138,7 @@ describe('OfflineService', () => {
         return null;
       });
       
-      localStorageMock.keys = () => ['deliverycity_expired', 'deliverycity_valid'];
+      // keys handled via (localStorageMock as any).keys below
       
       // Simular Object.keys
       (localStorageMock as any).keys = jest.fn(() => ['deliverycity_expired', 'deliverycity_valid']);

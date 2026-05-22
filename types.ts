@@ -134,6 +134,8 @@ export interface Order {
   pickupCode?: string;
   deliveryCode?: string;
   rating?: OrderRating;
+  feedback?: string;       // Comentário textual do cliente (legado / exibição)
+  driverName?: string;     // Nome do entregador (desnormalizado para exibição)
 }
 
 export interface OrderRating {
@@ -159,6 +161,7 @@ export interface Promotion {
   type?: 'PRODUCT_SPECIFIC' | 'MULTIPLE_PRODUCTS' | 'COUPON' | 'FREE_DELIVERY';
   productIds?: string[];
 }
+
 
 export interface PlatformSettings {
   platformFeePct: number;
