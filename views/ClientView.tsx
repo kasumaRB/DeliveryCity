@@ -38,8 +38,10 @@ import {
   Check,
   Trash2,
   Wallet,
+  Pencil,
 } from 'lucide-react';
 import { AddressModal } from '../components/AddressModal';
+import { DriverTrackingMap } from '../components/DriverTrackingMap';
 import Logo from '../assets/Logo.png';
 import Nome from '../assets/Nome.png';
 
@@ -56,6 +58,8 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     calculateDistance,
     submitRating,
     addAddress,
+    updateAddress,
+    deleteAddress,
     platformSettings,
     profiles,
   } = store || {};
@@ -69,6 +73,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
   const [selectedAddress, setSelectedAddress] = useState<UserAddress | null>(null);
   const [isAddressSelectorOpen, setIsAddressSelectorOpen] = useState(false);
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+  const [editingAddress, setEditingAddress] = useState<UserAddress | null>(null);
   const [showOrderSuccess, setShowOrderSuccess] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   // Rastreia se o checkout estava aberto quando o seletor de endereço foi ativado
@@ -184,17 +189,42 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     }
   };
 
-  const handleAddNewAddress = async (addr: Omit<UserAddress, 'id'>) => {
-    const newAddr = await addAddress(addr);
-    if (newAddr) {
-      handleSelectAddress(newAddr as UserAddress);
+  const handleSaveAddress = async (addr: Omit<UserAddress, 'id'>) => {
+    if (editingAddress) {
+      // Editar endereço existente
+      await updateAddress?.({ ...addr, id: editingAddress.id });
+      setEditingAddress(null);
+      setIsAddressModalOpen(false);
+      // Reabre o seletor para o usuário ver o endereço atualizado
+      setIsAddressSelectorOpen(true);
+    } else {
+      // Criar novo endereço
+      const newAddr = await addAddress?.(addr);
+      if (newAddr) {
+        handleSelectAddress(newAddr as UserAddress);
+      }
+      setIsAddressModalOpen(false);
+      setIsAddressSelectorOpen(false);
+      // Se o checkout estava aberto antes de entrar no fluxo de endereço, reabre
+      if (checkoutWasOpen) {
+        setIsCheckoutOpen(true);
+        setCheckoutWasOpen(false);
+      }
     }
-    setIsAddressModalOpen(false);
-    setIsAddressSelectorOpen(false);
-    // Se o checkout estava aberto antes de entrar no fluxo de endereço, reabre
-    if (checkoutWasOpen) {
-      setIsCheckoutOpen(true);
-      setCheckoutWasOpen(false);
+  };
+
+  const handleEditAddress = (addr: UserAddress) => {
+    setEditingAddress(addr);
+    setIsAddressSelectorOpen(false); // fecha o seletor para o modal aparecer limpo
+    setIsAddressModalOpen(true);
+  };
+
+  const handleDeleteAddress = async (addrId: string) => {
+    await deleteAddress?.(addrId);
+    // Se o endereço excluído era o selecionado, seleciona o primeiro disponível
+    if (selectedAddress?.id === addrId) {
+      const remaining = currentUserProfile?.savedAddresses?.filter(a => a.id !== addrId) ?? [];
+      setSelectedAddress(remaining.length > 0 ? remaining[0] : null);
     }
   };
 
@@ -913,20 +943,30 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                                     </a>
                                   )}
                                 </div>
-                                {distMeters !== null ? (
-                                  <div className="flex items-center gap-3 bg-white rounded-xl p-3">
-                                    <MapPin size={14} className="text-purple-500 shrink-0" />
-                                    <div>
-                                      <p className="text-xs font-black text-gray-800">
-                                        {distMeters < 1000
-                                          ? `${Math.round(distMeters)}m de você`
-                                          : `${(distMeters / 1000).toFixed(1)}km de você`}
-                                      </p>
-                                      <p className="text-[10px] text-gray-400 font-bold">
-                                        Previsão: ~{etaMins} min
-                                      </p>
-                                    </div>
-                                  </div>
+                                {driverLoc ? (
+                                  <>
+                                    {/* Mapa em tempo real */}
+                                    <DriverTrackingMap
+                                      driverLoc={driverLoc}
+                                      destCoords={custCoords ?? null}
+                                    />
+                                    {/* Distância e ETA abaixo do mapa */}
+                                    {distMeters !== null && (
+                                      <div className="flex items-center gap-3 bg-white rounded-xl p-3 mt-2">
+                                        <MapPin size={14} className="text-purple-500 shrink-0" />
+                                        <div>
+                                          <p className="text-xs font-black text-gray-800">
+                                            {distMeters < 1000
+                                              ? `${Math.round(distMeters)}m de você`
+                                              : `${(distMeters / 1000).toFixed(1)}km de você`}
+                                          </p>
+                                          <p className="text-[10px] text-gray-400 font-bold">
+                                            Previsão: ~{etaMins} min
+                                          </p>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </>
                                 ) : (
                                   <div className="flex items-center gap-2 text-[10px] text-purple-400 font-bold">
                                     <Loader size={12} className="animate-spin" />
@@ -1495,31 +1535,55 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
             </div>
             <div className="space-y-4 overflow-y-auto no-scrollbar mb-10">
               {currentUserProfile?.savedAddresses?.map(addr => (
-                <button
+                <div
                   key={addr.id}
-                  onClick={() => handleSelectAddress(addr)}
-                  className={`w-full flex items-center gap-5 p-5 rounded-[2rem] border-2 transition-all active:scale-[0.98] ${selectedAddress?.id === addr.id ? 'border-orange-500 bg-orange-50 shadow-lg' : 'border-gray-50 bg-gray-50 hover:border-orange-100'}`}
+                  className={`w-full flex items-center gap-3 p-4 rounded-[2rem] border-2 transition-all ${selectedAddress?.id === addr.id ? 'border-orange-500 bg-orange-50 shadow-lg' : 'border-gray-50 bg-gray-50'}`}
                 >
-                  <div
-                    className={`p-3 rounded-xl shadow-sm ${selectedAddress?.id === addr.id ? 'bg-orange-600 text-white' : 'bg-white text-gray-400'}`}
+                  {/* Área clicável para selecionar o endereço */}
+                  <button
+                    onClick={() => handleSelectAddress(addr)}
+                    className="flex items-center gap-4 flex-1 min-w-0 text-left active:scale-[0.98] transition-transform"
                   >
-                    <MapPin size={20} />
+                    <div
+                      className={`p-3 rounded-xl shadow-sm shrink-0 ${selectedAddress?.id === addr.id ? 'bg-orange-600 text-white' : 'bg-white text-gray-400'}`}
+                    >
+                      <MapPin size={20} />
+                    </div>
+                    <div className="overflow-hidden flex-1">
+                      <p className="font-black text-gray-900 text-sm truncate leading-tight mb-0.5">
+                        {addr.street}, {addr.number}
+                      </p>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest truncate">
+                        {addr.neighborhood || 'Centro'}
+                      </p>
+                    </div>
+                    {selectedAddress?.id === addr.id && (
+                      <CheckCircle2 size={20} className="text-orange-600 shrink-0" />
+                    )}
+                  </button>
+
+                  {/* Botões de ação: Editar e Excluir */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => handleEditAddress(addr)}
+                      className="p-2 rounded-xl text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-all active:scale-95"
+                      title="Editar endereço"
+                    >
+                      <Pencil size={15} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteAddress(addr.id)}
+                      className="p-2 rounded-xl text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all active:scale-95"
+                      title="Excluir endereço"
+                    >
+                      <Trash2 size={15} />
+                    </button>
                   </div>
-                  <div className="text-left overflow-hidden flex-1">
-                    <p className="font-black text-gray-900 text-sm truncate leading-tight mb-0.5">
-                      {addr.street}, {addr.number}
-                    </p>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest truncate">
-                      {addr.neighborhood || 'Centro'}
-                    </p>
-                  </div>
-                  {selectedAddress?.id === addr.id && (
-                    <CheckCircle2 size={20} className="text-orange-600 shrink-0" />
-                  )}
-                </button>
+                </div>
               ))}
               <button
                 onClick={() => {
+                  setEditingAddress(null);
                   setIsAddressSelectorOpen(false);
                   // Se checkout estava aberto, fecha-o para o AddressModal ficar visível
                   if (isCheckoutOpen) {
@@ -1543,9 +1607,22 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
       )}
       {isAddressModalOpen && (
         <AddressModal
-          onClose={() => setIsAddressModalOpen(false)}
-          onSave={handleAddNewAddress}
-          title="Novo Endereço de Entrega"
+          onClose={() => {
+            setIsAddressModalOpen(false);
+            if (editingAddress) {
+              // Se estava editando e cancelou, volta pro seletor
+              setEditingAddress(null);
+              setIsAddressSelectorOpen(true);
+            } else if (checkoutWasOpen) {
+              // Se estava criando durante checkout, reabre o checkout
+              setCheckoutWasOpen(false);
+              setIsCheckoutOpen(true);
+            }
+          }}
+          onSave={handleSaveAddress}
+          initialAddress={editingAddress}
+          title={editingAddress ? 'Editar Endereço' : 'Novo Endereço de Entrega'}
+          saveButtonLabel={editingAddress ? 'Salvar Alterações' : 'Salvar Endereço'}
         />
       )}
       {ratingOrder && (
@@ -1578,64 +1655,4 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                   {/* Driver stars */}
                   {ratingOrder.driverId && (
                     <div>
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">🏍️ Entregador</p>
-                      <div className="flex justify-center gap-3">
-                        {[1,2,3,4,5].map(star => (
-                          <button key={star} onClick={() => setDriverStars(star)}
-                            className={`transition-all duration-200 transform ${driverStars >= star ? 'scale-125' : 'scale-100 opacity-20 hover:opacity-50'}`}>
-                            <Star size={32} className="fill-blue-500 text-blue-500" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {/* Product + packaging */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Produto OK?</p>
-                      <div className="flex gap-2">
-                        <button onClick={() => setProductOk(true)}
-                          className={`flex-1 py-4 rounded-2xl transition-all ${productOk === true ? 'bg-green-600 text-white shadow-lg' : 'bg-gray-50 text-gray-400'}`}>
-                          <ThumbsUp size={18} className="mx-auto" />
-                        </button>
-                        <button onClick={() => setProductOk(false)}
-                          className={`flex-1 py-4 rounded-2xl transition-all ${productOk === false ? 'bg-red-600 text-white shadow-lg' : 'bg-gray-50 text-gray-400'}`}>
-                          <ThumbsDown size={18} className="mx-auto" />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Embalagem OK?</p>
-                      <div className="flex gap-2">
-                        <button onClick={() => setPackagingOk(true)}
-                          className={`flex-1 py-4 rounded-2xl transition-all ${packagingOk === true ? 'bg-green-600 text-white shadow-lg' : 'bg-gray-50 text-gray-400'}`}>
-                          <ThumbsUp size={18} className="mx-auto" />
-                        </button>
-                        <button onClick={() => setPackagingOk(false)}
-                          className={`flex-1 py-4 rounded-2xl transition-all ${packagingOk === false ? 'bg-red-600 text-white shadow-lg' : 'bg-gray-50 text-gray-400'}`}>
-                          <ThumbsDown size={18} className="mx-auto" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  {/* Comment */}
-                  <textarea
-                    value={ratingComment}
-                    onChange={e => setRatingComment(e.target.value)}
-                    rows={2}
-                    placeholder="Deixe um comentário (opcional)..."
-                    className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-medium outline-none border-2 border-transparent focus:border-orange-300 resize-none text-gray-700"
-                  />
-                  <button
-                    onClick={handleFinishRating}
-                    className="w-full bg-gray-950 text-white py-6 rounded-[2.5rem] font-black uppercase text-xs tracking-[0.3em] active:scale-95 transition-all shadow-2xl">
-                    Finalizar Feedback
-                  </button>
-                </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">🏍️ E
