@@ -1,4 +1,6 @@
 import React, { useEffect, useRef } from 'react';
+// CSS importado estaticamente no entry point (index.tsx)
+// para garantir que os estilos do Leaflet sejam aplicados antes da renderização.
 
 interface DriverTrackingMapProps {
   driverLoc: { lat: number; lng: number } | null;
@@ -12,7 +14,7 @@ export const DriverTrackingMap: React.FC<DriverTrackingMapProps> = ({ driverLoc,
   const destMarkerRef = useRef<any>(null);
   const initialized   = useRef(false);
 
-  // ── Inicializa o mapa uma única vez ────────────────────────────────────────
+  // ── Inicializa o mapa uma única vez ──────────────────────────────────────
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
@@ -20,10 +22,11 @@ export const DriverTrackingMap: React.FC<DriverTrackingMapProps> = ({ driverLoc,
     const center = driverLoc || destCoords || { lat: -9.5422, lng: -57.4486 };
 
     (async () => {
-      if (!mapRef.current || (mapRef.current as any)._leaflet_id) return;
+      if (!mapRef.current) return;
+      // Evita dupla inicialização se o React montar duas vezes (StrictMode)
+      if ((mapRef.current as any)._leaflet_id) return;
 
       const L = (await import('leaflet')).default;
-      await import('leaflet/dist/leaflet.css');
 
       const map = L.map(mapRef.current, {
         center: [center.lat, center.lng],
@@ -32,14 +35,16 @@ export const DriverTrackingMap: React.FC<DriverTrackingMapProps> = ({ driverLoc,
         attributionControl: false,
       });
 
+      // crossOrigin: '' é necessário para o Android WebView não bloquear os tiles
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
+        crossOrigin: '',
       }).addTo(map);
 
       // Controle de zoom discreto
       L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-      // ── Marcador de destino (pin padrão) ─────────────────────────────────
+      // ── Marcador de destino ───────────────────────────────────────────────
       if (destCoords) {
         delete (L.Icon.Default.prototype as any)._getIconUrl;
         L.Icon.Default.mergeOptions({
@@ -74,12 +79,31 @@ export const DriverTrackingMap: React.FC<DriverTrackingMapProps> = ({ driverLoc,
       }
 
       leafletMap.current = map;
+
+      // ── invalidateSize garante recálculo do tamanho do container ─────────
+      // Necessário quando o container estava oculto/colapsado ao inicializar
+      setTimeout(() => {
+        try { map.invalidateSize(); } catch { /* silencioso */ }
+      }, 150);
+
+      // ResizeObserver: recalcula sempre que o container muda de tamanho
+      // (ex: scroll para revelar o mapa, orientação do celular)
+      if (typeof ResizeObserver !== 'undefined' && mapRef.current) {
+        const ro = new ResizeObserver(() => {
+          try { map.invalidateSize(); } catch { /* silencioso */ }
+        });
+        ro.observe(mapRef.current);
+        (mapRef.current as any)._resizeObserver = ro;
+      }
     })();
 
     return () => {
+      if (mapRef.current && (mapRef.current as any)._resizeObserver) {
+        (mapRef.current as any)._resizeObserver.disconnect();
+      }
       if (leafletMap.current) {
         leafletMap.current.remove();
-        leafletMap.current  = null;
+        leafletMap.current    = null;
         driverMarker.current  = null;
         destMarkerRef.current = null;
       }
@@ -88,17 +112,13 @@ export const DriverTrackingMap: React.FC<DriverTrackingMapProps> = ({ driverLoc,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Atualiza posição do entregador quando chega nova localização ───────────
+  // ── Atualiza posição do entregador em tempo real ──────────────────────────
   useEffect(() => {
-    if (!driverLoc) return;
-
-    if (!leafletMap.current) return;
+    if (!driverLoc || !leafletMap.current) return;
 
     if (driverMarker.current) {
-      // Move o marcador existente suavemente
       driverMarker.current.setLatLng([driverLoc.lat, driverLoc.lng]);
     } else {
-      // Cria o marcador pela primeira vez (pode chegar após a inicialização do mapa)
       (async () => {
         const L = (await import('leaflet')).default;
         const driverIcon = L.divIcon({
@@ -110,7 +130,6 @@ export const DriverTrackingMap: React.FC<DriverTrackingMapProps> = ({ driverLoc,
         driverMarker.current = L.marker([driverLoc.lat, driverLoc.lng], { icon: driverIcon })
           .addTo(leafletMap.current);
 
-        // Se temos os dois pontos agora, ajusta bounds
         if (destCoords) {
           try {
             leafletMap.current.fitBounds(
@@ -122,13 +141,12 @@ export const DriverTrackingMap: React.FC<DriverTrackingMapProps> = ({ driverLoc,
       })();
     }
 
-    // Pan suave para acompanhar o entregador
     leafletMap.current.panTo([driverLoc.lat, driverLoc.lng], { animate: true, duration: 0.8 });
   }, [driverLoc]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
-      {/* Estilo da bolinha azul pulsante — inserido inline para não precisar de arquivo CSS separado */}
+      {/* Estilos da bolinha azul pulsante e correção de z-index do Leaflet */}
       <style>{`
         .dc-driver-dot {
           width: 18px;
@@ -144,17 +162,25 @@ export const DriverTrackingMap: React.FC<DriverTrackingMapProps> = ({ driverLoc,
           70%  { box-shadow: 0 2px 6px rgba(0,0,0,0.35), 0 0 0 14px rgba(59,130,246,0);   }
           100% { box-shadow: 0 2px 6px rgba(0,0,0,0.35), 0 0 0 0   rgba(59,130,246,0);   }
         }
+        /* Garante que os tiles fiquem visíveis dentro de containers com overflow:hidden */
+        .leaflet-container { z-index: 0 !important; }
+        .leaflet-pane,
+        .leaflet-tile-pane,
+        .leaflet-tile { z-index: 1 !important; }
+        .leaflet-control-container { z-index: 2 !important; }
       `}</style>
 
       <div
         ref={mapRef}
         style={{
           height: '200px',
+          minHeight: '200px',
           width: '100%',
           borderRadius: '12px',
           overflow: 'hidden',
           position: 'relative',
           zIndex: 0,
+          display: 'block',
         }}
       />
     </>

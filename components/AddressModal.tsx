@@ -103,7 +103,6 @@ export const AddressModal: React.FC<AddressModalProps> = ({
       if (!mapRef.current || (mapRef.current as any)._leaflet_id) return;
       try {
         const L = (await import('leaflet')).default;
-        await import('leaflet/dist/leaflet.css');
         leafletLib.current = L;
 
         delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -135,10 +134,11 @@ export const AddressModal: React.FC<AddressModalProps> = ({
           attributionControl: false,
         });
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, crossOrigin: '' }).addTo(map);
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
         leafletMap.current = map;
+        setTimeout(() => { try { map.invalidateSize(); } catch { /* silencioso */ } }, 150);
         setAddrCoords({ lat: startLocation.lat, lng: startLocation.lng });
         setIsLoadingInitial(false);
 
