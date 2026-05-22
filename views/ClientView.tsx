@@ -1581,26 +1581,32 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                   </div>
                 </div>
               ))}
-              <button
-                onClick={() => {
-                  setEditingAddress(null);
-                  setIsAddressSelectorOpen(false);
-                  // Se checkout estava aberto, fecha-o para o AddressModal ficar visível
-                  if (isCheckoutOpen) {
-                    setCheckoutWasOpen(true);
-                    setIsCheckoutOpen(false);
-                  }
-                  setIsAddressModalOpen(true);
-                }}
-                className="w-full flex items-center gap-5 p-5 rounded-[2rem] border-2 border-dashed border-gray-100 text-gray-400 hover:border-orange-200 hover:text-orange-600 transition-all active:scale-[0.98] group"
-              >
-                <div className="p-3 bg-gray-50 rounded-xl group-hover:bg-orange-50 transition-colors">
-                  <PlusCircle size={20} />
-                </div>
-                <span className="font-black text-[10px] uppercase tracking-[0.2em]">
-                  Adicionar novo endereço
-                </span>
-              </button>
+              {(currentUserProfile?.savedAddresses?.length ?? 0) < 2 ? (
+                <button
+                  onClick={() => {
+                    setEditingAddress(null);
+                    setIsAddressSelectorOpen(false);
+                    // Se checkout estava aberto, fecha-o para o AddressModal ficar visível
+                    if (isCheckoutOpen) {
+                      setCheckoutWasOpen(true);
+                      setIsCheckoutOpen(false);
+                    }
+                    setIsAddressModalOpen(true);
+                  }}
+                  className="w-full flex items-center gap-5 p-5 rounded-[2rem] border-2 border-dashed border-gray-100 text-gray-400 hover:border-orange-200 hover:text-orange-600 transition-all active:scale-[0.98] group"
+                >
+                  <div className="p-3 bg-gray-50 rounded-xl group-hover:bg-orange-50 transition-colors">
+                    <PlusCircle size={20} />
+                  </div>
+                  <span className="font-black text-[10px] uppercase tracking-[0.2em]">
+                    Adicionar novo endereço
+                  </span>
+                </button>
+              ) : (
+                <p className="text-center text-[10px] font-black text-gray-300 uppercase tracking-widest py-2">
+                  Limite de 2 endereços atingido · edite ou exclua um para adicionar outro
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -1648,11 +1654,4 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                 >
                   <Star size={40} className="fill-orange-500 text-orange-500" />
                 </button>
-              ))}
-            </div>
-            {storeStars > 0 && (
-              <div className="space-y-6 animate-in slide-in-from-bottom duration-500">
-                  {/* Driver stars */}
-                  {ratingOrder.driverId && (
-                    <div>
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">🏍️ E
+     
