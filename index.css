@@ -13,8 +13,9 @@
 html,
 body,
 #root {
+  height: 100%;
+  overflow: hidden;
   overscroll-behavior-y: none;
-  overflow-x: hidden;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
@@ -34,5 +35,4 @@ body,
 input,
 textarea {
   user-select: auto;
-  -webkit-user-select: auto;
-}
+  -webkit-user-se

@@ -538,7 +538,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FC] flex flex-col md:flex-row overflow-hidden relative safe-area-top safe-area-bottom">
+    <div className="h-screen bg-[#F8F9FC] flex flex-col md:flex-row overflow-hidden relative safe-area-top safe-area-bottom">
       {/* SIDEBAR DESKTOP */}
       <aside className="hidden md:flex w-72 bg-white border-r flex-col p-8 sticky top-0 h-screen z-30 shadow-xl shadow-gray-100">
         <div className="mb-14 flex flex-col items-center">
@@ -571,7 +571,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
       </aside>
 
       {/* CONTEÚDO PRINCIPAL COM PADDING INFERIOR PARA NÃO FICAR ATRÁS DO MENU */}
-      <main className="flex-1 flex flex-col min-h-screen pb-36 md:pb-0 relative z-10 overflow-y-auto no-scrollbar">
+      <main className="flex-1 flex flex-col min-h-0 pb-36 md:pb-0 relative z-10 overflow-y-auto no-scrollbar">
         {/* HEADER MOBILE AJUSTADO */}
         <header className="bg-white/90 backdrop-blur-xl sticky top-0 z-[45] px-6 py-4 flex flex-col gap-4 border-b border-gray-100 shadow-sm">
           <div className="flex justify-between items-center w-full">

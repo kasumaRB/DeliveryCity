@@ -371,7 +371,7 @@ export const AdminView: React.FC = () => {
   }, [profiles, userSearch]);
 
   return (
-    <div className="min-h-screen bg-[#F4F6F9] flex font-sans">
+    <div className="h-screen bg-[#F4F6F9] flex font-sans overflow-hidden">
       <div className="w-72 hidden md:block h-screen sticky top-0">
         <AdminSidebar
           activeTab={activeTab}
@@ -401,7 +401,7 @@ export const AdminView: React.FC = () => {
         </div>
       )}
 
-      <main className="flex-1 flex flex-col md:h-screen overflow-hidden">
+      <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
         <header className="h-20 bg-white border-b flex items-center justify-between px-6 md:px-10">
           <div className="flex items-center gap-4">
             <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-2 text-gray-500">
