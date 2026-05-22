@@ -212,7 +212,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   let lastFetchTime = 0;
   let cachedData: { restaurants?: any[]; orders?: any[]; profiles?: any[] } = {};
 
-  const fetchData = async (force = false) => {
+  const fetchData = async (force = false, sessionOverride?: Session | null) => {
     const now = Date.now();
     if (!force && now - lastFetchTime < 2000) return;
     lastFetchTime = now;
@@ -263,8 +263,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // SELF-HEALING: Se usuário tem sessão mas não tem perfil (OAuth sem trigger, etc.)
         // ⚠️  NÃO roda se a conta tem menos de 60 s — evita criar CLIENT/APPROVED durante
         //     o cadastro de parceiros (race condition com o RPC upsert_profile).
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
-        if (currentSession?.user && !mapped.find(p => p.id === currentSession.user.id)) {
+        // 🔒 FIX SESSÃO: Usa sessionOverride quando disponível (passado do auth listener)
+        //    para evitar race condition onde getSession() retorna null logo após troca de conta.
+        let currentSession: Session | null;
+        if (sessionOverride !== undefined) {
+          currentSession = sessionOverride;
+        } else {
+          const { data } = await supabase.auth.getSession();
+          currentSession = data.session;
+        }
+
+        if (currentSession?.user && !mapped.find(p => p.id === currentSession!.user.id)) {
           const accountAgeSec = (Date.now() - new Date(currentSession.user.created_at).getTime()) / 1000;
           const isJustCreated = accountAgeSec < 60; // dentro do janela de cadastro
           if (isJustCreated) {
@@ -297,7 +306,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // ✅ FIX CRÍTICO: Atualiza currentUserProfile DIRETAMENTE aqui, no mesmo ciclo,
         // evitando race condition onde profiles.find() roda antes do setProfiles() ser commitado.
         if (currentSession?.user) {
-          const myProfile = mapped.find(p => p.id === currentSession.user.id) || null;
+          const myProfile = mapped.find(p => p.id === currentSession!.user.id) || null;
           setCurrentUserProfile(myProfile);
           devLog('[DEV] currentUserProfile setado diretamente:', myProfile?.role, myProfile?.status);
         }
@@ -420,7 +429,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }, 8000);
 
         try {
-          await fetchData();
+          // 🔒 FIX SESSÃO: passa newSession diretamente para evitar race condition em getSession()
+          await fetchData(true, newSession);
 
           // Garante a existência do perfil (útil para login OAuth onde o redirect ocorre antes do App criar o registro)
           if (newSession?.user && newSession.user.app_metadata?.provider === 'google') {
@@ -444,7 +454,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   createdAt: Date.now(),
                   savedAddresses: [],
                 });
-                await fetchData();
+                await fetchData(true, newSession);
               } catch (e) {
                 console.error('Erro criador de perfil no OAuth', e);
               }
@@ -460,9 +470,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       } else if (event === 'TOKEN_REFRESHED') {
         setSession(newSession);
-        fetchData(); // Silenciosamente, sem bloquear UI
+        fetchData(false, newSession); // Silenciosamente, sem bloquear UI
       } else if (event === 'SIGNED_OUT') {
-        // 🔒 SEGURANÇA: Limpa carrinho ao deslogar
+        // 🔒 SEGURANÇA: Limpa tudo ao deslogar
+        setCurrentUserProfile(null); // ← explícito: não depende só do useEffect
+        setCurrentRole(null);
         setCart([]);
         clearOfflineCart();
         setSession(null);
@@ -1041,7 +1053,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         refreshData: fetchData,
         requestPasswordReset: async e => await supabase.auth.resetPasswordForEmail(e),
         realDistances,
-        recalculateDistances: async (addr, coords) => {
+        recalculateDistances: async (addr: string, coords: { lat: number; lng: number }) => {
           const d = await getRealDistances(
             addr,
             restaurants.map(r => ({ id: r.id, lat: r.coords.lat, lng: r.coords.lng })),

@@ -7,8 +7,17 @@ echo.
 
 cd /d "%~dp0"
 
+REM Caminho do ADB no Android Studio
+set ADB=%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe
+
+if not exist "%ADB%" (
+    echo ADB nao encontrado em: %ADB%
+    echo Tentando adb do PATH...
+    set ADB=adb
+)
+
 echo Verificando dispositivo conectado...
-adb devices
+"%ADB%" devices
 echo.
 
 set APK=android\app\build\outputs\apk\debug\app-debug.apk
@@ -21,8 +30,21 @@ if not exist "%APK%" (
 )
 
 echo Instalando APK no dispositivo...
-adb install -r "%APK%"
+"%ADB%" install -r "%APK%"
 
 if %ERRORLEVEL% EQU 0 (
     echo.
-    ec
+    echo ============================================
+    echo   INSTALADO COM SUCESSO!
+    echo   Abra o app DeliveryCity no celular
+    echo ============================================
+) else (
+    echo.
+    echo ============================================
+    echo   ERRO na instalacao
+    echo   Verifique se USB Debugging esta ativo
+    echo   e se o celular aparece em "adb devices"
+    echo ============================================
+)
+echo.
+pause

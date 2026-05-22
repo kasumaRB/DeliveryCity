@@ -192,6 +192,7 @@ export const AddressModal: React.FC<AddressModalProps> = ({
     initMap();
 
     return () => {
+      isMounted.current = false; // ← CRÍTICO: permite reinicializar ao reabrir o modal
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current);
       if (leafletMap.current) { leafletMap.current.remove(); leafletMap.current = null; }
@@ -236,6 +237,13 @@ export const AddressModal: React.FC<AddressModalProps> = ({
   const pinCls      = isMapDragging ? 'text-orange-400 -translate-y-4 scale-110' : 'text-orange-600';
   const shadowCls   = isMapDragging ? 'scale-50 opacity-20' : 'scale-100 opacity-80';
   const formCls     = isGeocodingLoading ? 'opacity-50 pointer-events-none' : 'opacity-100';
+
+  // Hints de campo: visíveis apenas depois que o geocoding terminou e algum campo ficou vazio
+  const showHints          = !isGeocodingLoading && !!addrCoords && !isLoadingInitial;
+  const missingStreet       = showHints && !addrStreet;
+  const missingNumber       = showHints && !addrNumber;
+  const missingNeighborhood = showHints && !addrNeighborhood;
+  const missingZip          = showHints && !addrZip;
 
   return (
     <div className="fixed inset-0 z-[120] bg-black/60 flex items-end md:items-center justify-center p-0 md:p-4 backdrop-blur-sm">
@@ -286,7 +294,7 @@ export const AddressModal: React.FC<AddressModalProps> = ({
               </div>
             )}
 
-            {/* Pino laranja central (local de entrega) */}
+            {/* Pino laranja central */}
             {!mapError && !isLoadingInitial && (
               <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[400] pointer-events-none pb-[34px]">
                 {!isMapDragging && (
@@ -351,21 +359,30 @@ export const AddressModal: React.FC<AddressModalProps> = ({
             <div className="space-y-1">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Rua / Avenida</label>
               <input value={addrStreet} onChange={e => setAddrStreet(e.target.value)}
-                className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:bg-white focus:border-orange-200 transition"
+                className={`w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:bg-white transition ${missingStreet ? 'border-orange-200 focus:border-orange-400' : 'border-gray-100 focus:border-orange-200'}`}
                 placeholder={isGeocodingLoading ? 'Buscando...' : 'Nome da rua'} />
+              {missingStreet && (
+                <p className="text-[9px] text-orange-500 font-bold ml-1">Não encontrado — preencha manualmente</p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Número</label>
                 <input value={addrNumber} onChange={e => setAddrNumber(e.target.value)}
-                  className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:bg-white focus:border-orange-200 transition"
+                  className={`w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:bg-white transition ${missingNumber ? 'border-orange-200 focus:border-orange-400' : 'border-gray-100 focus:border-orange-200'}`}
                   placeholder="S/N" />
+                {missingNumber && (
+                  <p className="text-[9px] text-orange-500 font-bold ml-1">Digite ou "S/N"</p>
+                )}
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">CEP</label>
                 <input value={addrZip} onChange={e => setAddrZip(e.target.value)}
-                  className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:bg-white focus:border-orange-200 transition"
+                  className={`w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:bg-white transition ${missingZip ? 'border-orange-200 focus:border-orange-400' : 'border-gray-100 focus:border-orange-200'}`}
                   placeholder="00000-000" />
+                {missingZip && (
+                  <p className="text-[9px] text-orange-500 font-bold ml-1">CEP não encontrado</p>
+                )}
               </div>
             </div>
           </div>
@@ -374,8 +391,11 @@ export const AddressModal: React.FC<AddressModalProps> = ({
             <div className="space-y-1">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Bairro</label>
               <input value={addrNeighborhood} onChange={e => setAddrNeighborhood(e.target.value)}
-                className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:bg-white focus:border-orange-200 transition"
+                className={`w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:bg-white transition ${missingNeighborhood ? 'border-orange-200 focus:border-orange-400' : 'border-gray-100 focus:border-orange-200'}`}
                 placeholder={isGeocodingLoading ? 'Buscando...' : 'Ex: Centro'} />
+              {missingNeighborhood && (
+                <p className="text-[9px] text-orange-500 font-bold ml-1">Não encontrado — preencha manualmente</p>
+              )}
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Referência</label>
@@ -385,10 +405,10 @@ export const AddressModal: React.FC<AddressModalProps> = ({
             </div>
           </div>
 
-          {/* Aviso: área sem mapeamento */}
-          {!isGeocodingLoading && addrCoords && !addrStreet && !addrNeighborhood && (
+          {/* Aviso: área sem mapeamento algum */}
+          {showHints && !addrStreet && !addrNeighborhood && (
             <p className="text-[9px] text-gray-400 font-bold text-center bg-gray-50 rounded-2xl px-4 py-3 border border-dashed border-gray-200">
-              Essa área não tem endereço mapeado — o ponto será salvo pelas coordenadas. Adicione uma referência para o entregador.
+              Área sem mapeamento — o ponto será salvo pelas coordenadas GPS. Preencha uma referência para o entregador.
             </p>
           )}
 

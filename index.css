@@ -35,4 +35,5 @@ body,
 input,
 textarea {
   user-select: auto;
-  -webkit-user-se
+  -webkit-user-select: auto;
+}

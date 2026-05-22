@@ -31,5 +31,20 @@
 
     <!-- Permissions -->
 
+    <!-- Rede -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Localização (GPS em tempo real — entregador e cliente) -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- Notificações push (obrigatório Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Câmera (futuro uso de foto de perfil / cardápio) -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
 </manifest>
