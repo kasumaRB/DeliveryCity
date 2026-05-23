@@ -1079,4 +1079,4 @@ export const useAppStore = () => {
   const context = useContext(AppContext);
   if (!context) throw new Error('useAppStore deve ser usado dentro de AppProvider');
   return context;
-}
+};

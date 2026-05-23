@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppStore } from '../store';
 import { supabase } from '../lib/supabase';
-import { OrderStatus, Product, UserRole, Promotion } from '../types';
+import { OrderStatus, Product, UserRole, Promotion, UserAddress } from '../types';
+import { AddressModal } from '../components/AddressModal';
 
 const resizeImage = (file: File, maxWidth: number, maxHeight: number): Promise<File> => {
   return new Promise((resolve, reject) => {
@@ -131,6 +132,10 @@ export const RestaurantView: React.FC = () => {
   // Profile Form States
   const [storeName, setStoreName] = useState(myRestaurant?.name || '');
   const [storeAddress, setStoreAddress] = useState(myRestaurant?.address || '');
+  const [storeCoords, setStoreCoords] = useState<{ lat: number; lng: number } | null>(
+    myRestaurant?.coords || null
+  );
+  const [showLocationModal, setShowLocationModal] = useState(false);
   const [storeDescription, setStoreDescription] = useState(currentUserProfile?.description || '');
   const [storeWorkingHours, setStoreWorkingHours] = useState(
     currentUserProfile?.workingHours || ''
@@ -163,6 +168,7 @@ export const RestaurantView: React.FC = () => {
     if (showEditModal && myRestaurant && currentUserProfile) {
       setStoreName(myRestaurant.name);
       setStoreAddress(myRestaurant.address || '');
+      setStoreCoords(myRestaurant.coords || null);
       setStoreDescription(currentUserProfile.description || '');
       setStoreWorkingHours(currentUserProfile.workingHours || '');
       setRespName(currentUserProfile.name);
@@ -320,7 +326,11 @@ export const RestaurantView: React.FC = () => {
     try {
       // Salva dados do restaurante e do perfil do responsável em paralelo
       await Promise.all([
-        updateRestaurant(myRestaurant.id, { name: storeName, address: storeAddress }),
+        updateRestaurant(myRestaurant.id, {
+          name: storeName,
+          address: storeAddress,
+          ...(storeCoords ? { coords: storeCoords } : {}),
+        }),
         updateUserProfile(currentUserProfile.id, {
           name: respName,
           phoneNumber: respPhone,
@@ -1553,6 +1563,27 @@ export const RestaurantView: React.FC = () => {
       </main>
 
       {/* MODAL DE EDIÇÃO DO LOJISTA */}
+      {showLocationModal && (
+        <AddressModal
+          onClose={() => setShowLocationModal(false)}
+          onSave={(addr: Omit<UserAddress, 'id'>) => {
+            const parts = [addr.street, addr.number && `nº ${addr.number}`, addr.neighborhood, addr.city, addr.state]
+              .filter(Boolean)
+              .join(', ');
+            setStoreAddress(parts);
+            if (addr.coords) setStoreCoords(addr.coords);
+            setShowLocationModal(false);
+          }}
+          initialAddress={
+            storeCoords
+              ? ({ coords: storeCoords, street: storeAddress, number: '', neighborhood: '', city: 'Apiacás', state: 'MT', label: 'Loja', zipCode: '' } as UserAddress)
+              : null
+          }
+          title="Localização da Loja"
+          saveButtonLabel="Confirmar Localização"
+        />
+      )}
+
       {showEditModal && (
         <div
           className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-6 animate-in fade-in duration-300"
@@ -1590,12 +1621,28 @@ export const RestaurantView: React.FC = () => {
                   placeholder="Nome da Loja"
                   className="w-full p-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-orange-100"
                 />
-                <input
-                  value={storeAddress}
-                  onChange={e => setStoreAddress(e.target.value)}
-                  placeholder="Endereço"
-                  className="w-full p-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-orange-100"
-                />
+                <div className="relative">
+                  <input
+                    value={storeAddress}
+                    onChange={e => setStoreAddress(e.target.value)}
+                    placeholder="Endereço da loja"
+                    className="w-full p-5 pr-14 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-orange-100"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowLocationModal(true)}
+                    title="Definir localização no mapa"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-orange-100 text-orange-600 hover:bg-orange-200 transition-all"
+                  >
+                    <MapPin size={20} />
+                  </button>
+                </div>
+                {storeCoords && (
+                  <p className="text-[11px] text-green-600 font-bold ml-2 flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                    Localização no mapa definida ✓
+                  </p>
+                )}
                 <input
                   value={storeWorkingHours}
                   onChange={e => setStoreWorkingHours(e.target.value)}

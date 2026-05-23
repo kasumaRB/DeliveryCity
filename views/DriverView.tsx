@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../store';
 import { supabase } from '../lib/supabase';
-import { Order, OrderStatus } from '../types';
+import { Order, OrderStatus, UserAddress } from '../types';
+import { AddressModal } from '../components/AddressModal';
 import {
   Navigation,
   CheckCircle,
@@ -48,6 +49,17 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [pixKey, setPixKey] = useState(currentUserProfile?.pixKey || '');
   const [asaasAccountId, setAsaasAccountId] = useState(currentUserProfile?.asaasAccountId || '');
 
+  // Endereço base / região de atuação
+  const baseAddr = currentUserProfile?.savedAddresses?.find(a => a.label === 'Base');
+  const [baseAddressText, setBaseAddressText] = useState(
+    baseAddr
+      ? [baseAddr.street, baseAddr.number && `nº ${baseAddr.number}`, baseAddr.neighborhood, baseAddr.city]
+          .filter(Boolean).join(', ')
+      : ''
+  );
+  const [baseAddressData, setBaseAddressData] = useState<UserAddress | null>(baseAddr || null);
+  const [showBaseModal, setShowBaseModal] = useState(false);
+
   const myRatings = useMemo(() => {
     return orders
       .filter(o => o.driverId === currentUserProfile?.id && o.rating)
@@ -64,12 +76,19 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     if (!currentUserProfile) return;
     setIsSaving(true);
     try {
+      // Monta lista de savedAddresses: mantém endereços que NÃO são Base, adiciona o novo Base
+      const otherAddresses = (currentUserProfile.savedAddresses || []).filter(a => a.label !== 'Base');
+      const newSavedAddresses = baseAddressData
+        ? [{ ...baseAddressData, label: 'Base' }, ...otherAddresses]
+        : otherAddresses;
+
       await updateUserProfile(currentUserProfile.id, {
         vehicleType: vehicle,
         licensePlate: vehicle !== 'Bicicleta' ? plate : '',
         phoneNumber: phone,
         pixKey,
         asaasAccountId,
+        savedAddresses: newSavedAddresses,
       });
       alert('Dados atualizados!');
       onBack();
@@ -154,6 +173,35 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
               />
             </div>
 
+            <div className="space-y-2 mb-6">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">
+                Endereço Base / Região de Atuação
+              </label>
+              <div className="relative">
+                <input
+                  value={baseAddressText}
+                  readOnly
+                  placeholder="Toque no mapa para definir sua região"
+                  className="w-full p-5 pr-14 bg-gray-700/50 rounded-2xl font-bold border-2 border-transparent outline-none text-white cursor-pointer"
+                  onClick={() => setShowBaseModal(true)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowBaseModal(true)}
+                  title="Definir região no mapa"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-blue-600/40 text-blue-300 hover:bg-blue-600/70 transition-all"
+                >
+                  <MapPin size={20} />
+                </button>
+              </div>
+              {baseAddressData?.coords && (
+                <p className="text-[11px] text-green-400 font-bold ml-2 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-green-400 inline-block" />
+                  Localização definida no mapa ✓
+                </p>
+              )}
+            </div>
+
             <div className="space-y-2 mb-8">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">
                 ID Subconta Asaas
@@ -215,6 +263,23 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           </div>
         </div>
       </div>
+
+      {showBaseModal && (
+        <AddressModal
+          onClose={() => setShowBaseModal(false)}
+          onSave={(addr: Omit<UserAddress, 'id'>) => {
+            const parts = [addr.street, addr.number && `nº ${addr.number}`, addr.neighborhood, addr.city]
+              .filter(Boolean)
+              .join(', ');
+            setBaseAddressText(parts);
+            setBaseAddressData({ ...addr, id: baseAddressData?.id || crypto.randomUUID(), label: 'Base' });
+            setShowBaseModal(false);
+          }}
+          initialAddress={baseAddressData}
+          title="Sua Região de Atuação"
+          saveButtonLabel="Confirmar Região"
+        />
+      )}
     </div>
   );
 };

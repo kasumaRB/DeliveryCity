@@ -135,7 +135,7 @@ export const AddressModal: React.FC<AddressModalProps> = ({
         });
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, crossOrigin: '' }).addTo(map);
-        L.control.zoom({ position: 'bottomright' }).addTo(map);
+        L.control.zoom({ position: 'topleft' }).addTo(map);
 
         leafletMap.current = map;
         setTimeout(() => { try { map.invalidateSize(); } catch { /* silencioso */ } }, 150);
