@@ -49,24 +49,55 @@ export const geocodeAddress = async (address: string): Promise<{ lat: number; ln
   }
 };
 
-// ── Reverse Geocoding: coordenadas → endereço (Nominatim) ──────────
+// ── Reverse Geocoding: coordenadas → endereço (Nominatim + ViaCEP fallback) ──
 export const reverseGeocodeDetails = async (lat: number, lng: number): Promise<GeocodedAddress> => {
   try {
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18`,
       { headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'DeliveryCity/1.0' } }
     );
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const addr = data?.address || {};
 
+    const city  = addr.city || addr.town || addr.village || addr.municipality || '';
+    const state = addr.state || '';
+    let zipCode = addr.postcode || '';
+
+    // ViaCEP fallback: se Nominatim não retornou CEP mas temos cidade, busca o CEP da cidade
+    if (!zipCode && city && state) {
+      try {
+        const stateMap: Record<string, string> = {
+          'Mato Grosso': 'MT', 'São Paulo': 'SP', 'Rio de Janeiro': 'RJ',
+          'Minas Gerais': 'MG', 'Bahia': 'BA', 'Paraná': 'PR',
+          'Rio Grande do Sul': 'RS', 'Pernambuco': 'PE', 'Ceará': 'CE',
+          'Goiás': 'GO', 'Pará': 'PA', 'Maranhão': 'MA', 'Amazonas': 'AM',
+          'Espírito Santo': 'ES', 'Mato Grosso do Sul': 'MS', 'Tocantins': 'TO',
+          'Rondônia': 'RO', 'Acre': 'AC', 'Amapá': 'AP', 'Roraima': 'RR',
+          'Piauí': 'PI', 'Paraíba': 'PB', 'Alagoas': 'AL', 'Sergipe': 'SE',
+          'Rio Grande do Norte': 'RN', 'Distrito Federal': 'DF', 'Santa Catarina': 'SC',
+        };
+        const uf = stateMap[state] || state.slice(0, 2).toUpperCase();
+        const cityEncoded = encodeURIComponent(city);
+        const viacepRes = await fetch(
+          `https://viacep.com.br/ws/${uf}/${cityEncoded}/x/json/`,
+        );
+        if (viacepRes.ok) {
+          const entries = await viacepRes.json();
+          if (Array.isArray(entries) && entries.length > 0 && !entries[0].erro) {
+            zipCode = entries[0].cep || '';
+          }
+        }
+      } catch { /* fallback silencioso */ }
+    }
+
     return {
       street:       addr.road || addr.pedestrian || addr.footway || '',
       number:       addr.house_number || '',
       neighborhood: addr.suburb || addr.neighbourhood || addr.quarter || '',
-      city:         addr.city || addr.town || addr.village || addr.municipality || '',
-      state:        addr.state || '',
-      zipCode:      addr.postcode || '',
+      city,
+      state,
+      zipCode,
       fullAddress:  data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
     };
   } catch {
@@ -133,6 +164,33 @@ export const searchAddresses = async (query: string): Promise<Array<{
     }));
   } catch {
     return [];
+  }
+};
+
+// ── ViaCEP: CEP → endereço completo (gratuito, sem API key) ───────
+export const lookupCEP = async (cep: string): Promise<{
+  street: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  zipCode: string;
+} | null> => {
+  const digits = cep.replace(/\D/g, '');
+  if (digits.length !== 8) return null;
+  try {
+    const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.erro) return null;
+    return {
+      street:       data.logradouro || '',
+      neighborhood: data.bairro     || '',
+      city:         data.localidade || '',
+      state:        data.uf         || '',
+      zipCode:      `${digits.slice(0, 5)}-${digits.slice(5)}`,
+    };
+  } catch {
+    return null;
   }
 };
 

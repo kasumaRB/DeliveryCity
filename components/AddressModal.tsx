@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { UserAddress } from '../types';
 import { MapPin, AlertCircle, Crosshair, Loader, X } from 'lucide-react';
-import { reverseGeocodeDetails } from '../services/mapsService';
+import { reverseGeocodeDetails, lookupCEP } from '../services/mapsService';
 
 interface AddressModalProps {
   onClose: () => void;
@@ -45,6 +45,27 @@ export const AddressModal: React.FC<AddressModalProps> = ({
   const [isGeocodingLoading, setIsGeocodingLoading] = useState(false);
   const [isMapDragging,      setIsMapDragging]      = useState(false);
   const [mapError,           setMapError]           = useState<string | null>(null);
+  const [isCepLoading,       setIsCepLoading]       = useState(false);
+
+  const handleCepChange = async (raw: string) => {
+    const digits    = raw.replace(/\D/g, '').slice(0, 8);
+    const formatted = digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits;
+    setAddrZip(formatted);
+    if (digits.length === 8) {
+      setIsCepLoading(true);
+      try {
+        const data = await lookupCEP(digits);
+        if (data) {
+          if (data.street)       setAddrStreet(data.street);
+          if (data.neighborhood) setAddrNeighborhood(data.neighborhood);
+          if (data.city)         setAddrCity(data.city);
+          if (data.state)        setAddrState(data.state);
+        }
+      } finally {
+        setIsCepLoading(false);
+      }
+    }
+  };
 
   const getCurrentPosition = (): Promise<{ lat: number; lng: number }> =>
     new Promise((resolve, reject) => {
@@ -376,12 +397,19 @@ export const AddressModal: React.FC<AddressModalProps> = ({
                 )}
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">CEP</label>
-                <input value={addrZip} onChange={e => setAddrZip(e.target.value)}
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                  CEP {isCepLoading && <span className="text-orange-400">· buscando...</span>}
+                </label>
+                <input
+                  value={addrZip}
+                  onChange={e => handleCepChange(e.target.value)}
+                  inputMode="numeric"
+                  maxLength={9}
                   className={`w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:bg-white transition ${missingZip ? 'border-orange-200 focus:border-orange-400' : 'border-gray-100 focus:border-orange-200'}`}
-                  placeholder="00000-000" />
-                {missingZip && (
-                  <p className="text-[9px] text-orange-500 font-bold ml-1">CEP não encontrado</p>
+                  placeholder="00000-000"
+                />
+                {missingZip && !isCepLoading && (
+                  <p className="text-[9px] text-orange-500 font-bold ml-1">Digite o CEP para preencher o endereço automaticamente</p>
                 )}
               </div>
             </div>
