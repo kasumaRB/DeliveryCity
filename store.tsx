@@ -797,6 +797,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { data, error } = await supabase.from('orders').insert(newOrder);
       if (error) throw new Error(`Falha ao criar pedido: ${error.message}`);
       await fetchData();
+
+      // Notifica restaurante imediatamente (apenas para PENDING — PIX/cartão notifica via webhook)
+      if (newOrder.status === OrderStatus.PENDING) {
+        const ownerId = restaurantData.owner_id;
+        if (ownerId) {
+          supabase.functions.invoke('send-push-notification', {
+            body: {
+              userId: ownerId,
+              title: '🛒 Novo Pedido!',
+              body: `${customerName} fez um pedido de R$ ${total.toFixed(2)}. Confirme agora!`,
+              data: { orderId: newOrder.id, type: 'NEW_ORDER' },
+            },
+          }).catch(() => {});
+        }
+      }
+
       return data;
     } catch (error) {
       throw error;
@@ -978,6 +994,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateOrderStatus: async (id, s) => {
           await supabase.from('orders').update({ status: s }).eq('id', id);
           await fetchData();
+
+          // Notificações por status
+          const order = orders.find(o => o.id === id);
+          if (!order) return;
+
+          if (s === OrderStatus.PREPARING && order.customerId) {
+            supabase.functions.invoke('send-push-notification', {
+              body: {
+                userId: order.customerId,
+                title: '👨‍🍳 Pedido aceito!',
+                body: `${order.restaurantName} confirmou seu pedido e está preparando tudo!`,
+                data: { orderId: id, type: 'ORDER_PREPARING' },
+              },
+            }).catch(() => {});
+          }
+
+          if (s === OrderStatus.READY) {
+            // Notifica todos os entregadores disponíveis
+            supabase.functions.invoke('send-push-notification', {
+              body: {
+                notifyDrivers: true,
+                title: '📦 Pedido disponível!',
+                body: `Novo pedido em ${order.restaurantName} pronto para retirada.`,
+                data: { orderId: id, type: 'ORDER_READY' },
+              },
+            }).catch(() => {});
+          }
         },
         confirmPickup,
         confirmDelivery,

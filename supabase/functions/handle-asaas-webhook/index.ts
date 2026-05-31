@@ -16,6 +16,7 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { sendPushToUser, sendPushToAllDrivers } from '../_shared/pushNotification.ts';
 
 const ASAAS_WEBHOOK_TOKEN = Deno.env.get('ASAAS_WEBHOOK_TOKEN') ?? '';
 
@@ -121,40 +122,48 @@ serve(async (req) => {
       });
     }
 
-    // ── 7. Notificar restaurante via push (best-effort) ───────────────────────
-    if (newStatus === 'PENDING') {
-      try {
-        const { data: orderData } = await supabase
-          .from('orders')
-          .select('restaurant_id')
-          .eq('id', orderId)
+    // ── 7. Notificar via push (best-effort) ──────────────────────────────────
+    try {
+      const { data: orderData } = await supabase
+        .from('orders')
+        .select('id, total, customer_id, restaurant_id, customer_name')
+        .eq('id', orderId)
+        .single();
+
+      if (newStatus === 'PENDING' && orderData?.restaurant_id) {
+        // Pagamento confirmado → notifica restaurante
+        const { data: restData } = await supabase
+          .from('restaurants')
+          .select('owner_id, name')
+          .eq('id', orderData.restaurant_id)
           .single();
 
-        if (orderData?.restaurant_id) {
-          const { data: restaurantOwner } = await supabase
-            .from('restaurants')
-            .select('owner_id')
-            .eq('id', orderData.restaurant_id)
-            .single();
-
-          if (restaurantOwner?.owner_id) {
-            const { data: ownerProfile } = await supabase
-              .from('profiles')
-              .select('push_token')
-              .eq('id', restaurantOwner.owner_id)
-              .single();
-
-            if (ownerProfile?.push_token) {
-              // Dispara notificação push (integração com serviço de push — best-effort)
-              console.log(`[handle-asaas-webhook] Push token do lojista: ${ownerProfile.push_token} — novo pedido ${orderId}`);
-              // TODO: Integrar com Expo Push Notifications / FCM aqui
-            }
-          }
+        if (restData?.owner_id) {
+          const total = (orderData.total as number)?.toFixed(2) ?? '?';
+          await sendPushToUser(supabase, restData.owner_id, {
+            title: '🛒 Novo Pedido!',
+            body: `${orderData.customer_name || 'Cliente'} fez um pedido de R$ ${total}. Confirme agora!`,
+            data: { orderId, type: 'NEW_ORDER' },
+          });
+          // Pedido pronto para entregadores buscarem
+          await sendPushToAllDrivers(supabase, {
+            title: '📦 Pedido disponível!',
+            body: `Novo pedido em ${restData.name || 'restaurante'}. Abra o app para aceitar.`,
+            data: { orderId, type: 'ORDER_READY' },
+          });
         }
-      } catch (pushErr) {
-        console.warn('[handle-asaas-webhook] Falha ao notificar restaurante:', pushErr);
-        // Não é fatal — o pedido já foi atualizado
       }
+
+      if (newStatus === 'CANCELLED' && orderData?.customer_id) {
+        // PIX expirou → notifica cliente
+        await sendPushToUser(supabase, orderData.customer_id, {
+          title: '❌ Pagamento expirado',
+          body: 'Seu pedido foi cancelado pois o PIX não foi pago a tempo.',
+          data: { orderId, type: 'ORDER_CANCELLED' },
+        });
+      }
+    } catch (pushErr) {
+      console.warn('[handle-asaas-webhook] Falha ao notificar:', pushErr);
     }
 
     return new Response(JSON.stringify({ received: true, orderId, newStatus }), {
