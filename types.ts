@@ -6,7 +6,7 @@ export enum UserRole {
 }
 
 export enum OrderStatus {
-  PENDING_PAYMENT = 'PENDING_PAYMENT', // PIX gerado, aguardando pagamento
+  PENDING_PAYMENT = 'PENDING_PAYMENT',
   PENDING = 'PENDING',
   PREPARING = 'PREPARING',
   READY = 'READY',
@@ -31,15 +31,14 @@ export interface UserAddress {
   coords: { lat: number; lng: number };
 }
 
-// Cartão tokenizado salvo — NUNCA armazena número real, apenas token do Asaas
 export interface SavedCard {
-  id: string;           // UUID local para identificar o card salvo
-  token: string;        // Token do Asaas (creditCardToken)
-  last4: string;        // Últimos 4 dígitos — só para exibição
-  brand: string;        // Bandeira (ex: "VISA", "MASTERCARD") — só para exibição
-  holderName: string;   // Nome do titular — só para exibição
-  expiryMonth: string;  // Mês de validade — só para exibição
-  expiryYear: string;   // Ano de validade — só para exibição
+  id: string;
+  token: string;
+  last4: string;
+  brand: string;
+  holderName: string;
+  expiryMonth: string;
+  expiryYear: string;
 }
 
 export interface UserProfile {
@@ -56,8 +55,8 @@ export interface UserProfile {
   pixKey?: string;
   description?: string;
   workingHours?: string;
-  asaasAccountId?: string;    // ID da subconta Asaas (parceiros: lojista/entregador)
-  asaasCustomerId?: string;   // ID do customer Asaas (clientes pagadores)
+  asaasAccountId?: string;
+  asaasCustomerId?: string;
   pushToken?: string;
   status: 'PENDING' | 'APPROVED' | 'BLOCKED';
   phoneNumber?: string;
@@ -71,6 +70,30 @@ export interface UserProfile {
   avatarUrl?: string;
   customFeePct?: number;
   savedCards?: SavedCard[];
+  favoriteRestaurantIds?: string[];
+}
+
+// Horário estruturado por dia da semana
+// day: 0=Dom 1=Seg 2=Ter 3=Qua 4=Qui 5=Sex 6=Sab
+export interface DaySchedule {
+  day: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  open: string;   // "08:00"
+  close: string;  // "22:00"
+  closed: boolean;
+}
+
+// Variações de produto (ex: tamanho, adicionais)
+export interface VariantOption {
+  id: string;
+  label: string;
+  priceAdd: number;
+}
+
+export interface ProductVariant {
+  id: string;
+  name: string;
+  required: boolean;
+  options: VariantOption[];
 }
 
 export interface Product {
@@ -81,6 +104,8 @@ export interface Product {
   ownerPrice?: number;
   image: string;
   category?: string;
+  available?: boolean;
+  variants?: ProductVariant[];
 }
 
 export interface Restaurant {
@@ -95,16 +120,19 @@ export interface Restaurant {
   address?: string;
   coords: { lat: number; lng: number };
   menu: Product[];
-  asaasAccountId?: string;    // ID da subconta Asaas do lojista
+  asaasAccountId?: string;
   deliveryFee?: number;
   minOrder?: number;
   isOpen?: boolean;
+  openingHours?: DaySchedule[];
   promotions?: Promotion[];
 }
 
 export interface OrderItem {
   product: Product;
   quantity: number;
+  selectedVariants?: Record<string, string>; // variantId -> optionId
+  variantPriceAdd?: number;
 }
 
 export interface Order {
@@ -120,22 +148,24 @@ export interface Order {
   total: number;
   paymentMethod: PaymentMethod;
   changeFor?: number;
-  paymentId?: string;          // ID legado / referência interna
-  asaasPaymentId?: string;     // ID da cobrança no Asaas
-  pixQrCode?: string;          // Código Pix copia-e-cola
-  pixQrCodeImage?: string;     // QR code em base64
+  paymentId?: string;
+  asaasPaymentId?: string;
+  pixQrCode?: string;
+  pixQrCodeImage?: string;
   status: OrderStatus;
   customerAddress: string;
   customerName: string;
   customerId?: string;
   coords?: { lat: number; lng: number };
   timestamp: number;
+  cancelledAt?: number;
   driverId?: string;
   pickupCode?: string;
   deliveryCode?: string;
+  deliveryPhotoUrl?: string;
   rating?: OrderRating;
-  feedback?: string;       // Comentário textual do cliente (legado / exibição)
-  driverName?: string;     // Nome do entregador (desnormalizado para exibição)
+  feedback?: string;
+  driverName?: string;
 }
 
 export interface OrderRating {
@@ -162,11 +192,28 @@ export interface Promotion {
   productIds?: string[];
 }
 
-
 export interface PlatformSettings {
   platformFeePct: number;
   driverFeePct: number;
   restaurantFeePct: number;
   minDeliveryFee: number;
   minOrderValue: number;
+}
+
+// Retorna se um restaurante está aberto agora com base nos horários estruturados
+export function isRestaurantOpenNow(restaurant: Restaurant): boolean {
+  if (restaurant.openingHours && restaurant.openingHours.length > 0) {
+    const now = new Date();
+    const dayOfWeek = now.getDay() as DaySchedule['day'];
+    const schedule = restaurant.openingHours.find(s => s.day === dayOfWeek);
+    if (!schedule || schedule.closed) return false;
+    const [openH, openM] = schedule.open.split(':').map(Number);
+    const [closeH, closeM] = schedule.close.split(':').map(Number);
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+    const openMins = openH * 60 + openM;
+    const closeMins = closeH * 60 + closeM;
+    return nowMins >= openMins && nowMins < closeMins;
+  }
+  // Fallback para toggle manual
+  return restaurant.isOpen !== false;
 }

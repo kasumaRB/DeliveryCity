@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppStore } from '../store';
 import { supabase } from '../lib/supabase';
-import { OrderStatus, Product, UserRole, Promotion, UserAddress } from '../types';
+import { OrderStatus, Product, UserRole, Promotion, UserAddress, DaySchedule } from '../types';
 import { AddressModal } from '../components/AddressModal';
 
 const resizeImage = (file: File, maxWidth: number, maxHeight: number): Promise<File> => {
@@ -89,6 +89,8 @@ import {
   Award,
   TrendingDown,
   Filter,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import Logo from '../assets/Logo.png';
 import Nome from '../assets/Nome.png';
@@ -140,6 +142,7 @@ export const RestaurantView: React.FC = () => {
   const [storeWorkingHours, setStoreWorkingHours] = useState(
     currentUserProfile?.workingHours || ''
   );
+  const [openingHoursSchedule, setOpeningHoursSchedule] = useState<DaySchedule[]>([]);
   const [respName, setRespName] = useState(currentUserProfile?.name || '');
   const [respPhone, setRespPhone] = useState(currentUserProfile?.phoneNumber || '');
   const [respCpf, setRespCpf] = useState(currentUserProfile?.cpf || '');
@@ -176,6 +179,20 @@ export const RestaurantView: React.FC = () => {
       setRespCpf(currentUserProfile.cpf || '');
       setRespPix(currentUserProfile.pixKey || '');
       setRespAsaasId(currentUserProfile.asaasAccountId || '');
+
+      const defaultSched: DaySchedule[] = ([0,1,2,3,4,5,6] as DaySchedule['day'][]).map(d => ({
+        day: d,
+        open: '08:00',
+        close: '22:00',
+        closed: d === 0 || d === 6,
+      }));
+      const existing = myRestaurant.openingHours && myRestaurant.openingHours.length > 0
+        ? myRestaurant.openingHours
+        : defaultSched;
+      const merged = ([0,1,2,3,4,5,6] as DaySchedule['day'][]).map(d =>
+        existing.find(s => s.day === d) || defaultSched.find(s => s.day === d)!
+      );
+      setOpeningHoursSchedule(merged);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showEditModal]);
@@ -330,6 +347,7 @@ export const RestaurantView: React.FC = () => {
           name: storeName,
           address: storeAddress,
           ...(storeCoords ? { coords: storeCoords } : {}),
+          openingHours: openingHoursSchedule,
         }),
         updateUserProfile(currentUserProfile.id, {
           name: respName,
@@ -852,14 +870,32 @@ export const RestaurantView: React.FC = () => {
                   {myRestaurant.menu.map(item => (
                     <div
                       key={item.id}
-                      className="bg-white p-6 rounded-[3.5rem] border border-gray-50 shadow-sm flex flex-col group hover:shadow-2xl transition-all h-full"
+                      className={`bg-white p-6 rounded-[3.5rem] border border-gray-50 shadow-sm flex flex-col group hover:shadow-2xl transition-all h-full ${item.available === false ? 'opacity-60' : ''}`}
                     >
                       <div className="relative h-56 rounded-[2.5rem] overflow-hidden mb-8 shadow-inner">
                         <img
                           src={item.image}
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                         />
+                        {item.available === false && (
+                          <div className="absolute inset-0 bg-gray-900/40 flex items-center justify-center">
+                            <span className="bg-red-500 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg">
+                              Esgotado
+                            </span>
+                          </div>
+                        )}
                         <div className="absolute top-4 right-4 flex gap-2">
+                          <button
+                            onClick={() => updateProduct(myRestaurant.id, item.id, { available: item.available === false })}
+                            title={item.available === false ? 'Reativar produto' : 'Marcar como esgotado'}
+                            className={`p-3 backdrop-blur-md rounded-2xl shadow-xl hover:bg-white transition active:scale-90 ${
+                              item.available === false
+                                ? 'bg-red-500 text-white'
+                                : 'bg-white/95 text-green-600'
+                            }`}
+                          >
+                            {item.available === false ? <EyeOff size={18} /> : <Eye size={18} />}
+                          </button>
                           <button
                             onClick={() => handleEditProduct(item)}
                             className="p-3 bg-white/95 backdrop-blur-md text-blue-600 rounded-2xl shadow-xl hover:bg-white transition active:scale-90"
@@ -1384,11 +1420,21 @@ export const RestaurantView: React.FC = () => {
                       Dados da Operação
                     </h4>
                     <div className="bg-gray-50 p-6 rounded-[2.5rem] space-y-4">
-                      <div className="flex items-center gap-4 text-gray-600">
-                        <Clock size={18} />
-                        <span className="text-sm font-bold">
-                          {currentUserProfile.workingHours || 'Não definido'}
-                        </span>
+                      <div className="flex items-start gap-4 text-gray-600">
+                        <Clock size={18} className="mt-0.5 shrink-0" />
+                        {myRestaurant.openingHours && myRestaurant.openingHours.length > 0 ? (
+                          <div className="text-xs font-bold space-y-0.5">
+                            {['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map((name, d) => {
+                              const s = myRestaurant.openingHours!.find(x => x.day === d);
+                              if (!s || s.closed) return <span key={d} className="block text-gray-300">{name}: Fechado</span>;
+                              return <span key={d} className="block">{name}: {s.open}–{s.close}</span>;
+                            })}
+                          </div>
+                        ) : (
+                          <span className="text-sm font-bold">
+                            {currentUserProfile.workingHours || 'Não definido'}
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-4 text-gray-600">
                         <MapPin size={18} />
@@ -1643,12 +1689,67 @@ export const RestaurantView: React.FC = () => {
                     Localização no mapa definida ✓
                   </p>
                 )}
-                <input
-                  value={storeWorkingHours}
-                  onChange={e => setStoreWorkingHours(e.target.value)}
-                  placeholder="Horário (ex: 08:00 às 22:00)"
-                  className="w-full p-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-orange-100"
-                />
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4 mb-3 block">
+                    Horário de Funcionamento
+                  </label>
+                  {openingHoursSchedule.length > 0 && (
+                    <div className="bg-gray-50 rounded-2xl overflow-hidden divide-y divide-gray-100">
+                      {openingHoursSchedule.map((sched, idx) => {
+                        const DAY_NAMES = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+                        return (
+                          <div key={sched.day} className="flex items-center gap-3 px-4 py-3">
+                            <span className="text-xs font-black text-gray-500 w-8 shrink-0">
+                              {DAY_NAMES[sched.day]}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = [...openingHoursSchedule];
+                                updated[idx] = { ...updated[idx], closed: !updated[idx].closed };
+                                setOpeningHoursSchedule(updated);
+                              }}
+                              className={`text-[9px] font-black px-2.5 py-1 rounded-lg transition-all shrink-0 ${
+                                sched.closed
+                                  ? 'bg-red-100 text-red-500'
+                                  : 'bg-green-100 text-green-600'
+                              }`}
+                            >
+                              {sched.closed ? 'Fechado' : 'Aberto'}
+                            </button>
+                            {!sched.closed ? (
+                              <>
+                                <input
+                                  type="time"
+                                  value={sched.open}
+                                  onChange={e => {
+                                    const updated = [...openingHoursSchedule];
+                                    updated[idx] = { ...updated[idx], open: e.target.value };
+                                    setOpeningHoursSchedule(updated);
+                                  }}
+                                  className="flex-1 p-2 bg-white rounded-xl font-bold text-xs border border-gray-200 outline-none focus:border-orange-200 min-w-0"
+                                />
+                                <span className="text-gray-400 text-xs shrink-0">até</span>
+                                <input
+                                  type="time"
+                                  value={sched.close}
+                                  onChange={e => {
+                                    const updated = [...openingHoursSchedule];
+                                    updated[idx] = { ...updated[idx], close: e.target.value };
+                                    setOpeningHoursSchedule(updated);
+                                  }}
+                                  className="flex-1 p-2 bg-white rounded-xl font-bold text-xs border border-gray-200 outline-none focus:border-orange-200 min-w-0"
+                                />
+                              </>
+                            ) : (
+                              <span className="flex-1 text-center text-gray-300 text-xs font-bold">—</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
                 <textarea
                   value={storeDescription}
                   onChange={e => setStoreDescription(e.target.value)}

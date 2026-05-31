@@ -11,6 +11,7 @@ import {
   OrderRating,
   OrderItem,
   PlatformSettings,
+  DaySchedule,
 } from './types';
 import { supabase } from './lib/supabase';
 import { Session } from '@supabase/supabase-js';
@@ -76,6 +77,8 @@ interface AppContextType {
   deleteAddress: (addressId: string) => Promise<void>;
   refreshData: () => Promise<void>;
   setupNotifications: (userId?: string) => Promise<void>;
+  toggleFavorite: (restaurantId: string) => Promise<void>;
+  cancelOrder: (orderId: string) => Promise<void>;
 
   addToCart: (item: any) => void;
   removeFromCart: (productId: string) => void;
@@ -159,6 +162,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     currentLocation: p.current_location || undefined,
     customFeePct: p.custom_fee_pct ? Number(p.custom_fee_pct) : undefined,
     savedCards: Array.isArray(p.saved_cards) ? p.saved_cards : [],
+    favoriteRestaurantIds: Array.isArray(p.favorite_restaurant_ids) ? p.favorite_restaurant_ids : [],
   });
 
   const mapOrder = (o: any): Order => ({
@@ -178,9 +182,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     customerName: o.customer_name,
     customerId: o.customer_id,
     timestamp: o.timestamp ? new Date(o.timestamp).getTime() : Date.now(),
+    cancelledAt: o.cancelled_at ? new Date(o.cancelled_at).getTime() : undefined,
     driverId: o.driver_id,
     pickupCode: o.pickup_code,
     deliveryCode: o.delivery_code,
+    deliveryPhotoUrl: o.delivery_photo_url || undefined,
     rating: o.rating,
     paymentId: o.payment_id,
     asaasPaymentId: o.asaas_payment_id,
@@ -238,8 +244,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           menu: r.menu || [],
           rating: Number(r.rating || 0),
           asaasAccountId: r.asaas_account_id,
-          // Protege contra coords null — evita crash em cálculos de distância
           coords: r.coords ?? { lat: -9.5422, lng: -57.4486 },
+          isOpen: r.is_open !== false,
+          openingHours: Array.isArray(r.opening_hours) ? r.opening_hours : [],
         }));
         setRestaurants(mapped);
         localStorage.setItem(STORAGE_KEY_RESTAURANTS, JSON.stringify(mapped));
@@ -539,6 +546,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           menu: r.menu || [],
           rating: Number(r.rating || 0),
           asaasAccountId: r.asaas_account_id,
+          isOpen: r.is_open !== false,
+          openingHours: Array.isArray(r.opening_hours) ? r.opening_hours : [],
         });
         if (payload.eventType === 'INSERT') {
           const novo = mapRest(payload.new);
@@ -683,6 +692,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             `Produto "${item.product.name}" não está disponível neste restaurante.`
           );
         }
+        if (realProduct.available === false) {
+          throw new Error(
+            `Produto "${item.product.name}" está temporariamente esgotado.`
+          );
+        }
         const realPrice = Number(realProduct.price);
         const frontendPrice = Number(item.product.price);
 
@@ -809,7 +823,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (data.avatarUrl !== undefined) up.avatar_url = data.avatarUrl;
     if (data.customFeePct !== undefined) up.custom_fee_pct = data.customFeePct;
     if (data.savedCards !== undefined) up.saved_cards = data.savedCards;
-    // currentLocation é atualizado silenciosamente (sem fetchData) para não sobrecarregar o banco
+    if (data.favoriteRestaurantIds !== undefined) up.favorite_restaurant_ids = data.favoriteRestaurantIds;
     if (data.currentLocation !== undefined) up.current_location = data.currentLocation;
 
     const { error } = await supabase.from('profiles').update(up).eq('id', id);
@@ -907,6 +921,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (error) throw error;
   };
 
+  const cancelOrder = async (orderId: string) => {
+    if (!session?.user?.id) throw new Error('Não autenticado.');
+    const order = orders.find(o => o.id === orderId);
+    if (!order) throw new Error('Pedido não encontrado.');
+    if (order.customerId !== session.user.id) throw new Error('Sem permissão.');
+    if (!['PENDING', 'PENDING_PAYMENT'].includes(order.status))
+      throw new Error('Não é possível cancelar um pedido que já está em preparo.');
+    const ageMs = Date.now() - order.timestamp;
+    if (ageMs > 3 * 60 * 1000)
+      throw new Error('O prazo de cancelamento (3 minutos) já expirou.');
+    const { error } = await supabase
+      .from('orders')
+      .update({ status: OrderStatus.CANCELLED, cancelled_at: Date.now() })
+      .eq('id', orderId);
+    if (error) throw error;
+    await fetchData();
+  };
+
+  const toggleFavorite = async (restaurantId: string) => {
+    if (!currentUserProfile) return;
+    const current = currentUserProfile.favoriteRestaurantIds || [];
+    const updated = current.includes(restaurantId)
+      ? current.filter(id => id !== restaurantId)
+      : [...current, restaurantId];
+    // Atualiza otimisticamente no estado local
+    setCurrentUserProfile(prev => prev ? { ...prev, favoriteRestaurantIds: updated } : prev);
+    setProfiles(prev => prev.map(p => p.id === currentUserProfile.id ? { ...p, favoriteRestaurantIds: updated } : p));
+    const { error } = await supabase
+      .from('profiles')
+      .update({ favorite_restaurant_ids: updated })
+      .eq('id', currentUserProfile.id);
+    if (error) {
+      // Reverte em caso de erro
+      setCurrentUserProfile(prev => prev ? { ...prev, favoriteRestaurantIds: current } : prev);
+      throw error;
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -981,7 +1033,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           await fetchData();
         },
         updateRestaurant: async (id, d) => {
-          const { error } = await supabase.from('restaurants').update(d).eq('id', id);
+          // Mapeia campos camelCase para snake_case do banco
+          const dbData: any = { ...d };
+          if ('isOpen' in d) { dbData.is_open = (d as any).isOpen; delete dbData.isOpen; }
+          if ('openingHours' in d) { dbData.opening_hours = (d as any).openingHours; delete dbData.openingHours; }
+          if ('ownerId' in d) { dbData.owner_id = (d as any).ownerId; delete dbData.ownerId; }
+          if ('asaasAccountId' in d) { dbData.asaas_account_id = (d as any).asaasAccountId; delete dbData.asaasAccountId; }
+          const { error } = await supabase.from('restaurants').update(dbData).eq('id', id);
           if (error) {
             console.error('Error updating restaurant:', error);
             throw new Error(`Erro ao atualizar restaurante: ${error.message}`);
@@ -1052,6 +1110,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         },
         refreshData: fetchData,
         requestPasswordReset: async e => await supabase.auth.resetPasswordForEmail(e),
+        toggleFavorite,
+        cancelOrder,
         realDistances,
         recalculateDistances: async (addr: string, coords: { lat: number; lng: number }) => {
           const d = await getRealDistances(

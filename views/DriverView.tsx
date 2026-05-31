@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppStore } from '../store';
 import { supabase } from '../lib/supabase';
 import { Order, OrderStatus, UserAddress } from '../types';
@@ -36,6 +36,8 @@ import {
   Power,
   MessageCircle,
   AlertTriangle,
+  Camera,
+  ImagePlus,
 } from 'lucide-react';
 import Logo from '../assets/Logo.png';
 import Nome from '../assets/Nome.png';
@@ -308,6 +310,13 @@ export const DriverView: React.FC = () => {
   const [currentPos, setCurrentPos] = useState<{ lat: number; lng: number } | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
+  // Delivery photo state
+  const [deliveryPhotoStep, setDeliveryPhotoStep] = useState(false);
+  const [deliveryPhotoPreview, setDeliveryPhotoPreview] = useState<string | null>(null);
+  const [deliveryPhotoFile, setDeliveryPhotoFile] = useState<File | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const deliveryPhotoInputRef = useRef<HTMLInputElement>(null);
+
   const activeOrder = useMemo(
     () =>
       orders.find(
@@ -456,18 +465,65 @@ export const DriverView: React.FC = () => {
 
   const handleVerifyCode = async () => {
     if (!activeOrder || !inputCode) return;
-    setIsVerifying(true);
     const isPickup = activeOrder.status === 'READY';
-    const success = isPickup
-      ? await confirmPickup(activeOrder.id, inputCode)
-      : await confirmDelivery(activeOrder.id, inputCode);
-    if (success) {
-      setShowCodeInput(false);
-      setInputCode('');
+
+    if (isPickup) {
+      setIsVerifying(true);
+      const success = await confirmPickup(activeOrder.id, inputCode);
+      if (success) {
+        setShowCodeInput(false);
+        setInputCode('');
+      } else {
+        alert('Código inválido.');
+      }
+      setIsVerifying(false);
     } else {
-      alert('Código inválido.');
+      // Delivery: go to photo capture step
+      setDeliveryPhotoStep(true);
     }
-    setIsVerifying(false);
+  };
+
+  const handleDeliveryPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setDeliveryPhotoFile(file);
+    const reader = new FileReader();
+    reader.onload = ev => setDeliveryPhotoPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleConfirmDeliveryWithPhoto = async () => {
+    if (!activeOrder || !inputCode) return;
+    setIsUploadingPhoto(true);
+    try {
+      // Upload photo if captured
+      if (deliveryPhotoFile) {
+        const fileName = `delivery/${activeOrder.id}-${Date.now()}.jpg`;
+        const { data, error: uploadErr } = await supabase.storage
+          .from('avatars')
+          .upload(fileName, deliveryPhotoFile, { upsert: true });
+        if (!uploadErr && data) {
+          const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
+          await supabase.from('orders').update({ delivery_photo_url: publicUrl }).eq('id', activeOrder.id);
+        }
+      }
+
+      const success = await confirmDelivery(activeOrder.id, inputCode);
+      if (success) {
+        setShowCodeInput(false);
+        setInputCode('');
+        setDeliveryPhotoStep(false);
+        setDeliveryPhotoPreview(null);
+        setDeliveryPhotoFile(null);
+      } else {
+        alert('Código inválido. Volte e verifique o código.');
+        setDeliveryPhotoStep(false);
+      }
+    } catch (e: any) {
+      alert('Erro ao confirmar entrega: ' + (e.message || 'Tente novamente'));
+    } finally {
+      setIsUploadingPhoto(false);
+    }
   };
 
   const formatCurrency = (value: number) =>
@@ -827,46 +883,123 @@ export const DriverView: React.FC = () => {
       {showCodeInput && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
           <div className="bg-gray-800 p-8 rounded-[3rem] w-full max-w-md animate-in zoom-in-95">
-            <div className="text-center mb-8">
-              <div className="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <KeyRound size={40} className="text-blue-400" />
-              </div>
-              <h3 className="text-2xl font-black text-white">Digite o Código</h3>
-              <p className="text-gray-400 text-sm mt-2">
-                {activeOrder?.status === 'READY'
-                  ? 'Código do pedido no restaurante'
-                  : 'Código de entrega'}
-              </p>
-            </div>
+            {!deliveryPhotoStep ? (
+              <>
+                <div className="text-center mb-8">
+                  <div className="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <KeyRound size={40} className="text-blue-400" />
+                  </div>
+                  <h3 className="text-2xl font-black text-white">Digite o Código</h3>
+                  <p className="text-gray-400 text-sm mt-2">
+                    {activeOrder?.status === 'READY'
+                      ? 'Código do pedido no restaurante'
+                      : 'Código de entrega do cliente'}
+                  </p>
+                </div>
 
-            <input
-              type="text"
-              value={inputCode}
-              onChange={e => setInputCode(e.target.value)}
-              className="w-full p-6 bg-gray-700/50 rounded-2xl text-center text-3xl font-black text-white tracking-[0.5em] border-2 border-gray-600 outline-none focus:border-blue-500 mb-6"
-              placeholder="0000"
-              maxLength={4}
-              autoFocus
-            />
+                <input
+                  type="text"
+                  value={inputCode}
+                  onChange={e => setInputCode(e.target.value)}
+                  className="w-full p-6 bg-gray-700/50 rounded-2xl text-center text-3xl font-black text-white tracking-[0.5em] border-2 border-gray-600 outline-none focus:border-blue-500 mb-6"
+                  placeholder="0000"
+                  maxLength={4}
+                  autoFocus
+                />
 
-            <div className="flex gap-4">
-              <button
-                onClick={() => {
-                  setShowCodeInput(false);
-                  setInputCode('');
-                }}
-                className="flex-1 py-4 bg-gray-700 text-gray-300 rounded-2xl font-bold"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleVerifyCode}
-                disabled={isVerifying || inputCode.length < 4}
-                className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-bold disabled:opacity-50"
-              >
-                {isVerifying ? <Loader className="animate-spin mx-auto" /> : 'Confirmar'}
-              </button>
-            </div>
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => {
+                      setShowCodeInput(false);
+                      setInputCode('');
+                    }}
+                    className="flex-1 py-4 bg-gray-700 text-gray-300 rounded-2xl font-bold"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleVerifyCode}
+                    disabled={isVerifying || inputCode.length < 4}
+                    className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-bold disabled:opacity-50"
+                  >
+                    {isVerifying ? <Loader className="animate-spin mx-auto" /> : 'Avançar'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-center mb-6">
+                  <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Camera size={40} className="text-green-400" />
+                  </div>
+                  <h3 className="text-2xl font-black text-white">Foto da Entrega</h3>
+                  <p className="text-gray-400 text-sm mt-2">
+                    Registre a entrega com uma foto (recomendado)
+                  </p>
+                </div>
+
+                <input
+                  ref={deliveryPhotoInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleDeliveryPhotoChange}
+                />
+
+                {deliveryPhotoPreview ? (
+                  <div className="relative mb-6">
+                    <img
+                      src={deliveryPhotoPreview}
+                      className="w-full h-48 object-cover rounded-2xl"
+                    />
+                    <button
+                      onClick={() => {
+                        setDeliveryPhotoPreview(null);
+                        setDeliveryPhotoFile(null);
+                      }}
+                      className="absolute top-2 right-2 p-1.5 bg-black/60 text-white rounded-full"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => deliveryPhotoInputRef.current?.click()}
+                    className="w-full h-36 border-2 border-dashed border-gray-600 rounded-2xl flex flex-col items-center justify-center gap-3 text-gray-400 hover:border-green-500 hover:text-green-400 transition-all mb-6"
+                  >
+                    <ImagePlus size={32} />
+                    <span className="text-sm font-bold">Tirar foto / Escolher imagem</span>
+                  </button>
+                )}
+
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => setDeliveryPhotoStep(false)}
+                    className="flex-1 py-4 bg-gray-700 text-gray-300 rounded-2xl font-bold"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    onClick={handleConfirmDeliveryWithPhoto}
+                    disabled={isUploadingPhoto}
+                    className="flex-1 py-4 bg-green-600 text-white rounded-2xl font-black disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {isUploadingPhoto ? (
+                      <Loader className="animate-spin" size={18} />
+                    ) : (
+                      <CheckCircle size={18} />
+                    )}
+                    {isUploadingPhoto ? 'Enviando...' : 'Confirmar Entrega'}
+                  </button>
+                </div>
+                {!deliveryPhotoPreview && (
+                  <p className="text-center text-gray-500 text-xs mt-3 font-medium">
+                    A foto é opcional mas recomendada para sua segurança
+                  </p>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}

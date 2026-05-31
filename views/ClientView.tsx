@@ -39,6 +39,9 @@ import {
   Trash2,
   Wallet,
   Pencil,
+  Heart,
+  Receipt,
+  Ban,
 } from 'lucide-react';
 import { AddressModal } from '../components/AddressModal';
 import { DriverTrackingMap } from '../components/DriverTrackingMap';
@@ -62,6 +65,8 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     deleteAddress,
     platformSettings,
     profiles,
+    toggleFavorite,
+    cancelOrder,
   } = store || {};
 
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
@@ -117,6 +122,13 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
   // Search and filter states
   const [selectedCategory, setSelectedCategory] = useState('');
   const [productSearch, setProductSearch] = useState('');
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+
+  // Receipt modal
+  const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
+
+  // Cancel order
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
 
   // Helper: traduz status do pedido para português
   const traduzirStatus = (status: string): { label: string; color: string } => {
@@ -247,12 +259,15 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
   };
 
   const filteredStores = useMemo(() => {
-    return restaurants.filter(
-      r =>
-        r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.category.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [restaurants, searchQuery]);
+    const favIds = currentUserProfile?.favoriteRestaurantIds ?? [];
+    return restaurants
+      .filter(r => !showFavoritesOnly || favIds.includes(r.id))
+      .filter(
+        r =>
+          r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          r.category.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+  }, [restaurants, searchQuery, showFavoritesOnly, currentUserProfile?.favoriteRestaurantIds]);
 
   const handleAddToCart = (product: Product) => {
     // 🔒 SEGURANÇA: Exige login antes de adicionar ao carrinho
@@ -618,7 +633,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
               <h2 className="text-3xl md:text-5xl font-black text-gray-900 tracking-tighter mb-8">
                 Fome de quê?
               </h2>
-              <div className="relative mb-10 max-w-2xl">
+              <div className="relative mb-6 max-w-2xl">
                 <Search
                   size={20}
                   className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300"
@@ -631,10 +646,43 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                   className="w-full bg-white border-2 border-transparent p-5 pl-16 rounded-[2rem] font-bold text-gray-700 outline-none shadow-xl shadow-gray-100 focus:border-orange-200 transition-all"
                 />
               </div>
+              {currentUserProfile && (
+                <div className="flex gap-3 mb-8">
+                  <button
+                    onClick={() => setShowFavoritesOnly(false)}
+                    className={`px-5 py-2.5 rounded-2xl font-bold text-xs transition-all ${
+                      !showFavoritesOnly
+                        ? 'bg-orange-600 text-white shadow-lg shadow-orange-100'
+                        : 'bg-white text-gray-500 border border-gray-100'
+                    }`}
+                  >
+                    Todos
+                  </button>
+                  <button
+                    onClick={() => setShowFavoritesOnly(true)}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl font-bold text-xs transition-all ${
+                      showFavoritesOnly
+                        ? 'bg-red-500 text-white shadow-lg shadow-red-100'
+                        : 'bg-white text-gray-500 border border-gray-100'
+                    }`}
+                  >
+                    <Heart size={13} className={showFavoritesOnly ? 'fill-white' : ''} />
+                    Favoritos
+                    {(currentUserProfile.favoriteRestaurantIds?.length ?? 0) > 0 && (
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-black ${
+                        showFavoritesOnly ? 'bg-white/20' : 'bg-red-100 text-red-500'
+                      }`}>
+                        {currentUserProfile.favoriteRestaurantIds!.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {filteredStores.map(restaurant => {
                   const estFee = estimatedDeliveryFee(restaurant);
                   const isClosed = restaurant.isOpen === false;
+                  const isFav = currentUserProfile?.favoriteRestaurantIds?.includes(restaurant.id) ?? false;
                   return (
                     <div
                       key={restaurant.id}
@@ -655,6 +703,20 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                           {restaurant.rating.toFixed(1)}{' '}
                           <Star size={12} className="fill-orange-500 text-orange-500" />
                         </div>
+                        {currentUserProfile && (
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              toggleFavorite?.(restaurant.id);
+                            }}
+                            className="absolute top-4 left-4 p-2 bg-white/90 backdrop-blur-sm rounded-xl shadow-sm active:scale-90 transition-all"
+                          >
+                            <Heart
+                              size={16}
+                              className={isFav ? 'fill-red-500 text-red-500' : 'text-gray-400'}
+                            />
+                          </button>
+                        )}
                         {isClosed && (
                           <div className="absolute inset-0 flex items-center justify-center">
                             <span className="bg-black/70 text-white text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full">
@@ -764,19 +826,27 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                   )
                   .map(product => {
                     const cartItem = cart.find(item => item.product.id === product.id);
+                    const isUnavailable = product.available === false;
                     return (
                       <div
                         key={product.id}
-                        className="bg-white rounded-[2rem] p-5 flex gap-5 shadow-lg shadow-gray-100 border border-gray-50 hover:shadow-xl transition-all"
+                        className={`bg-white rounded-[2rem] p-5 flex gap-5 shadow-lg shadow-gray-100 border border-gray-50 hover:shadow-xl transition-all ${isUnavailable ? 'opacity-60' : ''}`}
                       >
-                        <div className="w-24 h-24 bg-gray-100 rounded-2xl overflow-hidden shrink-0">
+                        <div className="w-24 h-24 bg-gray-100 rounded-2xl overflow-hidden shrink-0 relative">
                           <img
                             src={
                               product.image ||
                               'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500'
                             }
-                            className="w-full h-full object-cover"
+                            className={`w-full h-full object-cover ${isUnavailable ? 'grayscale' : ''}`}
                           />
+                          {isUnavailable && (
+                            <div className="absolute inset-0 bg-gray-900/30 flex items-center justify-center">
+                              <span className="bg-red-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wide">
+                                Esgotado
+                              </span>
+                            </div>
+                          )}
                         </div>
                         <div className="flex-1">
                           <h4 className="font-black text-gray-900 text-sm mb-1 leading-tight">
@@ -788,7 +858,11 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                               currency: 'BRL',
                             })}
                           </p>
-                          {cartItem ? (
+                          {isUnavailable ? (
+                            <span className="inline-block bg-red-50 text-red-400 px-3 py-1.5 rounded-xl font-black text-[9px] uppercase tracking-widest border border-red-100">
+                              Indisponível
+                            </span>
+                          ) : cartItem ? (
                             <div className="flex items-center gap-3 bg-gray-50 p-1.5 rounded-xl w-fit border border-gray-100">
                               <button
                                 onClick={() =>
@@ -882,10 +956,48 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                             >
                               {statusInfo.label}
                             </span>
-                            <span className="font-black text-lg text-gray-900">
-                              R$ {order.total.toFixed(2)}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-black text-lg text-gray-900">
+                                R$ {order.total.toFixed(2)}
+                              </span>
+                              {order.status === OrderStatus.DELIVERED && (
+                                <button
+                                  onClick={() => setReceiptOrder(order)}
+                                  className="p-2 bg-gray-50 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all active:scale-95"
+                                  title="Ver comprovante"
+                                >
+                                  <Receipt size={16} />
+                                </button>
+                              )}
+                            </div>
                           </div>
+
+                          {/* Cancel button for recent pending orders */}
+                          {[OrderStatus.PENDING, OrderStatus.PENDING_PAYMENT].includes(order.status as OrderStatus) &&
+                            Date.now() - order.timestamp <= 3 * 60 * 1000 && (
+                            <button
+                              onClick={async () => {
+                                if (!window.confirm('Tem certeza que deseja cancelar este pedido?')) return;
+                                setCancellingOrderId(order.id);
+                                try {
+                                  await cancelOrder?.(order.id);
+                                } catch (e: any) {
+                                  alert(e.message || 'Erro ao cancelar pedido');
+                                } finally {
+                                  setCancellingOrderId(null);
+                                }
+                              }}
+                              disabled={cancellingOrderId === order.id}
+                              className="mt-3 w-full flex items-center justify-center gap-2 py-3 bg-red-50 text-red-600 rounded-2xl font-black text-xs uppercase tracking-widest border border-red-100 active:scale-95 transition-all disabled:opacity-50"
+                            >
+                              {cancellingOrderId === order.id ? (
+                                <Loader size={14} className="animate-spin" />
+                              ) : (
+                                <Ban size={14} />
+                              )}
+                              Cancelar Pedido (dentro de 3 min)
+                            </button>
+                          )}
 
                           {/* Progress bar para pedidos ativos */}
                           {isActive && (
@@ -1631,6 +1743,78 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
           saveButtonLabel={editingAddress ? 'Salvar Alterações' : 'Salvar Endereço'}
         />
       )}
+      {/* RECEIPT MODAL */}
+      {receiptOrder && (
+        <div
+          className="fixed inset-0 z-[120] bg-black/70 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-6 animate-in fade-in duration-300"
+          onClick={() => setReceiptOrder(null)}
+        >
+          <div
+            className="bg-white w-full md:max-w-md rounded-t-[3.5rem] md:rounded-[3.5rem] p-10 shadow-2xl animate-in slide-in-from-bottom duration-500 max-h-[85vh] flex flex-col relative overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="absolute top-0 left-0 w-full h-1.5 bg-green-500" />
+            <div className="flex justify-between items-center mb-8 shrink-0">
+              <div>
+                <h3 className="text-xl font-black text-gray-900 tracking-tighter">Comprovante</h3>
+                <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mt-0.5">
+                  Pedido #{receiptOrder.id.slice(-6)}
+                </p>
+              </div>
+              <button
+                onClick={() => setReceiptOrder(null)}
+                className="p-3 bg-gray-50 text-gray-400 rounded-full hover:bg-red-50 hover:text-red-500 transition-all"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="overflow-y-auto no-scrollbar space-y-5">
+              <div className="bg-gray-50 rounded-2xl p-5 space-y-2">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Restaurante</p>
+                <p className="font-black text-gray-900">{receiptOrder.restaurantName}</p>
+                <p className="text-gray-400 text-xs font-bold">
+                  {new Date(receiptOrder.timestamp).toLocaleString('pt-BR', {
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit',
+                  })}
+                </p>
+              </div>
+              <div className="bg-gray-50 rounded-2xl p-5 space-y-3">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Itens</p>
+                {receiptOrder.items.map((item, i) => (
+                  <div key={i} className="flex justify-between text-sm font-bold text-gray-700">
+                    <span>{item.quantity}× {item.product.name}</span>
+                    <span>{(item.product.price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="bg-gray-50 rounded-2xl p-5 space-y-2">
+                <div className="flex justify-between text-xs font-bold text-gray-500">
+                  <span>Subtotal</span>
+                  <span>{receiptOrder.subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                </div>
+                <div className="flex justify-between text-xs font-bold text-gray-500">
+                  <span>Entrega</span>
+                  <span>{receiptOrder.deliveryFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                </div>
+                <div className="h-px bg-gray-200 my-1" />
+                <div className="flex justify-between font-black text-gray-900 text-lg">
+                  <span>Total</span>
+                  <span>{receiptOrder.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                </div>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
+                  Pagamento: {receiptOrder.paymentMethod === 'CREDIT_CARD' ? 'Cartão de Crédito' : receiptOrder.paymentMethod === 'DEBIT_CARD' ? 'Cartão de Débito' : 'PIX'}
+                </p>
+              </div>
+              <div className="bg-gray-50 rounded-2xl p-5">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Entregue em</p>
+                <p className="font-bold text-sm text-gray-700">{receiptOrder.customerAddress}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {ratingOrder && (
         <div className="fixed inset-0 z-[120] bg-gray-950/90 backdrop-blur-2xl flex items-center justify-center p-8 animate-in fade-in duration-500">
           <div className="bg-white w-full max-w-md rounded-[4rem] p-16 text-center shadow-2xl animate-in zoom-in-90 duration-500 relative overflow-hidden">
