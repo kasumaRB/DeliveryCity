@@ -362,6 +362,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .update({ status: OrderStatus.OUT_FOR_DELIVERY })
         .eq('id', orderId);
       await fetchData();
+
+      // Notifica cliente: entregador coletou e está a caminho
+      if (order.customerId) {
+        supabase.functions.invoke('send-push-notification', {
+          body: {
+            userId: order.customerId,
+            title: '🚀 Pedido saiu para entrega!',
+            body: `Seu pedido de ${order.restaurantName} está a caminho. Fique de olho!`,
+            data: { orderId, type: 'OUT_FOR_DELIVERY' },
+          },
+        }).catch(() => {});
+      }
+
       return true;
     }
     return false;
@@ -381,6 +394,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (order.deliveryCode === code) {
       await supabase.from('orders').update({ status: OrderStatus.DELIVERED }).eq('id', orderId);
       await fetchData();
+
+      // Notifica cliente: entregue — pede avaliação
+      if (order.customerId) {
+        supabase.functions.invoke('send-push-notification', {
+          body: {
+            userId: order.customerId,
+            title: '🎉 Pedido entregue!',
+            body: `Seu pedido de ${order.restaurantName} chegou. Que tal avaliar a experiência?`,
+            data: { orderId, type: 'DELIVERED' },
+          },
+        }).catch(() => {});
+      }
+
       return true;
     }
     return false;
@@ -848,6 +874,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const isOnlyLocationUpdate =
       Object.keys(data).length === 1 && data.currentLocation !== undefined;
     if (!isOnlyLocationUpdate) await fetchData();
+
+    if (data.status === 'APPROVED') {
+      const profile = profiles.find(p => p.id === id);
+      const roleName = profile?.role === 'RESTAURANT' ? 'lojista' : 'entregador';
+      supabase.functions.invoke('send-push-notification', {
+        body: {
+          userId: id,
+          title: '🎉 Conta aprovada!',
+          body: `Seu cadastro como ${roleName} foi aprovado. Já pode usar o DeliveryCity!`,
+          data: { type: 'ACCOUNT_APPROVED' },
+        },
+      }).catch(() => {});
+    }
     // O Realtime vai atualizar o estado automaticamente para dados relevantes
   };
 
@@ -1067,6 +1106,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
 
           await fetchData();
+
+          // Notifica cliente: entregador encontrado e a caminho do restaurante
+          if (order?.customerId) {
+            const driverName = driver?.name || 'Um entregador';
+            supabase.functions.invoke('send-push-notification', {
+              body: {
+                userId: order.customerId,
+                title: '🏍️ Entregador a caminho!',
+                body: `${driverName} está indo buscar seu pedido em ${order.restaurantName}.`,
+                data: { orderId: oid, type: 'DRIVER_ASSIGNED' },
+              },
+            }).catch(() => {});
+          }
         },
         registerProfile,
         updateUserProfile,
