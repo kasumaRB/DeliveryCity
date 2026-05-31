@@ -992,6 +992,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .eq('id', orderId);
     if (error) throw error;
     await fetchData();
+
+    // Notifica o restaurante sobre o cancelamento
+    const restaurant = restaurants.find(r => r.id === order.restaurantId);
+    if (restaurant?.ownerId) {
+      supabase.functions.invoke('send-push-notification', {
+        body: {
+          userId: restaurant.ownerId,
+          title: '❌ Pedido cancelado pelo cliente',
+          body: `${order.customerName || 'Cliente'} cancelou o pedido #${orderId.slice(-6)}.`,
+          data: { orderId, type: 'ORDER_CANCELLED' },
+        },
+      }).catch(() => {});
+    }
   };
 
   const toggleFavorite = async (restaurantId: string) => {
@@ -1057,6 +1070,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 title: '📦 Pedido disponível!',
                 body: `Novo pedido em ${order.restaurantName} pronto para retirada.`,
                 data: { orderId: id, type: 'ORDER_READY' },
+              },
+            }).catch(() => {});
+          }
+
+          if (s === OrderStatus.CANCELLED && order.customerId) {
+            supabase.functions.invoke('send-push-notification', {
+              body: {
+                userId: order.customerId,
+                title: '❌ Pedido cancelado',
+                body: `Seu pedido em ${order.restaurantName} foi cancelado. Dúvidas? Fale com o suporte.`,
+                data: { orderId: id, type: 'ORDER_CANCELLED' },
               },
             }).catch(() => {});
           }
