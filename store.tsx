@@ -197,6 +197,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const setupNotifications = async (userId?: string) => {
     try {
+      // Cria o canal de notificações (obrigatório Android 8+)
+      await PushNotifications.createChannel({
+        id: 'deliveries',
+        name: 'Pedidos e Entregas',
+        description: 'Atualizações em tempo real dos seus pedidos',
+        importance: 5, // IMPORTANCE_HIGH — toca som e aparece em destaque
+        visibility: 1,
+        sound: 'default',
+        vibration: true,
+        lights: true,
+      });
+
       const perm = await PushNotifications.requestPermissions();
       if (perm.receive === 'granted') {
         await PushNotifications.register();
