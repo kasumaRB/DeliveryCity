@@ -7,6 +7,7 @@ import { AdminView } from './views/AdminView';
 import { AuthView } from './views/AuthView';
 import { UserRole } from './types';
 import { Clock, LogOut, Phone, XCircle, RefreshCw, AlertTriangle } from 'lucide-react';
+import { useAndroidBack } from './hooks/useAndroidBack';
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -93,6 +94,11 @@ const BlockedView: React.FC<{ onSignOut: () => void }> = ({ onSignOut }) => (
 const AppContent: React.FC = () => {
   const { isLoading, currentUserProfile, signOut, session, refreshData } = useAppStore();
   const [showProfileModal, setShowProfileModal] = useState(false);
+
+  useAndroidBack(() => {
+    if (showProfileModal) { setShowProfileModal(false); return true; }
+    return false; // minimiza app
+  });
 
   // FIX: sessão existe mas perfil não carregou — fetchData falhou (rede/timing)
   // Mostra retry em vez de cair silenciosamente na ClientView genérica (loop de login)

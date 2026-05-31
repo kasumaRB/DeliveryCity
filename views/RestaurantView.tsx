@@ -96,6 +96,7 @@ import {
 import Logo from '../assets/Logo.png';
 import Nome from '../assets/Nome.png';
 import { TutorialModal, hasSeen, markSeen } from '../components/TutorialModal';
+import { useAndroidBack } from '../hooks/useAndroidBack';
 
 export const RestaurantView: React.FC = () => {
   const {
@@ -135,6 +136,14 @@ export const RestaurantView: React.FC = () => {
   useEffect(() => {
     if (currentUserProfile && !hasSeen('RESTAURANT')) setShowTutorial(true);
   }, [currentUserProfile?.id]);
+
+  useAndroidBack(() => {
+    if (showTutorial)             { markSeen('RESTAURANT'); setShowTutorial(false); return true; }
+    if (showEditModal)            { setShowEditModal(false);                        return true; }
+    if (showProductForm)          { setShowProductForm(false);                      return true; }
+    if (activeTab !== 'orders')   { setActiveTab('orders');                         return true; }
+    return false; // minimiza
+  });
 
   // Support
   const [supportMessage, setSupportMessage] = useState('');

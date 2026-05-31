@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { Order, OrderStatus, UserAddress } from '../types';
 import { AddressModal } from '../components/AddressModal';
 import { TutorialModal, hasSeen, markSeen } from '../components/TutorialModal';
+import { useAndroidBack } from '../hooks/useAndroidBack';
 import {
   Navigation,
   CheckCircle,
@@ -311,6 +312,13 @@ export const DriverView: React.FC = () => {
   useEffect(() => {
     if (currentUserProfile && !hasSeen('DRIVER')) setShowTutorial(true);
   }, [currentUserProfile?.id]);
+
+  useAndroidBack(() => {
+    if (showTutorial)          { markSeen('DRIVER'); setShowTutorial(false); return true; }
+    if (showCodeInput)         { setShowCodeInput(false);                   return true; }
+    if (activeTab !== 'home')  { setActiveTab('home');                      return true; }
+    return false; // minimiza
+  });
   const [showCodeInput, setShowCodeInput] = useState(false);
   const [inputCode, setInputCode] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);

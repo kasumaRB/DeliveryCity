@@ -12,6 +12,7 @@ import {
   SavedCard,
 } from '../types';
 import { TutorialModal, hasSeen, markSeen } from '../components/TutorialModal';
+import { useAndroidBack } from '../hooks/useAndroidBack';
 import {
   Star,
   Plus,
@@ -140,6 +141,18 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
   useEffect(() => {
     if (currentUserProfile && !hasSeen('CLIENT')) setShowTutorial(true);
   }, [currentUserProfile?.id]);
+
+  useAndroidBack(() => {
+    if (showTutorial)            { markSeen('CLIENT'); setShowTutorial(false);       return true; }
+    if (receiptOrder)            { setReceiptOrder(null);                            return true; }
+    if (pixModal)                { setPixModal(null);                                return true; }
+    if (isAddressModalOpen)      { setIsAddressModalOpen(false);                     return true; }
+    if (isAddressSelectorOpen)   { setIsAddressSelectorOpen(false);                  return true; }
+    if (isCheckoutOpen)          { setIsCheckoutOpen(false);                         return true; }
+    if (selectedRestaurant)      { setSelectedRestaurant(null);                      return true; }
+    if (activeTab !== 'home')    { setActiveTab('home'); setSelectedRestaurant(null); return true; }
+    return false; // home tab sem nada aberto → minimiza
+  });
 
   // Helper: traduz status do pedido para português
   const traduzirStatus = (status: string): { label: string; color: string } => {
