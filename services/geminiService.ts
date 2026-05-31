@@ -1,8 +1,7 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-// Fix: Updated initialization to strictly follow guidelines using process.env.API_KEY directly without fallback
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
 /**
  * Fix: Updated to use 'gemini-3-flash-preview' for basic text tasks (menu descriptions)
@@ -11,7 +10,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 export const generateMenuDescription = async (dishName: string, ingredients: string): Promise<string> => {
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.0-flash',
       contents: `Write a short, appetizing menu description (max 20 words) for a dish named "${dishName}" containing: ${ingredients}.`,
     });
     return response.text?.trim() || "Delicious and fresh ingredients.";

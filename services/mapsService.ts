@@ -40,6 +40,7 @@ export const geocodeAddress = async (address: string): Promise<{ lat: number; ln
       `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=1&countrycodes=br`,
       { headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'DeliveryCity/1.0' } }
     );
+    if (!res.ok) return null;
     const data = await res.json();
     if (data?.[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
     return null;
@@ -55,6 +56,7 @@ export const reverseGeocodeDetails = async (lat: number, lng: number): Promise<G
       `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
       { headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'DeliveryCity/1.0' } }
     );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const addr = data?.address || {};
 
@@ -70,7 +72,7 @@ export const reverseGeocodeDetails = async (lat: number, lng: number): Promise<G
   } catch {
     return {
       street: '', number: '', neighborhood: '',
-      city: 'Apiacás', state: 'MT', zipCode: '',
+      city: '', state: '', zipCode: '',
       fullAddress: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
     };
   }
@@ -122,6 +124,7 @@ export const searchAddresses = async (query: string): Promise<Array<{
       `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=5&countrycodes=br&addressdetails=1`,
       { headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'DeliveryCity/1.0' } }
     );
+    if (!res.ok) return [];
     const data = await res.json();
     return (data || []).map((item: any) => ({
       label: item.display_name,

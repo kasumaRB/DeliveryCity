@@ -25,7 +25,7 @@ const NotificationComponent: React.FC<NotificationProps> = ({ notification, onDi
     }, notification.duration || 5000);
 
     return () => clearTimeout(timer);
-  }, [notification, onDismiss]);
+  }, [notification.id, notification.duration, onDismiss]);
 
   const notificationStyles = {
     success: 'bg-green-50 border-green-200 text-green-800',
@@ -140,7 +140,7 @@ export const useNotifications = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   const addNotification = (notification: Omit<Notification, 'id'>) => {
-    const id = Math.random().toString(36).substr(2, 9);
+    const id = crypto.randomUUID();
     const newNotification: Notification = {
       id,
       ...notification,

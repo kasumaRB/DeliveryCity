@@ -48,7 +48,7 @@ export function useApi<T>(
 
   useEffect(() => {
     if (immediate) {
-      execute();
+      execute().catch(() => {});
     }
   }, [execute, immediate]);
 
@@ -75,10 +75,14 @@ export function useCachedApi<T>(
     // Verificar cache primeiro
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
-      const { data, timestamp } = JSON.parse(cached);
-      if (Date.now() - timestamp < cacheTime) {
-        setState({ data, loading: false, error: null });
-        return data;
+      try {
+        const { data, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp < cacheTime) {
+          setState({ data, loading: false, error: null });
+          return data;
+        }
+      } catch {
+        localStorage.removeItem(cacheKey);
       }
     }
 
