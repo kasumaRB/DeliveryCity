@@ -91,9 +91,11 @@ import {
   Filter,
   Eye,
   EyeOff,
+  HelpCircle,
 } from 'lucide-react';
 import Logo from '../assets/Logo.png';
 import Nome from '../assets/Nome.png';
+import { TutorialModal, hasSeen, markSeen } from '../components/TutorialModal';
 
 export const RestaurantView: React.FC = () => {
   const {
@@ -127,6 +129,12 @@ export const RestaurantView: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [restaurantImage, setRestaurantImage] = useState(myRestaurant?.image || '');
   const [showProductForm, setShowProductForm] = useState(false);
+
+  // Tutorial
+  const [showTutorial, setShowTutorial] = useState(false);
+  useEffect(() => {
+    if (currentUserProfile && !hasSeen('RESTAURANT')) setShowTutorial(true);
+  }, [currentUserProfile?.id]);
 
   // Support
   const [supportMessage, setSupportMessage] = useState('');
@@ -474,7 +482,22 @@ export const RestaurantView: React.FC = () => {
     setPromoMaxUsage(promo.maxUsage?.toString() || '');
   };
 
+  const restaurantSlides = [
+    { emoji: '🔔', title: 'Receba pedidos', description: 'Quando um cliente fizer um pedido, você será notificado. Toque em "Aceitar" para começar a preparar ou recuse se necessário.' },
+    { emoji: '🍔', title: 'Gerencie o cardápio', description: 'Na aba "Cardápio", adicione, edite e remova itens. Coloque fotos e descrições atraentes para vender mais.' },
+    { emoji: '🎁', title: 'Crie promoções', description: 'Em "Promoções", crie cupons de desconto ou frete grátis para atrair mais clientes.' },
+    { emoji: '📊', title: 'Acompanhe os resultados', description: 'Na aba de relatórios, veja faturamento por período, produtos mais vendidos e avaliações dos clientes.' },
+  ];
+
   return (
+    <>
+    {showTutorial && (
+      <TutorialModal
+        slides={restaurantSlides}
+        accentColor="orange"
+        onClose={() => { markSeen('RESTAURANT'); setShowTutorial(false); }}
+      />
+    )}
     <div className="min-h-screen bg-[#F8F9FB] flex flex-col md:flex-row h-screen overflow-hidden safe-area-top safe-area-bottom">
       {/* SIDEBAR DESKTOP */}
       <aside className="hidden md:flex w-72 bg-white border-r flex-col p-8 h-full shadow-xl shadow-gray-100">
@@ -1505,6 +1528,14 @@ export const RestaurantView: React.FC = () => {
                 </div>
 
                 <div className="space-y-6">
+                  <button
+                    onClick={() => setShowTutorial(true)}
+                    className="w-full flex items-center justify-center gap-3 py-4 bg-orange-50 border-2 border-orange-100 text-orange-600 rounded-[2rem] font-black uppercase text-sm tracking-widest active:scale-95 transition-all"
+                  >
+                    <HelpCircle size={20} />
+                    Ver tutorial do app
+                  </button>
+
                   <div>
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4 mb-2 block">
                       Descreva seu problema ou dúvida
@@ -1814,5 +1845,6 @@ export const RestaurantView: React.FC = () => {
         </div>
       )}
     </div>
+    </>
   );
 };

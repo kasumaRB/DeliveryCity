@@ -3,6 +3,7 @@ import { useAppStore } from '../store';
 import { supabase } from '../lib/supabase';
 import { Order, OrderStatus, UserAddress } from '../types';
 import { AddressModal } from '../components/AddressModal';
+import { TutorialModal, hasSeen, markSeen } from '../components/TutorialModal';
 import {
   Navigation,
   CheckCircle,
@@ -38,6 +39,7 @@ import {
   AlertTriangle,
   Camera,
   ImagePlus,
+  HelpCircle,
 } from 'lucide-react';
 import Logo from '../assets/Logo.png';
 import Nome from '../assets/Nome.png';
@@ -305,6 +307,10 @@ export const DriverView: React.FC = () => {
   const [supportMessage, setSupportMessage] = useState('');
   const [supportSending, setSupportSending] = useState(false);
   const [supportWhatsapp, setSupportWhatsapp] = useState<string | null>(null);
+  const [showTutorial, setShowTutorial] = useState(false);
+  useEffect(() => {
+    if (currentUserProfile && !hasSeen('DRIVER')) setShowTutorial(true);
+  }, [currentUserProfile?.id]);
   const [showCodeInput, setShowCodeInput] = useState(false);
   const [inputCode, setInputCode] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
@@ -541,7 +547,22 @@ export const DriverView: React.FC = () => {
       </div>
     );
 
+  const driverSlides = [
+    { emoji: '🔔', title: 'Notificação de pedido', description: 'Quando um pedido estiver pronto no restaurante, você receberá uma notificação. Aceite rápido — outros entregadores também são avisados!' },
+    { emoji: '📦', title: 'Vá buscar e confirme', description: 'No restaurante, toque em "Confirmar coleta" e digite o código que o atendente mostrar para você.' },
+    { emoji: '🚀', title: 'Entregue e finalize', description: 'Na entrega, o cliente mostrará o código no app dele. Digite o código para confirmar e concluir a entrega.' },
+    { emoji: '💰', title: 'Acompanhe seus ganhos', description: 'Veja o total de hoje, semana e mês na aba "Ganhos". O repasse é feito via Asaas diretamente na sua conta.' },
+  ];
+
   return (
+    <>
+    {showTutorial && (
+      <TutorialModal
+        slides={driverSlides}
+        accentColor="blue"
+        onClose={() => { markSeen('DRIVER'); setShowTutorial(false); }}
+      />
+    )}
     <div className="min-h-screen bg-gray-900 text-white flex flex-col h-screen overflow-hidden safe-area-top safe-area-bottom">
       {/* Top Bar */}
       <header className="bg-gray-800/80 backdrop-blur-xl border-b border-gray-700/50 px-6 py-4 flex justify-between items-center shrink-0">
@@ -838,6 +859,14 @@ export const DriverView: React.FC = () => {
           <div className="animate-in fade-in duration-500 space-y-6">
             <h2 className="text-2xl font-black text-white">Falar com Suporte</h2>
 
+            <button
+              onClick={() => setShowTutorial(true)}
+              className="flex items-center justify-center gap-3 w-full py-4 bg-gray-700 hover:bg-gray-600 active:scale-95 text-white rounded-[2rem] font-black uppercase text-sm tracking-widest transition-all"
+            >
+              <HelpCircle size={20} />
+              Ver tutorial do app
+            </button>
+
             {supportWhatsapp && (
               <a
                 href={`https://wa.me/55${supportWhatsapp}?text=${encodeURIComponent('Olá! Preciso de ajuda com uma entrega no DeliveryCity.')}`}
@@ -1030,5 +1059,6 @@ export const DriverView: React.FC = () => {
         </div>
       )}
     </div>
+    </>
   );
 };

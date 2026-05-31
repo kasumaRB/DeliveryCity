@@ -11,6 +11,7 @@ import {
   OrderRating,
   SavedCard,
 } from '../types';
+import { TutorialModal, hasSeen, markSeen } from '../components/TutorialModal';
 import {
   Star,
   Plus,
@@ -42,6 +43,7 @@ import {
   Heart,
   Receipt,
   Ban,
+  HelpCircle,
 } from 'lucide-react';
 import { AddressModal } from '../components/AddressModal';
 import { DriverTrackingMap } from '../components/DriverTrackingMap';
@@ -132,6 +134,12 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
 
   // WhatsApp de suporte
   const [supportWhatsapp, setSupportWhatsapp] = useState<string | null>(null);
+
+  // Tutorial
+  const [showTutorial, setShowTutorial] = useState(false);
+  useEffect(() => {
+    if (currentUserProfile && !hasSeen('CLIENT')) setShowTutorial(true);
+  }, [currentUserProfile?.id]);
 
   // Helper: traduz status do pedido para português
   const traduzirStatus = (status: string): { label: string; color: string } => {
@@ -560,7 +568,22 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     }
   };
 
+  const clientSlides = [
+    { emoji: '🏪', title: 'Escolha um restaurante', description: 'Veja os restaurantes disponíveis, o cardápio completo e adicione itens ao carrinho.' },
+    { emoji: '📍', title: 'Informe seu endereço', description: 'Use o mapa ou preencha manualmente. Você pode salvar endereços favoritos para usar rapidamente.' },
+    { emoji: '💳', title: 'Pague com PIX ou Crédito', description: 'Pagamento 100% seguro via Asaas. Com PIX você paga na hora; com cartão é automático.' },
+    { emoji: '🔑', title: 'Código de entrega', description: 'Quando o entregador chegar, você verá um código no app. Mostre ao entregador para confirmar o recebimento.' },
+  ];
+
   return (
+    <>
+    {showTutorial && (
+      <TutorialModal
+        slides={clientSlides}
+        accentColor="orange"
+        onClose={() => { markSeen('CLIENT'); setShowTutorial(false); }}
+      />
+    )}
     <div className="h-screen bg-[#F8F9FC] flex flex-col md:flex-row overflow-hidden relative safe-area-top safe-area-bottom">
       {/* SIDEBAR DESKTOP */}
       <aside className="hidden md:flex w-72 bg-white border-r flex-col p-8 sticky top-0 h-screen z-30 shadow-xl shadow-gray-100">
@@ -589,6 +612,12 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
             className={`w-full flex items-center gap-4 p-5 rounded-[2rem] font-bold transition-all ${activeTab === 'profile' ? 'bg-orange-600 text-white shadow-xl shadow-orange-100' : 'text-gray-400 hover:bg-gray-50'}`}
           >
             <User size={24} /> <span>Meu Perfil</span>
+          </button>
+          <button
+            onClick={() => setShowTutorial(true)}
+            className="w-full flex items-center gap-4 p-5 rounded-[2rem] font-bold text-gray-400 hover:bg-gray-50 transition-all"
+          >
+            <HelpCircle size={24} /> <span>Tutorial</span>
           </button>
         </nav>
       </aside>
@@ -1926,5 +1955,6 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
         </div>
       )}
     </div>
+    </>
   );
 };
