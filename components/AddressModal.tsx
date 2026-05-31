@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { UserAddress } from '../types';
 import { MapPin, AlertCircle, Crosshair, Loader, X } from 'lucide-react';
 import { reverseGeocodeDetails, lookupCEP } from '../services/mapsService';
+import { supabase } from '../lib/supabase';
 
 interface AddressModalProps {
   onClose: () => void;
@@ -27,6 +28,7 @@ export const AddressModal: React.FC<AddressModalProps> = ({
   const watchId       = useRef<number | null>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMounted     = useRef(false);
+  const cityCepRef    = useRef<string>('');
 
   const [addrLabel]                             = useState(initialAddress?.label || 'Casa');
   const [addrZip,          setAddrZip]          = useState(initialAddress?.zipCode || '');
@@ -46,6 +48,18 @@ export const AddressModal: React.FC<AddressModalProps> = ({
   const [isMapDragging,      setIsMapDragging]      = useState(false);
   const [mapError,           setMapError]           = useState<string | null>(null);
   const [isCepLoading,       setIsCepLoading]       = useState(false);
+
+  // Busca o CEP único da cidade (config do admin) para usar como padrão/fallback
+  useEffect(() => {
+    supabase.from('platform_settings').select('city_cep').maybeSingle()
+      .then(({ data }) => {
+        if (data?.city_cep) {
+          cityCepRef.current = data.city_cep;
+          // Preenche o CEP se ainda estiver vazio (endereço novo)
+          setAddrZip(prev => prev || data.city_cep);
+        }
+      });
+  }, []);
 
   const handleCepChange = async (raw: string) => {
     const digits    = raw.replace(/\D/g, '').slice(0, 8);
@@ -187,7 +201,8 @@ export const AddressModal: React.FC<AddressModalProps> = ({
               setAddrNeighborhood(details.neighborhood || '');
               if (details.city)  setAddrCity(details.city);
               if (details.state) setAddrState(details.state);
-              setAddrZip(details.zipCode || '');
+              // Usa o CEP do mapa; se não houver, cai no CEP único da cidade (config admin)
+              setAddrZip(details.zipCode || cityCepRef.current || '');
               if (details.number && !details.number.includes('-')) setAddrNumber(details.number);
             } catch { /* silencioso */ }
             finally { setIsGeocodingLoading(false); }

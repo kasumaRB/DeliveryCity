@@ -45,6 +45,7 @@ const SettingsTab: React.FC = () => {
     min_delivery_fee: 4.0,
     min_order_value: 15.0,
     support_whatsapp: '',
+    city_cep: '',
   });
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [settingsSaving, setSettingsSaving] = useState(false);
@@ -61,6 +62,7 @@ const SettingsTab: React.FC = () => {
           min_delivery_fee: data.min_delivery_fee ?? 4.0,
           min_order_value: data.min_order_value ?? 15.0,
           support_whatsapp: data.support_whatsapp ?? '',
+          city_cep: data.city_cep ?? '',
         });
       } catch {
         // falha silenciosa — usa valores padrão
@@ -213,6 +215,30 @@ const SettingsTab: React.FC = () => {
             ✓ Testar link: wa.me/55{settings.support_whatsapp}
           </a>
         )}
+      </div>
+
+      {/* CEP da cidade */}
+      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 space-y-4">
+        <h4 className="font-black text-gray-700 flex items-center gap-2">
+          <span className="text-blue-600">📍</span> CEP da Cidade
+        </h4>
+        <p className="text-xs text-gray-400 font-medium">
+          Cidades pequenas têm um CEP único para todos os endereços. Ele será preenchido
+          automaticamente quando o cliente cadastrar o endereço. Ex: Apiacás-MT = 78595-000.
+        </p>
+        <input
+          type="text"
+          inputMode="numeric"
+          maxLength={9}
+          value={settings.city_cep}
+          onChange={e => {
+            const d = e.target.value.replace(/\D/g, '').slice(0, 8);
+            const f = d.length > 5 ? `${d.slice(0, 5)}-${d.slice(5)}` : d;
+            setSettings(s => ({ ...s, city_cep: f }));
+          }}
+          placeholder="78595-000"
+          className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none border-2 border-transparent focus:border-blue-400 transition-all"
+        />
       </div>
 
       {settingsMsg && (
