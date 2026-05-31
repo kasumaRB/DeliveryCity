@@ -24,6 +24,13 @@ dist-ssr
 *.aab
 *.ipa
 
+# Binários de ferramentas (CLI do Supabase, etc.)
+*.exe
+
+# Scripts de teste/diagnóstico locais — nunca commitar (podem conter tokens)
+test_*.js
+temp_migration.sql
+
 # SQL scripts com dados sensíveis / correções internas
 supabase-corrections*.sql
 supabase-fix*.sql
