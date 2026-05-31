@@ -15,7 +15,7 @@ export enum OrderStatus {
   CANCELLED = 'CANCELLED',
 }
 
-export type PaymentMethod = 'CREDIT_CARD' | 'DEBIT_CARD' | 'PIX';
+export type PaymentMethod = 'CREDIT_CARD' | 'PIX';
 
 export interface UserAddress {
   id: string;

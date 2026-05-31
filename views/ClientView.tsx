@@ -1372,10 +1372,9 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                 </div>
               </div>
               {/* ── Seletor de método de pagamento ── */}
-              <div className="grid grid-cols-3 gap-3 mb-6">
+              <div className="grid grid-cols-2 gap-3 mb-6">
                 {([
                   { method: 'CREDIT_CARD', label: 'Crédito', icon: <CreditCard size={18} /> },
-                  { method: 'DEBIT_CARD',  label: 'Débito',  icon: <CreditCard size={18} /> },
                   { method: 'PIX',         label: 'PIX',     icon: <Smartphone size={18} /> },
                 ] as { method: PaymentMethod; label: string; icon: React.ReactNode }[]).map(({ method, label, icon }) => (
                   <button
@@ -1392,7 +1391,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
               </div>
 
               {/* ── Cartões salvos (somente para crédito/débito) ── */}
-              {(selectedPayment === 'CREDIT_CARD' || selectedPayment === 'DEBIT_CARD') && (() => {
+              {selectedPayment === 'CREDIT_CARD' && (() => {
                 const savedCards = currentUserProfile?.savedCards || [];
                 return (
                   <div className="mb-6 space-y-3">
@@ -1826,7 +1825,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                   <span>{receiptOrder.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                 </div>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
-                  Pagamento: {receiptOrder.paymentMethod === 'CREDIT_CARD' ? 'Cartão de Crédito' : receiptOrder.paymentMethod === 'DEBIT_CARD' ? 'Cartão de Débito' : 'PIX'}
+                  Pagamento: {receiptOrder.paymentMethod === 'CREDIT_CARD' ? 'Cartão de Crédito' : 'PIX'}
                 </p>
               </div>
               <div className="bg-gray-50 rounded-2xl p-5">
