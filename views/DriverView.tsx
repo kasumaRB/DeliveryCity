@@ -459,8 +459,9 @@ export const DriverView: React.FC = () => {
     window.addEventListener('offline', handleOffline);
 
     let lastLocationUpdate = 0;
+    let geoWatchId: number | null = null;
     if (navigator.geolocation) {
-      navigator.geolocation.watchPosition(
+      geoWatchId = navigator.geolocation.watchPosition(
         pos => {
           const newPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
           setCurrentPos(newPos);
@@ -480,6 +481,8 @@ export const DriverView: React.FC = () => {
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      // Limpa o watcher de GPS para não empilhar múltiplos ao re-rodar o effect
+      if (geoWatchId !== null) navigator.geolocation.clearWatch(geoWatchId);
     };
   }, [currentUserProfile?.id, isOnline, processSyncQueue, updateUserProfile]);
 

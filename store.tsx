@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
   Restaurant,
   Order,
@@ -230,13 +230,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const isDev = import.meta.env.DEV;
   const devLog = (...args: any[]) => { if (isDev) console.log(...args); };
 
-  let lastFetchTime = 0;
-  let cachedData: { restaurants?: any[]; orders?: any[]; profiles?: any[] } = {};
+  // Refs persistem entre renders (let no corpo do componente reseta a cada render,
+  // o que tornava o throttle de 2s inoperante e causava refetch excessivo)
+  const lastFetchTimeRef = useRef(0);
+  const cachedDataRef = useRef<{ restaurants?: any[]; orders?: any[]; profiles?: any[] }>({});
 
   const fetchData = async (force = false, sessionOverride?: Session | null) => {
     const now = Date.now();
-    if (!force && now - lastFetchTime < 2000) return;
-    lastFetchTime = now;
+    if (!force && now - lastFetchTimeRef.current < 2000) return;
+    lastFetchTimeRef.current = now;
+    const cachedData = cachedDataRef.current;
 
     try {
       const [restData, orderData, profileData, settingsData] = await Promise.all([
