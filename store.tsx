@@ -197,6 +197,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const setupNotifications = async (userId?: string) => {
     try {
+      // Remove listeners anteriores para evitar stacking entre logins
+      await PushNotifications.removeAllListeners();
+
       // Cria o canal de notificações (obrigatório Android 8+)
       await PushNotifications.createChannel({
         id: 'deliveries',
@@ -360,6 +363,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const confirmPickup = async (orderId: string, code: string): Promise<boolean> => {
     const order = orders.find(o => o.id === orderId);
     if (!order) return false;
+    if (order.pickupCode !== code) return false;
     if (!navigator.onLine) {
       addToSyncQueue({ orderId, code, type: 'pickup', timestamp: Date.now() });
       saveActiveOrderToOffline({ ...order, status: OrderStatus.OUT_FOR_DELIVERY });
@@ -581,6 +585,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const mapRest = (r: any) => ({
           ...r,
           ownerId: r.owner_id,
+          coords: r.coords ?? { lat: -9.5422, lng: -57.4486 },
           menu: r.menu || [],
           rating: Number(r.rating || 0),
           asaasAccountId: r.asaas_account_id,
@@ -880,6 +885,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (data.favoriteRestaurantIds !== undefined) up.favorite_restaurant_ids = data.favoriteRestaurantIds;
     if (data.currentLocation !== undefined) up.current_location = data.currentLocation;
 
+    // Captura role ANTES do fetchData (closure stale após setState assíncrono)
+    const profileRoleSnapshot = profiles.find(p => p.id === id)?.role;
+
     const { error } = await supabase.from('profiles').update(up).eq('id', id);
     if (error) throw error;
     // Se a única mudança é currentLocation, não faz fetchData completo (seria chamado a cada GPS update)
@@ -888,7 +896,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!isOnlyLocationUpdate) await fetchData();
 
     if (data.status === 'APPROVED') {
-      const profile = profiles.find(p => p.id === id);
+      const profile = { role: profileRoleSnapshot } as any;
       const roleName = profile?.role === 'RESTAURANT' ? 'lojista' : 'entregador';
       supabase.functions.invoke('send-push-notification', {
         body: {
@@ -1000,7 +1008,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       throw new Error('O prazo de cancelamento (3 minutos) já expirou.');
     const { error } = await supabase
       .from('orders')
-      .update({ status: OrderStatus.CANCELLED, cancelled_at: Date.now() })
+      .update({ status: OrderStatus.CANCELLED, cancelled_at: new Date().toISOString() })
       .eq('id', orderId);
     if (error) throw error;
     await fetchData();
@@ -1035,6 +1043,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (error) {
       // Reverte em caso de erro
       setCurrentUserProfile(prev => prev ? { ...prev, favoriteRestaurantIds: current } : prev);
+      setProfiles(prev => prev.map(p => p.id === currentUserProfile.id ? { ...p, favoriteRestaurantIds: current } : p));
       throw error;
     }
   };

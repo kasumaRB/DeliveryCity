@@ -302,6 +302,8 @@ export const RestaurantView: React.FC = () => {
   };
 
   const handleSaveItem = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
     const price = parseFloat(itemFormOwnerPrice);
     const feePct = currentUserProfile?.customFeePct !== undefined 
       ? currentUserProfile.customFeePct / 100 
@@ -334,6 +336,8 @@ export const RestaurantView: React.FC = () => {
       alert('Item salvo!');
     } catch (e: any) {
       alert('Erro ao salvar: ' + e.message);
+    } finally {
+      setIsSaving(false);
     }
   };
 

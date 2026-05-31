@@ -48,6 +48,7 @@ export const AddressModal: React.FC<AddressModalProps> = ({
   const [isMapDragging,      setIsMapDragging]      = useState(false);
   const [mapError,           setMapError]           = useState<string | null>(null);
   const [isCepLoading,       setIsCepLoading]       = useState(false);
+  const [zipIsFallback,      setZipIsFallback]      = useState(false);
 
   // Busca o CEP único da cidade (config do admin) para usar como padrão/fallback
   useEffect(() => {
@@ -55,8 +56,11 @@ export const AddressModal: React.FC<AddressModalProps> = ({
       .then(({ data }) => {
         if (data?.city_cep) {
           cityCepRef.current = data.city_cep;
-          // Preenche o CEP se ainda estiver vazio (endereço novo)
-          setAddrZip(prev => prev || data.city_cep);
+          // Preenche o CEP se ainda estiver vazio (endereço novo), marcando como fallback
+          setAddrZip(prev => {
+            if (!prev) { setZipIsFallback(true); return data.city_cep; }
+            return prev;
+          });
         }
       });
   }, []);
@@ -64,6 +68,7 @@ export const AddressModal: React.FC<AddressModalProps> = ({
   const handleCepChange = async (raw: string) => {
     const digits    = raw.replace(/\D/g, '').slice(0, 8);
     const formatted = digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits;
+    setZipIsFallback(false);
     setAddrZip(formatted);
     if (digits.length === 8) {
       setIsCepLoading(true);
@@ -202,7 +207,13 @@ export const AddressModal: React.FC<AddressModalProps> = ({
               if (details.city)  setAddrCity(details.city);
               if (details.state) setAddrState(details.state);
               // Usa o CEP do mapa; se não houver, cai no CEP único da cidade (config admin)
-              setAddrZip(details.zipCode || cityCepRef.current || '');
+              if (details.zipCode) {
+                setZipIsFallback(false);
+                setAddrZip(details.zipCode);
+              } else {
+                setZipIsFallback(true);
+                setAddrZip(cityCepRef.current || '');
+              }
               if (details.number && !details.number.includes('-')) setAddrNumber(details.number);
             } catch { /* silencioso */ }
             finally { setIsGeocodingLoading(false); }
@@ -279,7 +290,7 @@ export const AddressModal: React.FC<AddressModalProps> = ({
   const missingStreet       = showHints && !addrStreet;
   const missingNumber       = showHints && !addrNumber;
   const missingNeighborhood = showHints && !addrNeighborhood;
-  const missingZip          = showHints && !addrZip;
+  const missingZip          = showHints && (!addrZip || zipIsFallback);
 
   return (
     <div className="fixed inset-0 z-[120] bg-black/60 flex items-end md:items-center justify-center p-0 md:p-4 backdrop-blur-sm">
@@ -424,7 +435,11 @@ export const AddressModal: React.FC<AddressModalProps> = ({
                   placeholder="00000-000"
                 />
                 {missingZip && !isCepLoading && (
-                  <p className="text-[9px] text-orange-500 font-bold ml-1">Digite o CEP para preencher o endereço automaticamente</p>
+                  <p className="text-[9px] text-orange-500 font-bold ml-1">
+                    {zipIsFallback
+                      ? 'CEP padrão da cidade — confirme ou corrija se souber o CEP específico'
+                      : 'Digite o CEP para preencher o endereço automaticamente'}
+                  </p>
                 )}
               </div>
             </div>

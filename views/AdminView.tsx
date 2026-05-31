@@ -735,10 +735,11 @@ export const AdminView: React.FC = () => {
                               .eq('id', restaurantId)
                               .single();
                             if (existing) {
-                              await supabase
+                              const { error: activateErr } = await supabase
                                 .from('restaurants')
                                 .update({ is_active: true })
                                 .eq('id', restaurantId);
+                              if (activateErr) throw new Error(`Perfil aprovado, mas loja não ativada: ${activateErr.message}`);
                             }
                           }
                         } catch (err: any) {

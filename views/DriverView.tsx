@@ -502,20 +502,19 @@ export const DriverView: React.FC = () => {
     if (!activeOrder || !inputCode) return;
     setIsUploadingPhoto(true);
     try {
-      // Upload photo if captured
-      if (deliveryPhotoFile) {
-        const fileName = `delivery/${activeOrder.id}-${Date.now()}.jpg`;
-        const { data, error: uploadErr } = await supabase.storage
-          .from('avatars')
-          .upload(fileName, deliveryPhotoFile, { upsert: true });
-        if (!uploadErr && data) {
-          const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
-          await supabase.from('orders').update({ delivery_photo_url: publicUrl }).eq('id', activeOrder.id);
-        }
-      }
-
+      // Confirma entrega primeiro — só faz upload se código correto
       const success = await confirmDelivery(activeOrder.id, inputCode);
       if (success) {
+        if (deliveryPhotoFile) {
+          const fileName = `delivery/${activeOrder.id}-${Date.now()}.jpg`;
+          const { data, error: uploadErr } = await supabase.storage
+            .from('avatars')
+            .upload(fileName, deliveryPhotoFile, { upsert: true });
+          if (!uploadErr && data) {
+            const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
+            await supabase.from('orders').update({ delivery_photo_url: publicUrl }).eq('id', activeOrder.id);
+          }
+        }
         setShowCodeInput(false);
         setInputCode('');
         setDeliveryPhotoStep(false);
