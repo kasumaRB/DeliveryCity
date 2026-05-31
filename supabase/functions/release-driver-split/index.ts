@@ -18,7 +18,8 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const ASAAS_BASE_URL = Deno.env.get('ASAAS_BASE_URL') ?? 'https://sandbox.asaas.com/api/v3';
+// Fail-closed: padrão é PRODUÇÃO. Defina ASAAS_BASE_URL p/ usar sandbox.
+const ASAAS_BASE_URL = Deno.env.get('ASAAS_BASE_URL') ?? 'https://www.asaas.com/api/v3';
 const ASAAS_API_KEY  = Deno.env.get('ASAAS_API_KEY')  ?? '';
 
 const corsHeaders = {
@@ -32,6 +33,13 @@ serve(async (req) => {
   }
 
   try {
+    if (!ASAAS_API_KEY) {
+      console.error('[release-driver-split] ASAAS_API_KEY não configurada — abortando.');
+      return new Response(JSON.stringify({ error: 'Gateway de pagamento não configurado.' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // ── 1. Autenticar (exige role ADMIN ou service_role) ──────────────────────
     const authHeader = req.headers.get('Authorization') ?? '';
     const supabase = createClient(

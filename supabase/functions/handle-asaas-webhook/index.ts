@@ -108,7 +108,31 @@ serve(async (req) => {
         });
     }
 
-    // ── 6. Atualizar pedido ───────────────────────────────────────────────────
+    // ── 6. Para eventos de pagamento confirmado, validar o valor recebido ─────
+    // Impede que um pagamento parcial/manipulado marque o pedido como pago.
+    if (newStatus === 'PENDING') {
+      const { data: orderToValidate } = await supabase
+        .from('orders')
+        .select('total')
+        .eq('id', orderId)
+        .single();
+
+      const expected = Number(orderToValidate?.total ?? 0);
+      const paid     = Number(payment.value ?? 0);
+      // Tolerância de 1 centavo para arredondamento de ponto flutuante
+      if (expected > 0 && Math.abs(paid - expected) > 0.01) {
+        console.warn(
+          `[handle-asaas-webhook] Valor divergente no pedido ${orderId}: ` +
+          `esperado R$${expected.toFixed(2)}, recebido R$${paid.toFixed(2)} — NÃO confirmado.`
+        );
+        // 200 para o Asaas não reenviar; o pedido permanece PENDING_PAYMENT
+        return new Response(JSON.stringify({ received: true, value_mismatch: true }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // ── 6b. Atualizar pedido ──────────────────────────────────────────────────
     const { error: updateError } = await supabase
       .from('orders')
       .update({ status: newStatus })

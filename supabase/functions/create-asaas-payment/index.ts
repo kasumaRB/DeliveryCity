@@ -38,7 +38,10 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const ASAAS_BASE_URL = Deno.env.get('ASAAS_BASE_URL') ?? 'https://sandbox.asaas.com/api/v3';
+// Fail-closed: padrão é PRODUÇÃO. Para usar sandbox, defina ASAAS_BASE_URL
+// explicitamente. Isso evita que pagamentos reais caiam no sandbox em silêncio
+// caso a variável de ambiente não esteja configurada em produção.
+const ASAAS_BASE_URL = Deno.env.get('ASAAS_BASE_URL') ?? 'https://www.asaas.com/api/v3';
 const ASAAS_API_KEY  = Deno.env.get('ASAAS_API_KEY')  ?? '';
 
 const corsHeaders = {
@@ -69,6 +72,14 @@ serve(async (req) => {
   }
 
   try {
+    // ── 0. Configuração obrigatória ──────────────────────────────────────────
+    if (!ASAAS_API_KEY) {
+      console.error('[create-asaas-payment] ASAAS_API_KEY não configurada — abortando.');
+      return new Response(JSON.stringify({ error: 'Gateway de pagamento não configurado.' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // ── 1. Autenticar ────────────────────────────────────────────────────────
     const authHeader = req.headers.get('Authorization') ?? '';
     const supabase = createClient(
