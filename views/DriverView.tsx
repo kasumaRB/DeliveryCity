@@ -304,6 +304,7 @@ export const DriverView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'home' | 'history' | 'earnings' | 'support' | 'profile'>('home');
   const [supportMessage, setSupportMessage] = useState('');
   const [supportSending, setSupportSending] = useState(false);
+  const [supportWhatsapp, setSupportWhatsapp] = useState<string | null>(null);
   const [showCodeInput, setShowCodeInput] = useState(false);
   const [inputCode, setInputCode] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
@@ -428,6 +429,11 @@ export const DriverView: React.FC = () => {
       })
       .sort((a, b) => b.score - a.score);
   }, [orders, currentPos, currentUserProfile, calculateDistance, restaurants]);
+
+  useEffect(() => {
+    supabase.from('platform_settings').select('support_whatsapp').maybeSingle()
+      .then(({ data }) => { if (data?.support_whatsapp) setSupportWhatsapp(data.support_whatsapp); });
+  }, []);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -832,8 +838,21 @@ export const DriverView: React.FC = () => {
         {activeTab === 'support' && (
           <div className="animate-in fade-in duration-500 space-y-6">
             <h2 className="text-2xl font-black text-white">Falar com Suporte</h2>
+
+            {supportWhatsapp && (
+              <a
+                href={`https://wa.me/55${supportWhatsapp}?text=${encodeURIComponent('Olá! Preciso de ajuda com uma entrega no DeliveryCity.')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-3 w-full py-5 bg-green-500 hover:bg-green-400 active:scale-95 text-white rounded-[2rem] font-black uppercase text-sm tracking-widest shadow-lg shadow-green-900/30 transition-all"
+              >
+                <Phone size={20} />
+                Chamar no WhatsApp
+              </a>
+            )}
+
             <div className="bg-gray-800/50 rounded-[2.5rem] p-6 border border-gray-700/50">
-              <p className="text-gray-400 text-sm font-medium mb-6">Descreva seu problema ou dúvida. Nossa equipe responderá em breve.</p>
+              <p className="text-gray-400 text-sm font-medium mb-6">Ou deixe uma mensagem. Nossa equipe responderá em breve.</p>
               <textarea
                 value={supportMessage}
                 onChange={e => setSupportMessage(e.target.value)}

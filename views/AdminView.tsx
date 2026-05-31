@@ -44,6 +44,7 @@ const SettingsTab: React.FC = () => {
     restaurant_fee_pct: 8,
     min_delivery_fee: 4.0,
     min_order_value: 15.0,
+    support_whatsapp: '',
   });
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [settingsSaving, setSettingsSaving] = useState(false);
@@ -59,6 +60,7 @@ const SettingsTab: React.FC = () => {
           restaurant_fee_pct: data.restaurant_fee_pct ?? 8,
           min_delivery_fee: data.min_delivery_fee ?? 4.0,
           min_order_value: data.min_order_value ?? 15.0,
+          support_whatsapp: data.support_whatsapp ?? '',
         });
       } catch {
         // falha silenciosa — usa valores padrão
@@ -186,6 +188,31 @@ const SettingsTab: React.FC = () => {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* WhatsApp de suporte */}
+      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 space-y-4">
+        <h4 className="font-black text-gray-700 flex items-center gap-2">
+          <span className="text-green-600">📱</span> Contato de Suporte
+        </h4>
+        <p className="text-xs text-gray-400 font-medium">Número exibido para clientes e entregadores ao acessar a aba de suporte. Use somente dígitos (ex: 66999990000).</p>
+        <input
+          type="tel"
+          value={settings.support_whatsapp}
+          onChange={e => setSettings(s => ({ ...s, support_whatsapp: e.target.value.replace(/\D/g, '') }))}
+          placeholder="66999990000"
+          className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none border-2 border-transparent focus:border-green-400 transition-all"
+        />
+        {settings.support_whatsapp && (
+          <a
+            href={`https://wa.me/55${settings.support_whatsapp}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-green-600 font-bold text-xs hover:underline"
+          >
+            ✓ Testar link: wa.me/55{settings.support_whatsapp}
+          </a>
+        )}
       </div>
 
       {settingsMsg && (
