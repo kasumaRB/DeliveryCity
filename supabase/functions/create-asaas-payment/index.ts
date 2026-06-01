@@ -288,6 +288,8 @@ serve(async (req) => {
       pixQrCode,
       pixQrCodeImage,
       status: payment.status,
+      creditCardToken: payment.creditCardToken ?? null,
+      creditCardBrand: payment.creditCardBrand ?? null,
     }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

@@ -467,7 +467,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
       const selectedSaved = savedCards.find(c => c.id === selectedSavedCardId);
 
       // ── 1. Criar o pedido no banco (status PENDING_PAYMENT ou PENDING para dinheiro) ──
-      await createOrder(
+      const createdOrder = await createOrder(
         selectedRestaurant.id,
         cart,
         selectedPayment,
@@ -481,16 +481,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
 
       // ── 2. Para CREDIT_CARD ou PIX — chamar Edge Function create-asaas-payment ──
       if (selectedPayment === 'CREDIT_CARD' || selectedPayment === 'PIX') {
-        // Buscar o pedido recém-criado (último da lista do restaurante)
-        const { data: newOrders } = await supabase
-          .from('orders')
-          .select('id')
-          .eq('restaurant_id', selectedRestaurant.id)
-          .eq('customer_id', currentUserProfile.id)
-          .order('timestamp', { ascending: false })
-          .limit(1);
-
-        const newOrderId = newOrders?.[0]?.id;
+        const newOrderId = (createdOrder as any)?.id;
         if (!newOrderId) throw new Error('Pedido criado mas ID não encontrado.');
 
         const paymentBody: Record<string, any> = {

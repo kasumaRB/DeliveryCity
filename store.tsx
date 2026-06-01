@@ -840,7 +840,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         delivery_code: Math.floor(1000 + Math.random() * 9000).toString(),
       };
 
-      const { data, error } = await supabase.from('orders').insert(newOrder);
+      const { data, error } = await supabase.from('orders').insert(newOrder).select('id').single();
       if (error) throw new Error(`Falha ao criar pedido: ${error.message}`);
       await fetchData();
 
@@ -859,7 +859,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
 
-      return data;
+      return data; // { id: string } — ID do pedido criado
     } catch (error) {
       throw error;
     }
