@@ -366,7 +366,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const confirmPickup = async (orderId: string, code: string): Promise<boolean> => {
     const order = orders.find(o => o.id === orderId);
     if (!order) return false;
+    // Validação local rápida — evita chamada de rede com código errado
     if (order.pickupCode !== code) return false;
+
     if (!navigator.onLine) {
       addToSyncQueue({ orderId, code, type: 'pickup', timestamp: Date.now() });
       saveActiveOrderToOffline({ ...order, status: OrderStatus.OUT_FOR_DELIVERY });
@@ -375,33 +377,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
       return true;
     }
-    if (order.pickupCode === code) {
-      await supabase
-        .from('orders')
-        .update({ status: OrderStatus.OUT_FOR_DELIVERY })
-        .eq('id', orderId);
-      await fetchData();
 
-      // Notifica cliente: entregador coletou e está a caminho
-      if (order.customerId) {
-        supabase.functions.invoke('send-push-notification', {
-          body: {
-            userId: order.customerId,
-            title: '🚀 Pedido saiu para entrega!',
-            body: `Seu pedido de ${order.restaurantName} está a caminho. Fique de olho!`,
-            data: { orderId, type: 'OUT_FOR_DELIVERY' },
-          },
-        }).catch(() => {});
-      }
+    // Update atômico: verifica código e status no banco para evitar race condition
+    const { data: updated } = await supabase
+      .from('orders')
+      .update({ status: OrderStatus.OUT_FOR_DELIVERY })
+      .eq('id', orderId)
+      .eq('pickup_code', code)
+      .eq('status', OrderStatus.READY)
+      .select('id, customer_id, restaurant_name')
+      .maybeSingle();
 
-      return true;
+    if (!updated) return false;
+
+    await fetchData();
+
+    if (order.customerId) {
+      supabase.functions.invoke('send-push-notification', {
+        body: {
+          userId: order.customerId,
+          title: '🚀 Pedido saiu para entrega!',
+          body: `Seu pedido de ${order.restaurantName} está a caminho. Fique de olho!`,
+          data: { orderId, type: 'OUT_FOR_DELIVERY' },
+        },
+      }).catch(() => {});
     }
-    return false;
+
+    return true;
   };
 
   const confirmDelivery = async (orderId: string, code: string): Promise<boolean> => {
     const order = orders.find(o => o.id === orderId);
     if (!order) return false;
+    // Validação local rápida — evita aceitar qualquer código quando offline
+    if (order.deliveryCode !== code) return false;
+
     if (!navigator.onLine) {
       addToSyncQueue({ orderId, code, type: 'delivery', timestamp: Date.now() });
       clearOfflineActiveOrder();
@@ -410,25 +420,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
       return true;
     }
-    if (order.deliveryCode === code) {
-      await supabase.from('orders').update({ status: OrderStatus.DELIVERED }).eq('id', orderId);
-      await fetchData();
 
-      // Notifica cliente: entregue — pede avaliação
-      if (order.customerId) {
-        supabase.functions.invoke('send-push-notification', {
-          body: {
-            userId: order.customerId,
-            title: '🎉 Pedido entregue!',
-            body: `Seu pedido de ${order.restaurantName} chegou. Que tal avaliar a experiência?`,
-            data: { orderId, type: 'DELIVERED' },
-          },
-        }).catch(() => {});
-      }
+    // Update atômico: verifica código e status no banco
+    const { data: updated } = await supabase
+      .from('orders')
+      .update({ status: OrderStatus.DELIVERED })
+      .eq('id', orderId)
+      .eq('delivery_code', code)
+      .eq('status', OrderStatus.OUT_FOR_DELIVERY)
+      .select('id')
+      .maybeSingle();
 
-      return true;
+    if (!updated) return false;
+
+    await fetchData();
+
+    if (order.customerId) {
+      supabase.functions.invoke('send-push-notification', {
+        body: {
+          userId: order.customerId,
+          title: '🎉 Pedido entregue!',
+          body: `Seu pedido de ${order.restaurantName} chegou. Que tal avaliar a experiência?`,
+          data: { orderId, type: 'DELIVERED' },
+        },
+      }).catch(() => {});
     }
-    return false;
+
+    return true;
   };
 
   const processSyncQueue = useCallback(async () => {
