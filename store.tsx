@@ -56,7 +56,7 @@ interface AppContextType {
     addressCoords?: { lat: number; lng: number },
     deliveryFeeOverride?: number,
     discountAmount?: number
-  ) => Promise<void>;
+  ) => Promise<{ id: any } | null>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   confirmPickup: (orderId: string, code: string) => Promise<boolean>;
   confirmDelivery: (orderId: string, code: string) => Promise<boolean>;
@@ -92,6 +92,9 @@ interface AppContextType {
   ) => Promise<void>;
   calculateDistance: (lat1: number, lon1: number, lat2: number, lon2: number) => number;
   platformSettings: PlatformSettings | null;
+  reportFailedDelivery: (orderId: string, reason: string) => Promise<void>;
+  startReturn: (orderId: string) => Promise<void>;
+  confirmReturn: (orderId: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -193,6 +196,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     pixQrCode: o.pix_qr_code,
     pixQrCodeImage: o.pix_qr_code_image,
     coords: o.coords,
+    customerPhone: o.customer_phone ?? undefined,
+    failureReason: o.failure_reason ?? undefined,
+    driverName: o.driver_name ?? undefined,
   });
 
   const setupNotifications = async (userId?: string) => {
@@ -432,6 +438,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .maybeSingle();
 
     if (!updated) return false;
+
+    // Repasses pós-entrega: restaurante e entregador recebem somente agora
+    supabase.functions.invoke('release-payment-splits', { body: { orderId } }).catch(() => {});
 
     await fetchData();
 
@@ -848,6 +857,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const platformFee          = (finalProductTotal - restaurantNetEarnings) + (deliveryFee - driverEarnings);
       const total                = finalProductTotal + deliveryFee;
 
+      const { data: clientProfile } = await supabase
+        .from('profiles').select('phone_number').eq('id', session.user.id).maybeSingle();
+
       const newOrder = {
         id: `ORD-${Date.now().toString().slice(-6)}`,
         restaurant_id: restaurantId,
@@ -855,6 +867,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         customer_id: session.user.id,
         customer_address: address,
         customer_name: customerName,
+        customer_phone: clientProfile?.phone_number ?? null,
         // PIX e Cartão de crédito começam como PENDING_PAYMENT até o webhook confirmar
         // Dinheiro e débito (offline) vão direto para PENDING
         status: (paymentMethod === 'PIX' || paymentMethod === 'CREDIT_CARD')
@@ -1086,6 +1099,74 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const reportFailedDelivery = async (orderId: string, reason: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) throw new Error('Pedido não encontrado.');
+
+    const { data: updated, error } = await supabase.from('orders')
+      .update({ status: OrderStatus.DELIVERY_FAILED, failure_reason: reason })
+      .eq('id', orderId).eq('status', OrderStatus.OUT_FOR_DELIVERY)
+      .select('id').maybeSingle();
+    if (error || !updated) throw new Error('Não foi possível registrar a falha de entrega.');
+
+    // Reembolso automático via Asaas (best-effort: não bloqueia o fluxo se falhar)
+    supabase.functions.invoke('refund-asaas-payment', { body: { orderId } }).catch(() => {});
+
+    await fetchData();
+
+    if (order.customerId) {
+      supabase.functions.invoke('send-push-notification', {
+        body: {
+          userId: order.customerId,
+          title: '⚠️ Problema na entrega',
+          body: 'Seu entregador não conseguiu concluir a entrega. O reembolso será processado em breve.',
+          data: { orderId, type: 'DELIVERY_FAILED' },
+        },
+      }).catch(() => {});
+    }
+
+    supabase.from('support_tickets').insert({
+      user_id: session!.user.id,
+      user_name: currentUserProfile?.name,
+      user_role: 'DRIVER',
+      message: `[AUTO] Entrega não concluída — Pedido #${orderId}. Motivo: ${reason}`,
+      status: 'OPEN',
+      created_at: new Date().toISOString(),
+    }).then(null, () => {});
+  };
+
+  const startReturn = async (orderId: string) => {
+    const { error } = await supabase.from('orders')
+      .update({ status: OrderStatus.RETURNING })
+      .eq('id', orderId).eq('status', OrderStatus.DELIVERY_FAILED);
+    if (error) throw new Error(error.message);
+    await fetchData();
+
+    const order = orders.find(o => o.id === orderId);
+    if (order?.restaurantId) {
+      const { data: rest } = await supabase.from('restaurants')
+        .select('owner_id').eq('id', order.restaurantId).single();
+      if (rest?.owner_id) {
+        supabase.functions.invoke('send-push-notification', {
+          body: {
+            userId: rest.owner_id,
+            title: '🔄 Devolução a caminho',
+            body: `Pedido #${orderId.slice(-4)} não pôde ser entregue. O entregador está retornando com o pedido.`,
+            data: { orderId, type: 'RETURNING' },
+          },
+        }).catch(() => {});
+      }
+    }
+  };
+
+  const confirmReturn = async (orderId: string) => {
+    const { error } = await supabase.from('orders')
+      .update({ status: OrderStatus.RETURNED })
+      .eq('id', orderId).eq('status', OrderStatus.RETURNING);
+    if (error) throw new Error(error.message);
+    await fetchData();
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -1180,13 +1261,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (error) throw new Error(`Erro ao aceitar pedido: ${error.message}`);
           if (!updated) throw new Error('Este pedido já foi aceito por outro entregador.');
 
-          // ── Repasse assíncrono para a subconta do entregador (Asaas) ──
-          // Best-effort: falha não impede a aceitação do pedido
-          if (order?.asaasPaymentId) {
-            supabase.functions.invoke('release-driver-split', {
-              body: { orderId: oid, driverId: did },
-            }).catch(err => devLog('[store] Falha no release-driver-split (não fatal):', err));
-          }
+          // Repasse somente em DELIVERED — release-payment-splits cuida de restaurante e entregador
 
           await fetchData();
 
@@ -1306,6 +1381,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         removeFromCart,
         updateCartItemQuantity,
         clearCart,
+        reportFailedDelivery,
+        startReturn,
+        confirmReturn,
       }}
     >
       {children}

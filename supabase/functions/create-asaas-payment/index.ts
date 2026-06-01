@@ -228,15 +228,8 @@ serve(async (req) => {
       externalReference: orderId,
     };
 
-    // Split para o restaurante (definido no momento da criação da cobrança)
-    if (restaurant?.asaas_account_id && restaurantNetEarnings > 0) {
-      paymentPayload.split = [
-        {
-          walletId: restaurant.asaas_account_id,
-          fixedValue: Math.round(restaurantNetEarnings * 100) / 100,
-        },
-      ];
-    }
+    // Sem split no momento do pagamento — repasses ocorrem somente em DELIVERED
+    // via release-payment-splits, garantindo reembolso total em caso de DELIVERY_FAILED
 
     // Dados de cartão de crédito
     if (billingType === 'CREDIT_CARD') {

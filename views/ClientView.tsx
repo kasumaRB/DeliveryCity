@@ -164,6 +164,9 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
       OUT_FOR_DELIVERY: { label: '\ud83d\udeb4 Em Entrega',    color: 'bg-purple-100 text-purple-700' },
       DELIVERED:        { label: '\ud83c\udf89 Entregue',      color: 'bg-gray-100 text-gray-600' },
       CANCELLED:        { label: '\u274c Cancelado',     color: 'bg-red-100 text-red-700' },
+      DELIVERY_FAILED:  { label: '\u26a0\ufe0f N\u00e3o entregue', color: 'bg-red-100 text-red-700' },
+      RETURNING:        { label: '\ud83d\udd04 Devolvendo',    color: 'bg-orange-100 text-orange-700' },
+      RETURNED:         { label: '\ud83d\udce6 Devolvido',     color: 'bg-gray-100 text-gray-500' },
     };
     return map[status] || { label: status, color: 'bg-orange-100 text-orange-700' };
   };
@@ -951,7 +954,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                     .sort((a, b) => b.timestamp - a.timestamp)
                     .map(order => {
                       const statusInfo = traduzirStatus(order.status);
-                      const isActive = !['DELIVERED', 'CANCELLED'].includes(order.status);
+                      const isActive = !['DELIVERED', 'CANCELLED', 'RETURNED'].includes(order.status);
                       return (
                         <div
                           key={order.id}

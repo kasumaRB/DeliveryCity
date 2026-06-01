@@ -112,6 +112,7 @@ export const RestaurantView: React.FC = () => {
     updateUserProfile,
     refreshData,
     platformSettings,
+    confirmReturn,
   } = useAppStore();
 
   const myRestaurant = restaurants.find(r => r.ownerId === currentUserProfile?.id);
@@ -741,6 +742,47 @@ export const RestaurantView: React.FC = () => {
                     )}
                   </div>
                 </div>
+
+                {/* COLUNA: DEVOLUÇÕES */}
+                {getOrdersByStatus([OrderStatus.RETURNING]).length > 0 && (
+                  <div className="flex flex-col min-w-[320px] h-full">
+                    <div className="flex items-center justify-between mb-6 px-4">
+                      <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-3">
+                        <span className="text-orange-500">↩</span> Devoluções
+                      </h3>
+                      <span className="bg-orange-100 text-orange-600 text-[10px] font-black px-3 py-1 rounded-full">
+                        {getOrdersByStatus([OrderStatus.RETURNING]).length}
+                      </span>
+                    </div>
+                    <div className="flex-1 bg-orange-50/30 rounded-[3rem] p-5 space-y-5 overflow-y-auto no-scrollbar border-2 border-dashed border-orange-200 shadow-inner">
+                      {getOrdersByStatus([OrderStatus.RETURNING]).map(order => (
+                        <div key={order.id} className="bg-white p-6 rounded-[2.5rem] shadow-sm animate-in zoom-in-95 border border-orange-100">
+                          <div className="flex justify-between items-start mb-4">
+                            <span className="font-black text-gray-900 text-xl tracking-tighter">#{order.id.slice(-4)}</span>
+                            <span className="text-[9px] font-black uppercase tracking-widest text-orange-500">Retornando</span>
+                          </div>
+                          <p className="text-sm text-gray-500 mb-1 font-medium">{order.customerName}</p>
+                          {order.failureReason && (
+                            <p className="text-xs text-gray-400 mb-4">Motivo: {order.failureReason}</p>
+                          )}
+                          <button
+                            onClick={async () => {
+                              if (!window.confirm('Confirmar que você recebeu o pedido devolvido pelo entregador?')) return;
+                              try {
+                                await confirmReturn(order.id);
+                              } catch (e: any) {
+                                alert(e.message || 'Erro ao confirmar devolução.');
+                              }
+                            }}
+                            className="w-full py-3 bg-orange-500 text-white rounded-2xl font-black text-sm"
+                          >
+                            ✓ Confirmar recebimento da devolução
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1233,6 +1275,9 @@ export const RestaurantView: React.FC = () => {
               OUT_FOR_DELIVERY: { label: 'Em Entrega', color: 'text-purple-600 bg-purple-50' },
               DELIVERED: { label: 'Entregue', color: 'text-gray-600 bg-gray-100' },
               CANCELLED: { label: 'Cancelado', color: 'text-red-600 bg-red-50' },
+              DELIVERY_FAILED: { label: 'Não entregue', color: 'text-red-700 bg-red-100' },
+              RETURNING: { label: 'Devolvendo', color: 'text-orange-600 bg-orange-50' },
+              RETURNED: { label: 'Devolvido', color: 'text-gray-500 bg-gray-100' },
             };
 
             return (

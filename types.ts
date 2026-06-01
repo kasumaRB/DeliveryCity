@@ -13,6 +13,9 @@ export enum OrderStatus {
   OUT_FOR_DELIVERY = 'OUT_FOR_DELIVERY',
   DELIVERED = 'DELIVERED',
   CANCELLED = 'CANCELLED',
+  DELIVERY_FAILED = 'DELIVERY_FAILED',
+  RETURNING = 'RETURNING',
+  RETURNED = 'RETURNED',
 }
 
 export type PaymentMethod = 'CREDIT_CARD' | 'PIX';
@@ -166,6 +169,8 @@ export interface Order {
   rating?: OrderRating;
   feedback?: string;
   driverName?: string;
+  customerPhone?: string;
+  failureReason?: string;
 }
 
 export interface OrderRating {

@@ -582,6 +582,9 @@ export const AdminView: React.FC = () => {
                         OUT_FOR_DELIVERY: {label:'Em Entrega', color:'text-purple-600 bg-purple-50'},
                         DELIVERED: {label:'Entregue', color:'text-gray-600 bg-gray-100'},
                         CANCELLED: {label:'Cancelado', color:'text-red-600 bg-red-50'},
+                        DELIVERY_FAILED: {label:'Não entregue', color:'text-red-700 bg-red-100'},
+                        RETURNING: {label:'Devolvendo', color:'text-orange-600 bg-orange-50'},
+                        RETURNED: {label:'Devolvido', color:'text-gray-500 bg-gray-100'},
                       };
                       const s = statusMap[o.status] || {label: o.status, color:'text-gray-500 bg-gray-100'};
                       return (

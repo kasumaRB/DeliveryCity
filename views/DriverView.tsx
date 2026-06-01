@@ -41,6 +41,9 @@ import {
   Camera,
   ImagePlus,
   HelpCircle,
+  MessageSquare,
+  RotateCcw,
+  Bell,
 } from 'lucide-react';
 import Logo from '../assets/Logo.png';
 import Nome from '../assets/Nome.png';
@@ -297,6 +300,8 @@ export const DriverView: React.FC = () => {
     assignDriver,
     confirmPickup,
     confirmDelivery,
+    reportFailedDelivery,
+    startReturn,
     signOut,
     processSyncQueue,
     calculateDistance,
@@ -323,6 +328,12 @@ export const DriverView: React.FC = () => {
   const [inputCode, setInputCode] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null);
+
+  // Fluxo de falha de entrega
+  const [showFailedModal, setShowFailedModal] = useState(false);
+  const [failureReason, setFailureReason] = useState('');
+  const [isReportingFailed, setIsReportingFailed] = useState(false);
+  const [failedConfirmed, setFailedConfirmed] = useState(false);
   const [currentPos, setCurrentPos] = useState<{ lat: number; lng: number } | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
@@ -337,7 +348,8 @@ export const DriverView: React.FC = () => {
     () =>
       orders.find(
         o =>
-          o.driverId === currentUserProfile?.id && ['READY', 'OUT_FOR_DELIVERY'].includes(o.status)
+          o.driverId === currentUserProfile?.id &&
+          ['READY', 'OUT_FOR_DELIVERY', 'DELIVERY_FAILED', 'RETURNING'].includes(o.status)
       ),
     [orders, currentUserProfile]
   );
@@ -624,46 +636,94 @@ export const DriverView: React.FC = () => {
         {/* Active Order */}
         {activeOrder && (
           <div className="mb-6 animate-in fade-in slide-in-from-top-4">
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 rounded-[2.5rem] shadow-xl shadow-blue-900/20">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-blue-100 text-sm font-bold uppercase tracking-wider">
-                  {activeOrder.status === 'READY' ? '🛒 Retirada' : '🚚 Entrega'}
-                </span>
-                <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-black text-white">
-                  #{activeOrder.id.slice(-4)}
-                </span>
-              </div>
+            {/* Card principal do pedido ativo */}
+            {(activeOrder.status === 'READY' || activeOrder.status === 'OUT_FOR_DELIVERY') && (
+              <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 rounded-[2.5rem] shadow-xl shadow-blue-900/20">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-blue-100 text-sm font-bold uppercase tracking-wider">
+                    {activeOrder.status === 'READY' ? '🛒 Retirada' : '🚚 Entrega'}
+                  </span>
+                  <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-black text-white">
+                    #{activeOrder.id.slice(-4)}
+                  </span>
+                </div>
 
-              <div className="flex items-center gap-4 mb-4">
-                <div
-                  className={`p-4 rounded-2xl ${activeOrder.status === 'READY' ? 'bg-orange-500' : 'bg-green-500'}`}
+                <div className="flex items-center gap-4 mb-4">
+                  <div className={`p-4 rounded-2xl ${activeOrder.status === 'READY' ? 'bg-orange-500' : 'bg-green-500'}`}>
+                    {activeOrder.status === 'READY' ? <Store size={28} /> : <MapPin size={28} />}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-black text-white">
+                      {activeOrder.status === 'READY' ? activeOrder.restaurantName : activeOrder.customerName}
+                    </h3>
+                    <p className="text-blue-200 text-sm font-medium">
+                      {activeOrder.status === 'READY' ? 'Vá até o restaurante' : activeOrder.customerAddress}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowCodeInput(true)}
+                    className="flex-1 bg-white text-blue-600 py-4 rounded-2xl font-black uppercase text-sm tracking-wider shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
+                  >
+                    <KeyRound size={20} />
+                    {activeOrder.status === 'READY' ? 'Confirmar Retirada' : 'Finalizar'}
+                  </button>
+                </div>
+
+                {activeOrder.status === 'OUT_FOR_DELIVERY' && (
+                  <button
+                    onClick={() => { setFailedConfirmed(false); setFailureReason(''); setShowFailedModal(true); }}
+                    className="mt-3 w-full py-3 bg-red-600/20 text-red-400 border border-red-500/30 rounded-2xl font-bold text-sm flex items-center justify-center gap-2"
+                  >
+                    <AlertTriangle size={16} />
+                    Não consegui entregar
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Card de devolução — entregador voltando ao restaurante */}
+            {activeOrder.status === 'DELIVERY_FAILED' && (
+              <div className="bg-gradient-to-r from-orange-600 to-red-700 p-6 rounded-[2.5rem] shadow-xl">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-orange-100 text-sm font-bold uppercase tracking-wider">⚠️ Entrega não concluída</span>
+                  <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-black text-white">#{activeOrder.id.slice(-4)}</span>
+                </div>
+                <p className="text-orange-100 text-sm mb-4">Reembolso em processamento. Você precisa devolver o pedido ao restaurante.</p>
+                <a
+                  href={`https://maps.google.com/?q=${encodeURIComponent(activeOrder.restaurantName)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-white font-bold text-sm mb-4 underline"
                 >
-                  {activeOrder.status === 'READY' ? <Store size={28} /> : <MapPin size={28} />}
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-black text-white">
-                    {activeOrder.status === 'READY'
-                      ? activeOrder.restaurantName
-                      : activeOrder.customerName}
-                  </h3>
-                  <p className="text-blue-200 text-sm font-medium">
-                    {activeOrder.status === 'READY'
-                      ? 'Vá até o restaurante'
-                      : activeOrder.customerAddress}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
+                  <MapPin size={16} /> Navegar até {activeOrder.restaurantName}
+                </a>
                 <button
-                  onClick={() => setShowCodeInput(true)}
-                  className="flex-1 bg-white text-blue-600 py-4 rounded-2xl font-black uppercase text-sm tracking-wider shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
+                  onClick={async () => {
+                    try { await startReturn(activeOrder.id); }
+                    catch (e: any) { alert(e.message || 'Erro ao iniciar devolução.'); }
+                  }}
+                  className="w-full py-4 bg-white text-orange-600 rounded-2xl font-black uppercase text-sm tracking-wider shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
                 >
-                  <KeyRound size={20} />
-                  {activeOrder.status === 'READY' ? 'Confirmar Retirada' : 'Finalizar'}
+                  <RotateCcw size={18} /> Iniciar devolução
                 </button>
               </div>
-            </div>
+            )}
+
+            {/* Card aguardando confirmação do restaurante */}
+            {activeOrder.status === 'RETURNING' && (
+              <div className="bg-gradient-to-r from-gray-700 to-gray-800 p-6 rounded-[2.5rem] shadow-xl border border-gray-600">
+                <div className="flex items-center gap-3 mb-3">
+                  <RotateCcw size={24} className="text-orange-400 animate-spin" style={{ animationDuration: '3s' }} />
+                  <div>
+                    <h3 className="text-white font-black">Devolvendo ao restaurante</h3>
+                    <p className="text-gray-400 text-sm">Aguarde a confirmação do restaurante após entregar o pedido.</p>
+                  </div>
+                </div>
+                <span className="bg-orange-500/20 text-orange-400 text-xs font-bold px-3 py-1 rounded-full">#{activeOrder.id.slice(-4)}</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -941,6 +1001,138 @@ export const DriverView: React.FC = () => {
           <span className="text-[10px] font-bold">Sair</span>
         </button>
       </nav>
+
+      {/* Modal: Não consegui entregar */}
+      {showFailedModal && activeOrder && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-end justify-center z-50">
+          <div className="bg-gray-900 rounded-t-[3rem] w-full max-w-lg p-6 pb-10 animate-in slide-in-from-bottom-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-black text-white">Problema na entrega</h3>
+              <button onClick={() => setShowFailedModal(false)} className="p-2 text-gray-400 hover:text-white">
+                <X size={22} />
+              </button>
+            </div>
+
+            {!failedConfirmed ? (
+              <>
+                {/* Seção 1: Contato com o cliente */}
+                {activeOrder.customerPhone && (
+                  <div className="bg-gray-800 rounded-2xl p-4 mb-4">
+                    <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3">Tentar contato com o cliente</p>
+                    <div className="flex gap-3">
+                      <a
+                        href={`https://wa.me/55${activeOrder.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${activeOrder.customerName}! Estou no endereço de entrega do seu pedido. Pode me atender?`)}`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2"
+                      >
+                        <MessageSquare size={16} /> WhatsApp
+                      </a>
+                      <button
+                        onClick={() => {
+                          supabase.functions.invoke('send-push-notification', {
+                            body: {
+                              userId: activeOrder.customerId,
+                              title: '📍 Entregador no seu endereço',
+                              body: 'Seu entregador está aguardando. Toque para abrir o app.',
+                              data: { orderId: activeOrder.id, type: 'DRIVER_WAITING' },
+                            },
+                          }).catch(() => {});
+                          alert('Notificação enviada ao cliente!');
+                        }}
+                        className="flex-1 py-3 bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded-xl font-bold text-sm flex items-center justify-center gap-2"
+                      >
+                        <Bell size={16} /> Notificar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Seção 2: Suporte da plataforma */}
+                {supportWhatsapp && (
+                  <div className="bg-gray-800 rounded-2xl p-4 mb-4">
+                    <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3">Suporte da plataforma</p>
+                    <a
+                      href={`https://wa.me/55${supportWhatsapp}?text=${encodeURIComponent(`Preciso de ajuda na entrega do pedido #${activeOrder.id.slice(-4)}.`)}`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-green-400 font-bold text-sm"
+                    >
+                      <MessageSquare size={16} /> Falar com suporte via WhatsApp
+                    </a>
+                  </div>
+                )}
+
+                {/* Seção 3: Confirmar não-entrega */}
+                <div className="bg-gray-800 rounded-2xl p-4 mb-4">
+                  <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3">Motivo da não-entrega</p>
+                  <div className="space-y-2">
+                    {['Cliente não estava no local', 'Não atende / não responde', 'Endereço não encontrado', 'Cliente recusou o pedido', 'Outro'].map(r => (
+                      <label key={r} className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${failureReason === r ? 'bg-red-600/20 border border-red-500/40' : 'bg-gray-700/50 border border-transparent'}`}>
+                        <input
+                          type="radio"
+                          name="failureReason"
+                          value={r}
+                          checked={failureReason === r}
+                          onChange={e => setFailureReason(e.target.value)}
+                          className="accent-red-500"
+                        />
+                        <span className="text-white text-sm font-medium">{r}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  disabled={!failureReason || isReportingFailed}
+                  onClick={async () => {
+                    setIsReportingFailed(true);
+                    try {
+                      await reportFailedDelivery(activeOrder.id, failureReason);
+                      setFailedConfirmed(true);
+                    } catch (e: any) {
+                      alert(e.message || 'Erro ao registrar falha.');
+                    } finally {
+                      setIsReportingFailed(false);
+                    }
+                  }}
+                  className="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-sm disabled:opacity-40 flex items-center justify-center gap-2"
+                >
+                  {isReportingFailed ? <Loader size={18} className="animate-spin" /> : <AlertTriangle size={18} />}
+                  Confirmar não entrega e solicitar reembolso
+                </button>
+              </>
+            ) : (
+              /* Após confirmar: instruções de devolução */
+              <div className="text-center">
+                <div className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <RotateCcw size={32} className="text-orange-400" />
+                </div>
+                <h4 className="text-white font-black text-lg mb-2">Reembolso solicitado</h4>
+                <p className="text-gray-400 text-sm mb-6">Agora você precisa devolver o pedido ao restaurante <strong className="text-white">{activeOrder.restaurantName}</strong>.</p>
+                <a
+                  href={`https://maps.google.com/?q=${encodeURIComponent(activeOrder.restaurantName)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 text-blue-400 font-bold text-sm mb-6 underline"
+                >
+                  <MapPin size={16} /> Abrir rota no Google Maps
+                </a>
+                <button
+                  onClick={async () => {
+                    try {
+                      await startReturn(activeOrder.id);
+                      setShowFailedModal(false);
+                    } catch (e: any) {
+                      alert(e.message || 'Erro ao iniciar devolução.');
+                    }
+                  }}
+                  className="w-full py-4 bg-orange-500 text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2"
+                >
+                  <RotateCcw size={18} /> Iniciar devolução
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Code Input Modal */}
       {showCodeInput && (
