@@ -322,6 +322,7 @@ export const DriverView: React.FC = () => {
   const [showCodeInput, setShowCodeInput] = useState(false);
   const [inputCode, setInputCode] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+  const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null);
   const [currentPos, setCurrentPos] = useState<{ lat: number; lng: number } | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
@@ -693,13 +694,17 @@ export const DriverView: React.FC = () => {
                     key={order.id}
                     className="bg-gray-800/50 p-6 rounded-[2.5rem] border border-gray-700/50 hover:border-blue-500/50 transition-all cursor-pointer active:scale-[0.98]"
                     onClick={async () => {
-                      if (!isOnline) return;
+                      if (!isOnline || acceptingOrderId) return;
+                      setAcceptingOrderId(order.id);
                       try {
                         await assignDriver(order.id, currentUserProfile?.id!);
                       } catch (e: any) {
                         alert(e.message || 'Não foi possível aceitar este pedido.');
+                      } finally {
+                        setAcceptingOrderId(null);
                       }
                     }}
+                    style={{ opacity: acceptingOrderId === order.id ? 0.6 : 1, pointerEvents: acceptingOrderId ? 'none' : 'auto' }}
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div>

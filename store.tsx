@@ -711,6 +711,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     try {
       // ═══════════════════════════════════════════════════════
+      // 0. IDEMPOTÊNCIA: Bloqueia pedido duplicado (ex: reconexão após queda)
+      // ═══════════════════════════════════════════════════════
+      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+      const { data: recentOrder } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('customer_id', session.user.id)
+        .eq('restaurant_id', restaurantId)
+        .in('status', ['PENDING_PAYMENT', 'PENDING'])
+        .gte('timestamp', twoMinutesAgo)
+        .maybeSingle();
+
+      if (recentOrder) {
+        throw new Error('Você já tem um pedido em andamento neste restaurante. Aguarde a confirmação antes de fazer outro.');
+      }
+
+      // ═══════════════════════════════════════════════════════
       // 1. BUSCAR RESTAURANTE DO BANCO — não confiar no estado do React
       // ═══════════════════════════════════════════════════════
       const { data: restaurantData, error: restError } = await supabase
