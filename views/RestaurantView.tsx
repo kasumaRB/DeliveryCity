@@ -627,6 +627,14 @@ export const RestaurantView: React.FC = () => {
                             })}
                           </span>
                         </div>
+                        <div className="mb-4 px-1">
+                          <p className="text-sm font-black text-gray-800">{order.customerName}</p>
+                          {order.customerAddress && (
+                            <p className="text-xs text-gray-400 font-medium mt-0.5 leading-tight">
+                              {order.customerAddress}
+                            </p>
+                          )}
+                        </div>
                         <div className="space-y-3 mb-8 bg-gray-50 p-5 rounded-[1.5rem] border border-gray-100">
                           {order.items.map((item, idx) => (
                             <div
