@@ -328,3 +328,43 @@ CREATE POLICY products_write ON public.products
       WHERE p.id = (SELECT auth.uid()) AND p.role = 'ADMIN'
     )
   );
+
+-- ============================================================
+-- Storage: avatars bucket — consolidate 13 policies into 3
+-- (applied as separate migrations: consolidate_avatars_storage_policies,
+--  drop_avatars_listing_policy)
+-- ============================================================
+
+DROP POLICY IF EXISTS "Allow all for authenticated"                        ON storage.objects;
+DROP POLICY IF EXISTS "Allow authenticated delete avatars"                 ON storage.objects;
+DROP POLICY IF EXISTS "Allow authenticated update avatars"                 ON storage.objects;
+DROP POLICY IF EXISTS "Allow authenticated upload avatars"                 ON storage.objects;
+DROP POLICY IF EXISTS "Allow public read avatars"                          ON storage.objects;
+DROP POLICY IF EXISTS "Avatar publico para leitura"                        ON storage.objects;
+DROP POLICY IF EXISTS "Avatar público para leitura"                        ON storage.objects;
+DROP POLICY IF EXISTS "Dono pode atualizar seu avatar"                     ON storage.objects;
+DROP POLICY IF EXISTS "Public Access"                                      ON storage.objects;
+DROP POLICY IF EXISTS "Upload de avatar autenticado"                       ON storage.objects;
+DROP POLICY IF EXISTS "Usuario atualiza proprio avatar"                    ON storage.objects;
+DROP POLICY IF EXISTS "Usuario deleta proprio avatar"                      ON storage.objects;
+DROP POLICY IF EXISTS "Usuários autenticados podem fazer upload de avatar" ON storage.objects;
+
+-- No SELECT policy needed: bucket is public, direct URL access works without it.
+-- Listing (GET /storage/v1/object/list/avatars) is intentionally blocked.
+CREATE POLICY avatars_insert ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'avatars');
+
+CREATE POLICY avatars_update ON storage.objects
+  FOR UPDATE TO public
+  USING (
+    bucket_id = 'avatars'
+    AND (auth.uid())::text = (storage.foldername(name))[1]
+  );
+
+CREATE POLICY avatars_delete ON storage.objects
+  FOR DELETE TO public
+  USING (
+    bucket_id = 'avatars'
+    AND (auth.uid())::text = (storage.foldername(name))[1]
+  );
