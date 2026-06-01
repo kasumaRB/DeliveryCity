@@ -15,10 +15,6 @@
 DROP INDEX IF EXISTS public.profiles_unique_cpf;
 DROP INDEX IF EXISTS public.profiles_unique_phone;
 
--- ── 2. Add missing index on products(restaurant_id) ──────────
-CREATE INDEX IF NOT EXISTS products_restaurant_id_idx
-  ON public.products (restaurant_id);
-
 -- ── 3. Fix functions ──────────────────────────────────────────
 
 -- 3a. delete_user_by_id — admin guard + fixed search_path
@@ -40,12 +36,12 @@ END;
 $$;
 REVOKE EXECUTE ON FUNCTION public.delete_user_by_id(uuid) FROM anon;
 
--- 3b. is_admin — fixed search_path
+-- 3b. is_admin — SECURITY INVOKER (só lê public.profiles)
 CREATE OR REPLACE FUNCTION public.is_admin()
   RETURNS boolean
   LANGUAGE plpgsql
-  SECURITY DEFINER
-  SET search_path = public, pg_catalog
+  SECURITY INVOKER
+  SET search_path = public
 AS $$
 BEGIN
   RETURN EXISTS (
@@ -54,7 +50,6 @@ BEGIN
   );
 END;
 $$;
-REVOKE EXECUTE ON FUNCTION public.is_admin() FROM anon;
 
 -- 3c. increment_balance — fixed search_path
 CREATE OR REPLACE FUNCTION public.increment_balance(user_id uuid, amount numeric)
@@ -68,12 +63,12 @@ BEGIN
 END;
 $$;
 
--- 3d. get_auth_user_role — fixed search_path
+-- 3d. get_auth_user_role — SECURITY INVOKER (só lê public.profiles)
 CREATE OR REPLACE FUNCTION public.get_auth_user_role()
   RETURNS text
   LANGUAGE plpgsql
-  SECURITY DEFINER
-  SET search_path = public, pg_catalog
+  SECURITY INVOKER
+  SET search_path = public
 AS $$
 DECLARE
   v_role TEXT;
@@ -82,7 +77,6 @@ BEGIN
   RETURN v_role;
 END;
 $$;
-REVOKE EXECUTE ON FUNCTION public.get_auth_user_role() FROM anon;
 
 -- 3e. handle_new_user — revoke from non-trigger roles (trigger-only function)
 REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM anon;
@@ -302,14 +296,29 @@ CREATE POLICY profiles_update ON public.profiles
   );
 
 -- ── 9. Fix RLS: products — public reads, owners/admins write ─
+-- Políticas separadas por comando para evitar SELECT duplicado
+-- (products_write FOR ALL cobria SELECT junto com products_select).
 
 DROP POLICY IF EXISTS "Acesso Total para Autenticados" ON public.products;
+DROP POLICY IF EXISTS products_write ON public.products;
 
 CREATE POLICY products_select ON public.products
   FOR SELECT USING (true);
 
-CREATE POLICY products_write ON public.products
-  FOR ALL
+CREATE POLICY products_insert ON public.products
+  FOR INSERT
+  WITH CHECK (
+    restaurant_id IN (
+      SELECT id FROM public.restaurants WHERE owner_id = (SELECT auth.uid())
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = (SELECT auth.uid()) AND p.role = 'ADMIN'
+    )
+  );
+
+CREATE POLICY products_update ON public.products
+  FOR UPDATE
   USING (
     restaurant_id IN (
       SELECT id FROM public.restaurants WHERE owner_id = (SELECT auth.uid())
@@ -328,6 +337,23 @@ CREATE POLICY products_write ON public.products
       WHERE p.id = (SELECT auth.uid()) AND p.role = 'ADMIN'
     )
   );
+
+CREATE POLICY products_delete ON public.products
+  FOR DELETE
+  USING (
+    restaurant_id IN (
+      SELECT id FROM public.restaurants WHERE owner_id = (SELECT auth.uid())
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = (SELECT auth.uid()) AND p.role = 'ADMIN'
+    )
+  );
+
+-- ── 10. Performance: remover índices não utilizados ───────────
+DROP INDEX IF EXISTS public.orders_restaurant_id_timestamp_idx;
+DROP INDEX IF EXISTS public.orders_driver_id_idx;
+DROP INDEX IF EXISTS public.orders_customer_id_idx;
 
 -- ============================================================
 -- Storage: avatars bucket — consolidate 13 policies into 3
