@@ -197,6 +197,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     pixQrCodeImage: o.pix_qr_code_image,
     coords: o.coords,
     customerPhone: o.customer_phone ?? undefined,
+    customerAvatarUrl: o.customer_avatar_url ?? undefined,
     failureReason: o.failure_reason ?? undefined,
     driverName: o.driver_name ?? undefined,
   });
@@ -858,7 +859,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const total                = finalProductTotal + deliveryFee;
 
       const { data: clientProfile } = await supabase
-        .from('profiles').select('phone_number').eq('id', session.user.id).maybeSingle();
+        .from('profiles').select('phone_number, avatar_url').eq('id', session.user.id).maybeSingle();
 
       const newOrder = {
         id: `ORD-${Date.now().toString().slice(-6)}`,
@@ -868,6 +869,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         customer_address: address,
         customer_name: customerName,
         customer_phone: clientProfile?.phone_number ?? null,
+        customer_avatar_url: clientProfile?.avatar_url ?? null,
         // PIX e Cartão de crédito começam como PENDING_PAYMENT até o webhook confirmar
         // Dinheiro e débito (offline) vão direto para PENDING
         status: (paymentMethod === 'PIX' || paymentMethod === 'CREDIT_CARD')

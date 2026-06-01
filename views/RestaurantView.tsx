@@ -627,13 +627,28 @@ export const RestaurantView: React.FC = () => {
                             })}
                           </span>
                         </div>
-                        <div className="mb-4 px-1">
-                          <p className="text-sm font-black text-gray-800">{order.customerName}</p>
-                          {order.customerAddress && (
-                            <p className="text-xs text-gray-400 font-medium mt-0.5 leading-tight">
-                              {order.customerAddress}
-                            </p>
+                        <div className="mb-4 flex items-center gap-3">
+                          {order.customerAvatarUrl ? (
+                            <img
+                              src={order.customerAvatarUrl}
+                              alt={order.customerName}
+                              className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-9 h-9 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                              <span className="text-orange-600 font-black text-sm">
+                                {order.customerName.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
                           )}
+                          <div className="min-w-0">
+                            <p className="text-sm font-black text-gray-800 truncate">{order.customerName}</p>
+                            {order.customerAddress && (
+                              <p className="text-xs text-gray-400 font-medium mt-0.5 leading-tight truncate">
+                                {order.customerAddress}
+                              </p>
+                            )}
+                          </div>
                         </div>
                         <div className="space-y-3 mb-8 bg-gray-50 p-5 rounded-[1.5rem] border border-gray-100">
                           {order.items.map((item, idx) => (

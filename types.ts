@@ -170,6 +170,7 @@ export interface Order {
   feedback?: string;
   driverName?: string;
   customerPhone?: string;
+  customerAvatarUrl?: string;
   failureReason?: string;
 }
 
