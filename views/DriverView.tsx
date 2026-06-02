@@ -49,15 +49,16 @@ import Logo from '../assets/Logo.png';
 import Nome from '../assets/Nome.png';
 
 const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
-  const { currentUserProfile, updateUserProfile, orders, platformSettings } = useAppStore();
+  const { currentUserProfile, updateUserProfile, orders } = useAppStore();
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [vehicle, setVehicle] = useState(currentUserProfile?.vehicleType || 'Moto');
   const [plate, setPlate] = useState(currentUserProfile?.licensePlate || '');
   const [phone, setPhone] = useState(currentUserProfile?.phoneNumber || '');
   const [pixKey, setPixKey] = useState(currentUserProfile?.pixKey || '');
-  const [asaasAccountId, setAsaasAccountId] = useState(currentUserProfile?.asaasAccountId || '');
+  const [asaasAccountId] = useState(currentUserProfile?.asaasAccountId || '');
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
-  // Endereço base / região de atuação
   const baseAddr = currentUserProfile?.savedAddresses?.find(a => a.label === 'Base');
   const [baseAddressText, setBaseAddressText] = useState(
     baseAddr
@@ -68,34 +69,57 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [baseAddressData, setBaseAddressData] = useState<UserAddress | null>(baseAddr || null);
   const [showBaseModal, setShowBaseModal] = useState(false);
 
-  const myRatings = useMemo(() => {
-    return orders
-      .filter(o => o.driverId === currentUserProfile?.id && o.rating)
-      .map(o => o.rating!)
-      .reverse();
-  }, [orders, currentUserProfile]);
+  const myDeliveries = useMemo(() =>
+    orders.filter(o => o.driverId === currentUserProfile?.id && o.status === OrderStatus.DELIVERED),
+    [orders, currentUserProfile]
+  );
+
+  const myRatings = useMemo(() =>
+    orders.filter(o => o.driverId === currentUserProfile?.id && (o.rating as any)?.driverStars > 0),
+    [orders, currentUserProfile]
+  );
 
   const avgRating = useMemo(() => {
-    if (myRatings.length === 0) return 0;
-    return myRatings.reduce((sum, r) => sum + (r.driverStars || 0), 0) / myRatings.length;
+    if (!myRatings.length) return 0;
+    return myRatings.reduce((s, o) => s + ((o.rating as any)?.driverStars ?? 0), 0) / myRatings.length;
   }, [myRatings]);
+
+  const totalEarned = useMemo(() =>
+    myDeliveries.reduce((s, o) => s + (o.driverNetEarnings || 0), 0),
+    [myDeliveries]
+  );
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentUserProfile) return;
+    setIsUploadingAvatar(true);
+    try {
+      const ext = file.name.split('.').pop();
+      const fileName = `driver-${currentUserProfile.id}.${ext}`;
+      const { data, error } = await supabase.storage.from('avatars').upload(fileName, file, { upsert: true });
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(data.path);
+      await updateUserProfile(currentUserProfile.id, { avatarUrl: publicUrl });
+    } catch (e: any) {
+      alert('Erro ao enviar foto: ' + (e?.message || 'Tente novamente'));
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!currentUserProfile) return;
     setIsSaving(true);
     try {
-      // Monta lista de savedAddresses: mantém endereços que NÃO são Base, adiciona o novo Base
       const otherAddresses = (currentUserProfile.savedAddresses || []).filter(a => a.label !== 'Base');
       const newSavedAddresses = baseAddressData
         ? [{ ...baseAddressData, label: 'Base' }, ...otherAddresses]
         : otherAddresses;
-
       await updateUserProfile(currentUserProfile.id, {
         vehicleType: vehicle,
         licensePlate: vehicle !== 'Bicicleta' ? plate : '',
         phoneNumber: phone,
         pixKey,
-        asaasAccountId,
         savedAddresses: newSavedAddresses,
       });
       alert('Dados atualizados!');
@@ -107,169 +131,172 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     }
   };
 
+  const vehicleIcons: Record<string, string> = { Moto: '🏍️', Bicicleta: '🚲', Carro: '🚗' };
+
   return (
-    <div className="animate-in fade-in p-6 md:p-8 max-w-4xl mx-auto">
-      <button
-        onClick={onBack}
-        className="flex items-center gap-2 text-gray-400 font-bold mb-6 hover:text-white transition-colors"
-      >
-        <ChevronRight className="rotate-180" /> Voltar
-      </button>
+    <div className="animate-in fade-in pb-8">
+      {/* Hero */}
+      <div className="bg-gradient-to-br from-gray-900 via-blue-950 to-gray-900 px-6 pt-6 pb-10 relative">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 text-gray-400 font-bold mb-6 hover:text-white transition-colors text-sm"
+        >
+          <ChevronRight className="rotate-180" size={18} /> Voltar
+        </button>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-gradient-to-br from-blue-600 to-blue-700 p-8 rounded-[3rem] shadow-xl shadow-blue-900/20">
-            <h1 className="text-3xl font-black text-white mb-2">Meu Perfil</h1>
-            <p className="text-blue-200 font-medium">Gerencie suas informações</p>
-          </div>
-
-          <div className="bg-gray-800/50 p-8 rounded-[3rem] border border-gray-700/50">
-            <h3 className="text-lg font-bold mb-6 text-white flex items-center gap-3">
-              <Bike className="text-blue-400" /> Veículo
-            </h3>
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              {['Moto', 'Bicicleta', 'Carro'].map(v => (
-                <button
-                  key={v}
-                  onClick={() => setVehicle(v)}
-                  className={`p-5 rounded-2xl font-bold transition-all ${
-                    vehicle === v
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30'
-                      : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700'
-                  }`}
-                >
-                  {v}
-                </button>
-              ))}
-            </div>
-
-            {vehicle !== 'Bicicleta' && (
-              <div className="space-y-2 mb-6">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">
-                  Placa do Veículo
-                </label>
-                <input
-                  value={plate}
-                  onChange={e => setPlate(e.target.value.toUpperCase())}
-                  className="w-full p-5 bg-gray-700/50 rounded-2xl font-bold border-2 border-transparent outline-none text-white focus:border-blue-500 transition-all"
-                  placeholder="ABC-1234"
-                />
-              </div>
-            )}
-
-            <div className="space-y-2 mb-6">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">
-                WhatsApp
-              </label>
-              <input
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                className="w-full p-5 bg-gray-700/50 rounded-2xl font-bold border-2 border-transparent outline-none text-white focus:border-blue-500 transition-all"
-                placeholder="(00) 00000-0000"
-              />
-            </div>
-
-            <div className="space-y-2 mb-6">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">
-                Chave PIX
-              </label>
-              <input
-                value={pixKey}
-                onChange={e => setPixKey(e.target.value)}
-                className="w-full p-5 bg-gray-700/50 rounded-2xl font-bold border-2 border-transparent outline-none text-white focus:border-blue-500 transition-all"
-                placeholder="CPF, E-mail ou Telefone..."
-              />
-            </div>
-
-            <div className="space-y-2 mb-6">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">
-                Endereço Base / Região de Atuação
-              </label>
-              <div className="relative">
-                <input
-                  value={baseAddressText}
-                  readOnly
-                  placeholder="Toque no mapa para definir sua região"
-                  className="w-full p-5 pr-14 bg-gray-700/50 rounded-2xl font-bold border-2 border-transparent outline-none text-white cursor-pointer"
-                  onClick={() => setShowBaseModal(true)}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowBaseModal(true)}
-                  title="Definir região no mapa"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-blue-600/40 text-blue-300 hover:bg-blue-600/70 transition-all"
-                >
-                  <MapPin size={20} />
-                </button>
-              </div>
-              {baseAddressData?.coords && (
-                <p className="text-[11px] text-green-400 font-bold ml-2 flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-green-400 inline-block" />
-                  Localização definida no mapa ✓
-                </p>
+        {/* Avatar + nome */}
+        <div className="flex items-end gap-5 mb-8">
+          <div className="relative">
+            <div className="w-24 h-24 rounded-[2rem] overflow-hidden bg-blue-900/60 border-2 border-blue-500/40 shadow-xl">
+              {currentUserProfile?.avatarUrl ? (
+                <img src={currentUserProfile.avatarUrl} alt="foto" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <User size={40} className="text-blue-300" />
+                </div>
               )}
             </div>
-
-            <div className="space-y-2 mb-8">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">
-                ID Subconta Asaas
-              </label>
-              <input
-                value={asaasAccountId}
-                onChange={e => setAsaasAccountId(e.target.value)}
-                className="w-full p-5 bg-gray-700/50 rounded-2xl font-bold border-2 border-transparent outline-none text-white focus:border-blue-500 transition-all"
-                placeholder="Gerado automaticamente ao cadastrar..."
-                readOnly
-              />
-            </div>
-
             <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white py-5 rounded-2xl font-black uppercase text-sm tracking-widest flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg shadow-blue-900/20"
+              onClick={() => avatarInputRef.current?.click()}
+              disabled={isUploadingAvatar}
+              className="absolute -bottom-2 -right-2 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center shadow-lg border-2 border-gray-900 hover:bg-blue-500 transition-all"
             >
-              {isSaving ? <Loader className="animate-spin" size={20} /> : <Save size={20} />}
-              Salvar Alterações
+              {isUploadingAvatar ? <Loader size={14} className="animate-spin text-white" /> : <Camera size={14} className="text-white" />}
+            </button>
+            <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl font-black text-white truncate">{currentUserProfile?.name || 'Entregador'}</h1>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <span className="text-sm font-bold text-blue-300">
+                {vehicleIcons[vehicle] || '🚗'} {vehicle}
+              </span>
+              {plate && vehicle !== 'Bicicleta' && (
+                <span className="bg-white/10 text-gray-300 text-[10px] font-black px-2 py-0.5 rounded-lg tracking-widest">
+                  {plate}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: 'Entregas', value: myDeliveries.length, color: 'text-green-400' },
+            { label: 'Nota Média', value: myRatings.length ? avgRating.toFixed(1) + ' ⭐' : '—', color: 'text-amber-400' },
+            { label: 'Total Ganho', value: `R$${totalEarned.toFixed(0)}`, color: 'text-blue-300' },
+          ].map(s => (
+            <div key={s.label} className="bg-white/5 backdrop-blur rounded-2xl p-3 text-center border border-white/10">
+              <p className={`text-lg font-black ${s.color}`}>{s.value}</p>
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mt-0.5">{s.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Formulário */}
+      <div className="px-6 -mt-4 space-y-4">
+
+        {/* Veículo */}
+        <div className="bg-gray-800/60 backdrop-blur p-6 rounded-[2rem] border border-gray-700/50">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+            <Bike size={14} className="text-blue-400" /> Veículo
+          </p>
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            {['Moto', 'Bicicleta', 'Carro'].map(v => (
+              <button
+                key={v}
+                onClick={() => setVehicle(v)}
+                className={`py-3 rounded-2xl text-sm font-black transition-all ${vehicle === v ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30' : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700'}`}
+              >
+                {vehicleIcons[v]} {v}
+              </button>
+            ))}
+          </div>
+          {vehicle !== 'Bicicleta' && (
+            <input
+              value={plate}
+              onChange={e => setPlate(e.target.value.toUpperCase())}
+              className="w-full p-4 bg-gray-700/50 rounded-2xl font-black border-2 border-transparent outline-none text-white focus:border-blue-500 transition-all tracking-widest text-center text-lg"
+              placeholder="ABC-1234"
+              maxLength={8}
+            />
+          )}
+        </div>
+
+        {/* Contato */}
+        <div className="bg-gray-800/60 backdrop-blur p-6 rounded-[2rem] border border-gray-700/50">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+            <Phone size={14} className="text-green-400" /> Contato
+          </p>
+          <input
+            value={phone}
+            onChange={e => setPhone(e.target.value)}
+            className="w-full p-4 bg-gray-700/50 rounded-2xl font-bold border-2 border-transparent outline-none text-white focus:border-blue-500 transition-all"
+            placeholder="(00) 00000-0000"
+          />
+        </div>
+
+        {/* Pagamento */}
+        <div className="bg-gray-800/60 backdrop-blur p-6 rounded-[2rem] border border-gray-700/50">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+            <Wallet size={14} className="text-purple-400" /> Chave PIX
+          </p>
+          <input
+            value={pixKey}
+            onChange={e => setPixKey(e.target.value)}
+            className="w-full p-4 bg-gray-700/50 rounded-2xl font-bold border-2 border-transparent outline-none text-white focus:border-blue-500 transition-all"
+            placeholder="CPF, e-mail ou telefone"
+          />
+        </div>
+
+        {/* Região */}
+        <div className="bg-gray-800/60 backdrop-blur p-6 rounded-[2rem] border border-gray-700/50">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+            <MapPin size={14} className="text-orange-400" /> Região de Atuação
+          </p>
+          <div className="relative">
+            <input
+              value={baseAddressText}
+              readOnly
+              placeholder="Toque para definir sua região"
+              className="w-full p-4 pr-12 bg-gray-700/50 rounded-2xl font-bold border-2 border-transparent outline-none text-white cursor-pointer"
+              onClick={() => setShowBaseModal(true)}
+            />
+            <button
+              type="button"
+              onClick={() => setShowBaseModal(true)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-orange-600/30 text-orange-400 hover:bg-orange-600/50 transition-all"
+            >
+              <MapPin size={16} />
             </button>
           </div>
+          {baseAddressData?.coords && (
+            <p className="text-[11px] text-green-400 font-bold mt-2 ml-1 flex items-center gap-1.5">
+              <CheckCircle size={12} /> Localização definida
+            </p>
+          )}
         </div>
 
-        <div className="space-y-6">
-          <div className="bg-gradient-to-br from-amber-500 to-orange-500 p-8 rounded-[3rem] shadow-xl shadow-orange-900/20 text-center">
-            <Star className="mx-auto mb-3 text-white" size={40} />
-            <h3 className="text-5xl font-black text-white mb-1">{avgRating.toFixed(1)}</h3>
-            <p className="text-white/80 font-medium text-sm">Média de Avaliações</p>
-            <div className="flex justify-center gap-1 mt-4">
-              {[...Array(5)].map((_, i) => (
-                <Star
-                  key={i}
-                  size={16}
-                  className={i < Math.round(avgRating) ? 'text-white fill-white' : 'text-white/30'}
-                />
-              ))}
-            </div>
+        {/* Conta Asaas (somente leitura) */}
+        {asaasAccountId && (
+          <div className="bg-gray-800/40 p-5 rounded-[2rem] border border-gray-700/30">
+            <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">ID Conta Asaas</p>
+            <p className="text-gray-500 text-xs font-mono break-all">{asaasAccountId}</p>
           </div>
+        )}
 
-          <div className="bg-gray-800/50 p-8 rounded-[3rem] border border-gray-700/50">
-            <h3 className="text-lg font-bold mb-4 text-white flex items-center gap-3">
-              <Info className="text-blue-400" size={20} /> Dicas
-            </h3>
-            <ul className="space-y-3 text-gray-400 text-sm font-medium">
-              <li className="flex items-start gap-2">
-                <CheckCircle size={16} className="text-green-500 shrink-0 mt-0.5" />
-                Mantenha seu perfil atualizado
-              </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle size={16} className="text-green-500 shrink-0 mt-0.5" />
-                Responda rápido para mais pedidos
-              </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle size={16} className="text-green-500 shrink-0 mt-0.5" />
-                Avaliações boas = mais entregas
-              </li>
-            </ul>
-          </div>
-        </div>
+        {/* Salvar */}
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="w-full bg-gradient-to-r from-blue-600 to-blue-500 text-white py-5 rounded-2xl font-black uppercase text-sm tracking-widest flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg shadow-blue-900/40"
+        >
+          {isSaving ? <Loader className="animate-spin" size={20} /> : <Save size={20} />}
+          Salvar Alterações
+        </button>
       </div>
 
       {showBaseModal && (
