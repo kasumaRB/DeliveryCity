@@ -57,3 +57,6 @@ PASSO_A_PASSO_*.md
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code runtime files
+.claude/
