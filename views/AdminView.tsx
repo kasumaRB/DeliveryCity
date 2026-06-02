@@ -285,6 +285,7 @@ const AdminSidebar: React.FC<{
         { id: 'partners', label: 'Parceiros', icon: Store },
         { id: 'support', label: 'Suporte', icon: MessageSquare,
           badge: profiles.filter(() => true).length > 0 ? undefined : undefined },
+        { id: 'reviews', label: 'Avaliações', icon: Star },
         { id: 'settings', label: 'Configurações', icon: DollarSign },
         { id: 'system', label: 'Status & Logs', icon: Terminal },
       ].map(item => (
@@ -329,7 +330,7 @@ export const AdminView: React.FC = () => {
   } = useAppStore();
 
   const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'users' | 'requests' | 'partners' | 'support' | 'settings' | 'system' | 'orders'
+    'dashboard' | 'users' | 'requests' | 'partners' | 'support' | 'reviews' | 'settings' | 'system' | 'orders'
   >('dashboard');
   const [userSearch, setUserSearch] = useState('');
   const [viewingUser, setViewingUser] = useState<UserProfile | null>(null);
@@ -1003,6 +1004,137 @@ export const AdminView: React.FC = () => {
                     ))}
                   </div>
                 )}
+              </div>
+            );
+          })()}
+
+          {activeTab === 'reviews' && (() => {
+            const ratedOrders = orders
+              .filter(o => o.rating)
+              .sort((a, b) => b.timestamp - a.timestamp);
+
+            const byRestaurant = restaurants.map(r => {
+              const restOrders = ratedOrders.filter(o => o.restaurantId === r.id);
+              const avg = restOrders.length
+                ? restOrders.reduce((s, o) => s + ((o.rating as any)?.storeStars ?? 0), 0) / restOrders.length
+                : 0;
+              return { restaurant: r, orders: restOrders, avg };
+            }).filter(x => x.orders.length > 0).sort((a, b) => b.avg - a.avg);
+
+            const globalAvg = ratedOrders.length
+              ? ratedOrders.reduce((s, o) => s + ((o.rating as any)?.storeStars ?? 0), 0) / ratedOrders.length
+              : 0;
+
+            return (
+              <div className="space-y-8 animate-in fade-in">
+                <div>
+                  <h3 className="text-2xl font-black text-gray-900 tracking-tighter">Avaliações</h3>
+                  <p className="text-sm text-gray-400 font-medium mt-1">{ratedOrders.length} avaliações no total</p>
+                </div>
+
+                {/* KPIs globais */}
+                <div className="grid grid-cols-3 gap-4">
+                  {[
+                    { label: 'Média Geral', value: globalAvg.toFixed(1) + ' ⭐', color: 'text-amber-500' },
+                    { label: 'Total de Avaliações', value: ratedOrders.length, color: 'text-purple-600' },
+                    { label: 'Restaurantes Avaliados', value: byRestaurant.length, color: 'text-blue-600' },
+                  ].map(k => (
+                    <div key={k.label} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm text-center">
+                      <p className={`text-2xl font-black ${k.color}`}>{k.value}</p>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">{k.label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Ranking por restaurante */}
+                {byRestaurant.length > 0 && (
+                  <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+                    <h4 className="font-black text-sm uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
+                      <Award size={16} /> Ranking de Restaurantes
+                    </h4>
+                    <div className="space-y-3">
+                      {byRestaurant.map(({ restaurant: r, orders: ro, avg }, idx) => (
+                        <div key={r.id} className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50">
+                          <span className="text-lg font-black text-gray-300 w-6 text-center">{idx + 1}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-black text-gray-800 text-sm truncate">{r.name}</p>
+                            <p className="text-xs text-gray-400 font-medium">{ro.length} avaliações</p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {[1,2,3,4,5].map(s => (
+                              <Star key={s} size={12} className={s <= Math.round(avg) ? 'fill-amber-400 text-amber-400' : 'text-gray-200'} />
+                            ))}
+                            <span className="text-sm font-black text-gray-700 ml-2">{avg.toFixed(1)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Feed de todas as avaliações */}
+                <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+                  <h4 className="font-black text-sm uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
+                    <MessageSquare size={16} /> Todas as Avaliações
+                  </h4>
+                  {ratedOrders.length === 0 ? (
+                    <p className="text-gray-400 text-sm font-medium text-center py-8">Nenhuma avaliação ainda.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {ratedOrders.map(order => {
+                        const r = order.rating as any;
+                        const storeStars: number = r?.storeStars ?? 0;
+                        const driverStars: number = r?.driverStars ?? 0;
+                        return (
+                          <div key={order.id} className="p-5 rounded-2xl border border-gray-100 bg-gray-50">
+                            <div className="flex items-start justify-between gap-4 mb-3">
+                              <div className="min-w-0">
+                                <p className="font-black text-gray-800 text-sm truncate">{order.customerName}</p>
+                                <p className="text-xs text-gray-400 font-medium truncate">{order.restaurantName}</p>
+                              </div>
+                              <span className="text-[10px] text-gray-400 font-bold whitespace-nowrap">
+                                {new Date(order.timestamp).toLocaleDateString('pt-BR')}
+                              </span>
+                            </div>
+
+                            <div className="flex flex-wrap gap-3 mb-3">
+                              {/* Estrelas restaurante */}
+                              <div className="flex items-center gap-1">
+                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1">Loja</span>
+                                {[1,2,3,4,5].map(s => (
+                                  <Star key={s} size={11} className={s <= storeStars ? 'fill-amber-400 text-amber-400' : 'text-gray-200'} />
+                                ))}
+                              </div>
+                              {/* Estrelas entregador */}
+                              {driverStars > 0 && (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1">Entregador</span>
+                                  {[1,2,3,4,5].map(s => (
+                                    <Star key={s} size={11} className={s <= driverStars ? 'fill-blue-400 text-blue-400' : 'text-gray-200'} />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Badges produto/embalagem */}
+                            <div className="flex gap-2 mb-3">
+                              <span className={`text-[10px] font-black px-2 py-1 rounded-full ${r?.productOk ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                                {r?.productOk ? '✓ Produto OK' : '✗ Produto com problema'}
+                              </span>
+                              <span className={`text-[10px] font-black px-2 py-1 rounded-full ${r?.packagingOk ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                                {r?.packagingOk ? '✓ Embalagem OK' : '✗ Embalagem com problema'}
+                              </span>
+                            </div>
+
+                            {r?.comment && (
+                              <p className="text-sm text-gray-600 italic">"{r.comment}"</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             );
           })()}
