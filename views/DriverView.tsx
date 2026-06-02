@@ -310,6 +310,7 @@ export const DriverView: React.FC = () => {
   } = useAppStore();
 
   const [activeTab, setActiveTab] = useState<'home' | 'history' | 'earnings' | 'support' | 'profile'>('home');
+  const [historySubTab, setHistorySubTab] = useState<'deliveries' | 'reviews'>('deliveries');
   const [supportMessage, setSupportMessage] = useState('');
   const [supportSending, setSupportSending] = useState(false);
   const [supportWhatsapp, setSupportWhatsapp] = useState<string | null>(null);
@@ -832,41 +833,119 @@ export const DriverView: React.FC = () => {
         {/* Histórico de Entregas */}
         {activeTab === 'history' && (
           <div className="animate-in fade-in duration-500">
-            <h2 className="text-2xl font-black text-white mb-6">Histórico de Entregas</h2>
-            <div className="space-y-3">
-              {myDelivered.length === 0 ? (
-                <div className="text-center py-16 text-gray-500 bg-gray-800/30 rounded-[3rem] border border-gray-700/50">
-                  <History size={48} className="mx-auto mb-4 opacity-30" />
-                  <p className="font-bold">Nenhuma entrega realizada ainda</p>
-                </div>
-              ) : (
-                orders.filter(o => o.driverId === currentUserProfile?.id)
-                  .sort((a, b) => b.timestamp - a.timestamp).slice(0, 50)
-                  .map(order => (
-                    <div key={order.id} className="bg-gray-800/50 p-5 rounded-2xl border border-gray-700/50">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <span className="font-bold text-white">{order.restaurantName}</span>
-                          <p className="text-gray-500 text-xs mt-0.5">
-                            {new Date(order.timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                          </p>
+            <h2 className="text-2xl font-black text-white mb-6">
+              {historySubTab === 'deliveries' ? 'Histórico de Entregas' : 'Minhas Avaliações'}
+            </h2>
+
+            {/* Toggle entregas / avaliações */}
+            <div className="flex bg-gray-800/60 rounded-2xl p-1 mb-6">
+              <button
+                onClick={() => setHistorySubTab('deliveries')}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${historySubTab === 'deliveries' ? 'bg-blue-600 text-white shadow' : 'text-gray-400'}`}
+              >
+                <History size={14} /> Entregas
+              </button>
+              <button
+                onClick={() => setHistorySubTab('reviews')}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${historySubTab === 'reviews' ? 'bg-amber-500 text-white shadow' : 'text-gray-400'}`}
+              >
+                <Star size={14} /> Avaliações {myRatings.length > 0 && `(${myRatings.length})`}
+              </button>
+            </div>
+
+            {/* Sub-tab: Entregas */}
+            {historySubTab === 'deliveries' && (
+              <div className="space-y-3">
+                {myDelivered.length === 0 ? (
+                  <div className="text-center py-16 text-gray-500 bg-gray-800/30 rounded-[3rem] border border-gray-700/50">
+                    <History size={48} className="mx-auto mb-4 opacity-30" />
+                    <p className="font-bold">Nenhuma entrega realizada ainda</p>
+                  </div>
+                ) : (
+                  orders.filter(o => o.driverId === currentUserProfile?.id)
+                    .sort((a, b) => b.timestamp - a.timestamp).slice(0, 50)
+                    .map(order => (
+                      <div key={order.id} className="bg-gray-800/50 p-5 rounded-2xl border border-gray-700/50">
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <span className="font-bold text-white">{order.restaurantName}</span>
+                            <p className="text-gray-500 text-xs mt-0.5">
+                              {new Date(order.timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                          <span className={`text-[9px] font-black uppercase px-3 py-1 rounded-full ${
+                            order.status === OrderStatus.DELIVERED ? 'bg-green-500/20 text-green-400'
+                            : order.status === OrderStatus.CANCELLED ? 'bg-red-500/20 text-red-400'
+                            : 'bg-gray-600 text-gray-300'
+                          }`}>
+                            {order.status === OrderStatus.DELIVERED ? 'Entregue' : order.status === OrderStatus.CANCELLED ? 'Cancelado' : order.status}
+                          </span>
                         </div>
-                        <span className={`text-[9px] font-black uppercase px-3 py-1 rounded-full ${
-                          order.status === OrderStatus.DELIVERED ? 'bg-green-500/20 text-green-400'
-                          : order.status === OrderStatus.CANCELLED ? 'bg-red-500/20 text-red-400'
-                          : 'bg-gray-600 text-gray-300'
-                        }`}>
-                          {order.status === OrderStatus.DELIVERED ? 'Entregue' : order.status === OrderStatus.CANCELLED ? 'Cancelado' : order.status}
-                        </span>
+                        <div className="flex items-center justify-between text-sm pt-2 border-t border-gray-700/50">
+                          <span className="text-gray-500 text-xs">#{order.id.slice(-6)} · {order.customerName}</span>
+                          <span className="text-green-400 font-bold">{formatCurrency(order.driverNetEarnings)}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between text-sm pt-2 border-t border-gray-700/50">
-                        <span className="text-gray-500 text-xs">#{order.id.slice(-6)} · {order.customerName}</span>
-                        <span className="text-green-400 font-bold">{formatCurrency(order.driverNetEarnings)}</span>
+                    ))
+                )}
+              </div>
+            )}
+
+            {/* Sub-tab: Avaliações */}
+            {historySubTab === 'reviews' && (
+              <div className="space-y-4">
+                {myRatings.length === 0 ? (
+                  <div className="text-center py-16 text-gray-500 bg-gray-800/30 rounded-[3rem] border border-gray-700/50">
+                    <Star size={48} className="mx-auto mb-4 opacity-30" />
+                    <p className="font-bold">Nenhuma avaliação ainda</p>
+                    <p className="text-sm mt-2 text-gray-600">As avaliações dos clientes aparecem aqui após a entrega</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Média em destaque */}
+                    <div className="bg-gradient-to-r from-amber-600 to-orange-500 p-6 rounded-[2rem] flex items-center gap-5 shadow-lg">
+                      <span className="text-5xl font-black text-white">{avgRating.toFixed(1)}</span>
+                      <div>
+                        <div className="flex gap-1 mb-1">
+                          {[1,2,3,4,5].map(s => (
+                            <Star key={s} size={18} className={s <= Math.round(avgRating) ? 'fill-white text-white' : 'text-white/30'} />
+                          ))}
+                        </div>
+                        <p className="text-white/80 text-sm font-bold">{myRatings.length} avaliação{myRatings.length !== 1 ? 'ões' : ''}</p>
                       </div>
                     </div>
-                  ))
-              )}
-            </div>
+
+                    {/* Lista de avaliações */}
+                    {myRatings.map(order => {
+                      const stars: number = (order.rating as any)?.driverStars ?? 0;
+                      const comment: string | undefined = (order.rating as any)?.comment || order.feedback;
+                      return (
+                        <div key={order.id} className="bg-gray-800/50 p-5 rounded-2xl border border-gray-700/50">
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <div className="flex gap-1 mb-1">
+                                {[1,2,3,4,5].map(s => (
+                                  <Star key={s} size={16} className={s <= stars ? 'fill-amber-400 text-amber-400' : 'text-gray-600'} />
+                                ))}
+                              </div>
+                              <p className="text-gray-400 text-xs">{order.customerName} · {order.restaurantName}</p>
+                            </div>
+                            <span className="text-gray-500 text-[10px] whitespace-nowrap">
+                              {new Date(order.timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                            </span>
+                          </div>
+                          {comment ? (
+                            <p className="text-gray-200 text-sm italic bg-gray-900/40 px-4 py-3 rounded-xl">"{comment}"</p>
+                          ) : (
+                            <p className="text-gray-600 text-xs italic">Sem comentário</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -899,37 +978,6 @@ export const DriverView: React.FC = () => {
               ))}
             </div>
 
-            <div className="bg-gray-800/50 rounded-[2rem] p-6 border border-gray-700/50">
-              <h3 className="font-black text-white mb-4 flex items-center gap-2"><Star size={18} className="text-amber-400" /> Minhas Avaliações ({myRatings.length})</h3>
-              {myRatings.length === 0 ? (
-                <p className="text-gray-500 text-sm font-medium text-center py-6">Nenhuma avaliação ainda</p>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-4 mb-4 pb-4 border-b border-gray-700/50">
-                    <span className="text-4xl font-black text-white">{avgRating.toFixed(1)}</span>
-                    <div>
-                      <div className="flex gap-1">{[...Array(5)].map((_,i) => <Star key={i} size={14} className={i < Math.round(avgRating) ? 'text-amber-400 fill-amber-400' : 'text-gray-600'} />)}</div>
-                      <p className="text-gray-400 text-xs mt-1">{myRatings.length} avaliações</p>
-                    </div>
-                  </div>
-                  {myRatings.slice(0, 10).map(order => {
-                    const stars = typeof order.rating === 'object' ? (order.rating as any)?.driverStars : order.rating;
-                    return (
-                      <div key={order.id} className="bg-gray-900/40 p-4 rounded-2xl">
-                        <div className="flex justify-between items-start">
-                          <div className="flex gap-1">{[...Array(5)].map((_,i) => <Star key={i} size={12} className={i < (stars||0) ? 'text-amber-400 fill-amber-400' : 'text-gray-600'} />)}</div>
-                          <span className="text-gray-500 text-[10px]">{new Date(order.timestamp).toLocaleDateString('pt-BR')}</span>
-                        </div>
-                        {((order.rating as any)?.comment || order.feedback) && (
-                          <p className="text-gray-300 text-sm mt-2 italic">"{(order.rating as any)?.comment || order.feedback}"</p>
-                        )}
-                        <p className="text-gray-500 text-xs mt-1">{order.restaurantName} → {order.customerName}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
           </div>
         )}
 
