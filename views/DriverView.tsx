@@ -383,14 +383,15 @@ export const DriverView: React.FC = () => {
   }, [myDelivered]);
 
   const myRatings = useMemo(() =>
-    orders.filter(o => o.driverId === currentUserProfile?.id && o.rating)
+    orders
+      .filter(o => o.driverId === currentUserProfile?.id && (o.rating as any)?.driverStars > 0)
       .sort((a, b) => b.timestamp - a.timestamp),
     [orders, currentUserProfile]
   );
 
   const avgRating = useMemo(() => {
     if (!myRatings.length) return 0;
-    return myRatings.reduce((s, o) => s + ((o.rating as any)?.driverStars || o.rating || 0), 0) / myRatings.length;
+    return myRatings.reduce((s, o) => s + ((o.rating as any)?.driverStars ?? 0), 0) / myRatings.length;
   }, [myRatings]);
 
   const handleSendSupport = async () => {
@@ -919,7 +920,9 @@ export const DriverView: React.FC = () => {
                           <div className="flex gap-1">{[...Array(5)].map((_,i) => <Star key={i} size={12} className={i < (stars||0) ? 'text-amber-400 fill-amber-400' : 'text-gray-600'} />)}</div>
                           <span className="text-gray-500 text-[10px]">{new Date(order.timestamp).toLocaleDateString('pt-BR')}</span>
                         </div>
-                        {order.feedback && <p className="text-gray-300 text-sm mt-2 italic">"{order.feedback}"</p>}
+                        {((order.rating as any)?.comment || order.feedback) && (
+                          <p className="text-gray-300 text-sm mt-2 italic">"{(order.rating as any)?.comment || order.feedback}"</p>
+                        )}
                         <p className="text-gray-500 text-xs mt-1">{order.restaurantName} → {order.customerName}</p>
                       </div>
                     );
