@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppStore } from '../store';
 import { supabase } from '../lib/supabase';
-import { OrderStatus, Product, UserRole, Promotion, UserAddress, DaySchedule } from '../types';
+import { OrderStatus, Product, UserRole, Promotion, UserAddress } from '../types';
 import { AddressModal } from '../components/AddressModal';
 
 const resizeImage = (file: File, maxWidth: number, maxHeight: number): Promise<File> => {
@@ -89,14 +89,9 @@ import {
   Award,
   TrendingDown,
   Filter,
-  Eye,
-  EyeOff,
-  HelpCircle,
 } from 'lucide-react';
 import Logo from '../assets/Logo.png';
 import Nome from '../assets/Nome.png';
-import { TutorialModal, hasSeen, markSeen } from '../components/TutorialModal';
-import { useAndroidBack } from '../hooks/useAndroidBack';
 
 export const RestaurantView: React.FC = () => {
   const {
@@ -112,7 +107,6 @@ export const RestaurantView: React.FC = () => {
     updateUserProfile,
     refreshData,
     platformSettings,
-    confirmReturn,
   } = useAppStore();
 
   const myRestaurant = restaurants.find(r => r.ownerId === currentUserProfile?.id);
@@ -132,20 +126,6 @@ export const RestaurantView: React.FC = () => {
   const [restaurantImage, setRestaurantImage] = useState(myRestaurant?.image || '');
   const [showProductForm, setShowProductForm] = useState(false);
 
-  // Tutorial
-  const [showTutorial, setShowTutorial] = useState(false);
-  useEffect(() => {
-    if (currentUserProfile && !hasSeen('RESTAURANT')) setShowTutorial(true);
-  }, [currentUserProfile?.id]);
-
-  useAndroidBack(() => {
-    if (showTutorial)             { markSeen('RESTAURANT'); setShowTutorial(false); return true; }
-    if (showEditModal)            { setShowEditModal(false);                        return true; }
-    if (showProductForm)          { setShowProductForm(false);                      return true; }
-    if (activeTab !== 'orders')   { setActiveTab('orders');                         return true; }
-    return false; // minimiza
-  });
-
   // Support
   const [supportMessage, setSupportMessage] = useState('');
 
@@ -160,7 +140,6 @@ export const RestaurantView: React.FC = () => {
   const [storeWorkingHours, setStoreWorkingHours] = useState(
     currentUserProfile?.workingHours || ''
   );
-  const [openingHoursSchedule, setOpeningHoursSchedule] = useState<DaySchedule[]>([]);
   const [respName, setRespName] = useState(currentUserProfile?.name || '');
   const [respPhone, setRespPhone] = useState(currentUserProfile?.phoneNumber || '');
   const [respCpf, setRespCpf] = useState(currentUserProfile?.cpf || '');
@@ -197,20 +176,6 @@ export const RestaurantView: React.FC = () => {
       setRespCpf(currentUserProfile.cpf || '');
       setRespPix(currentUserProfile.pixKey || '');
       setRespAsaasId(currentUserProfile.asaasAccountId || '');
-
-      const defaultSched: DaySchedule[] = ([0,1,2,3,4,5,6] as DaySchedule['day'][]).map(d => ({
-        day: d,
-        open: '08:00',
-        close: '22:00',
-        closed: d === 0 || d === 6,
-      }));
-      const existing = myRestaurant.openingHours && myRestaurant.openingHours.length > 0
-        ? myRestaurant.openingHours
-        : defaultSched;
-      const merged = ([0,1,2,3,4,5,6] as DaySchedule['day'][]).map(d =>
-        existing.find(s => s.day === d) || defaultSched.find(s => s.day === d)!
-      );
-      setOpeningHoursSchedule(merged);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showEditModal]);
@@ -320,8 +285,6 @@ export const RestaurantView: React.FC = () => {
   };
 
   const handleSaveItem = async () => {
-    if (isSaving) return;
-    setIsSaving(true);
     const price = parseFloat(itemFormOwnerPrice);
     const feePct = currentUserProfile?.customFeePct !== undefined 
       ? currentUserProfile.customFeePct / 100 
@@ -354,8 +317,6 @@ export const RestaurantView: React.FC = () => {
       alert('Item salvo!');
     } catch (e: any) {
       alert('Erro ao salvar: ' + e.message);
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -369,7 +330,6 @@ export const RestaurantView: React.FC = () => {
           name: storeName,
           address: storeAddress,
           ...(storeCoords ? { coords: storeCoords } : {}),
-          openingHours: openingHoursSchedule,
         }),
         updateUserProfile(currentUserProfile.id, {
           name: respName,
@@ -492,30 +452,15 @@ export const RestaurantView: React.FC = () => {
     setPromoMaxUsage(promo.maxUsage?.toString() || '');
   };
 
-  const restaurantSlides = [
-    { emoji: '🔔', title: 'Receba pedidos', description: 'Quando um cliente fizer um pedido, você será notificado. Toque em "Aceitar" para começar a preparar ou recuse se necessário.' },
-    { emoji: '🍔', title: 'Gerencie o cardápio', description: 'Na aba "Cardápio", adicione, edite e remova itens. Coloque fotos e descrições atraentes para vender mais.' },
-    { emoji: '🎁', title: 'Crie promoções', description: 'Em "Promoções", crie cupons de desconto ou frete grátis para atrair mais clientes.' },
-    { emoji: '📊', title: 'Acompanhe os resultados', description: 'Na aba de relatórios, veja faturamento por período, produtos mais vendidos e avaliações dos clientes.' },
-  ];
-
   return (
-    <>
-    {showTutorial && (
-      <TutorialModal
-        slides={restaurantSlides}
-        accentColor="orange"
-        onClose={() => { markSeen('RESTAURANT'); setShowTutorial(false); }}
-      />
-    )}
     <div className="min-h-screen bg-[#F8F9FB] flex flex-col md:flex-row h-screen overflow-hidden safe-area-top safe-area-bottom">
       {/* SIDEBAR DESKTOP */}
-      <aside className="hidden md:flex w-72 bg-white border-r flex-col p-8 h-full shadow-xl shadow-gray-100">
-        <div className="flex flex-col items-center mb-14 gap-3">
-          <img src={Logo} alt="Logo" className="h-16 w-auto object-contain drop-shadow-lg" />
-          <img src={Nome} alt="DeliveryCity" className="h-5 w-auto object-contain opacity-50" />
+      <aside className="hidden md:flex w-64 bg-white border-r border-gray-200 flex-col py-8 px-5 h-full">
+        <div className="flex items-center gap-3 mb-10 px-2">
+          <img src={Logo} alt="Logo" className="h-8 w-auto object-contain" />
+          <img src={Nome} alt="DeliveryCity" className="h-4 w-auto object-contain opacity-40" />
         </div>
-        <nav className="flex-1 space-y-3">
+        <nav className="flex-1 space-y-1">
           {[
             { id: 'orders', label: 'Cozinha', icon: LayoutDashboard },
             { id: 'menu', label: 'Cardápio', icon: List },
@@ -527,17 +472,21 @@ export const RestaurantView: React.FC = () => {
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id as any)}
-              className={`w-full flex items-center gap-5 p-5 rounded-[2rem] font-bold transition-all ${activeTab === item.id ? 'bg-orange-600 text-white shadow-xl shadow-orange-100' : 'text-gray-400 hover:bg-gray-50'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm ${
+                activeTab === item.id
+                  ? 'border-l-4 border-orange-600 bg-orange-50 text-orange-600 pl-3'
+                  : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'
+              }`}
             >
-              <item.icon size={22} /> <span className="text-sm">{item.label}</span>
+              <item.icon size={18} /> <span>{item.label}</span>
             </button>
           ))}
         </nav>
         <button
           onClick={signOut}
-          className="mt-auto flex items-center gap-5 p-5 text-gray-400 hover:text-red-500 transition-colors font-bold text-sm uppercase tracking-widest"
+          className="mt-auto flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-red-500 transition-colors font-bold text-sm"
         >
-          <LogOut size={22} /> Sair
+          <LogOut size={18} /> Sair
         </button>
       </aside>
 
@@ -585,9 +534,9 @@ export const RestaurantView: React.FC = () => {
                       const next = !myRestaurant.isOpen;
                       await updateRestaurant(myRestaurant.id, { isOpen: next });
                     }}
-                    className={`flex items-center gap-3 px-6 py-3 rounded-[2rem] font-black text-sm uppercase tracking-wider transition-all shrink-0 shadow-sm ${
+                    className={`flex items-center gap-3 px-5 py-2.5 rounded-xl font-black text-sm uppercase tracking-wide transition-all shrink-0 ${
                       myRestaurant.isOpen !== false
-                        ? 'bg-green-500 text-white shadow-green-100'
+                        ? 'bg-green-500 text-white'
                         : 'bg-red-100 text-red-600 hover:bg-red-200'
                     }`}
                   >
@@ -602,69 +551,49 @@ export const RestaurantView: React.FC = () => {
               <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-8 min-h-0 overflow-x-auto pb-4 no-scrollbar">
                 {/* COLUNA: PENDENTES */}
                 <div className="flex flex-col min-w-[320px] h-full">
-                  <div className="flex items-center justify-between mb-6 px-4">
-                    <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-3">
-                      <Clock size={16} /> Pendentes
+                  <div className="flex items-center gap-2 mb-4 px-1">
+                    <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
+                    <h3 className="text-xs font-black text-gray-500 uppercase tracking-[0.15em]">
+                      Pendentes ({getOrdersByStatus([OrderStatus.PENDING]).length})
                     </h3>
-                    <span className="bg-orange-100 text-orange-600 text-[10px] font-black px-3 py-1 rounded-full">
-                      {getOrdersByStatus([OrderStatus.PENDING]).length}
-                    </span>
                   </div>
-                  <div className="flex-1 bg-gray-100/50 rounded-[3rem] p-5 space-y-5 overflow-y-auto no-scrollbar border-2 border-dashed border-gray-200 shadow-inner">
+                  <div className="flex-1 space-y-3 overflow-y-auto no-scrollbar">
                     {getOrdersByStatus([OrderStatus.PENDING]).map(order => (
                       <div
                         key={order.id}
-                        className="bg-white p-6 rounded-[2.5rem] shadow-sm animate-in zoom-in-95 border border-gray-50 hover:shadow-xl transition-all"
+                        className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 animate-in zoom-in-95 hover:shadow-md transition-all"
                       >
-                        <div className="flex justify-between items-start mb-6">
-                          <span className="font-black text-gray-900 text-xl tracking-tighter">
-                            #{order.id.slice(-4)}
-                          </span>
-                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                            {new Date(order.timestamp).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </span>
-                        </div>
-                        <div className="mb-4 flex items-center gap-3">
-                          {order.customerAvatarUrl ? (
-                            <img
-                              src={order.customerAvatarUrl}
-                              alt={order.customerName}
-                              className="w-9 h-9 rounded-full object-cover flex-shrink-0"
-                            />
-                          ) : (
-                            <div className="w-9 h-9 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
-                              <span className="text-orange-600 font-black text-sm">
-                                {order.customerName.charAt(0).toUpperCase()}
-                              </span>
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className="w-7 h-7 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+                                <span className="text-orange-600 font-black text-xs">
+                                  {order.customerName.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                              <span className="font-black text-gray-900 text-sm">{order.customerName}</span>
                             </div>
-                          )}
-                          <div className="min-w-0">
-                            <p className="text-sm font-black text-gray-800 truncate">{order.customerName}</p>
                             {order.customerAddress && (
-                              <p className="text-xs text-gray-400 font-medium mt-0.5 leading-tight truncate">
-                                {order.customerAddress}
-                              </p>
+                              <p className="text-gray-400 text-xs truncate max-w-[160px]">{order.customerAddress}</p>
                             )}
                           </div>
+                          <div className="text-right shrink-0">
+                            <span className="font-black text-gray-900 text-sm">#{order.id.slice(-4)}</span>
+                            <p className="text-gray-400 text-[10px]">
+                              {new Date(order.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
                         </div>
-                        <div className="space-y-3 mb-8 bg-gray-50 p-5 rounded-[1.5rem] border border-gray-100">
+                        <div className="border-t border-gray-50 pt-2 space-y-1 mb-3">
                           {order.items.map((item, idx) => (
-                            <div
-                              key={idx}
-                              className="text-sm font-bold text-gray-700 flex justify-between"
-                            >
-                              <span>
-                                {item.quantity}x {item.product.name}
-                              </span>
+                            <div key={idx} className="flex justify-between text-xs text-gray-600">
+                              <span>{item.quantity}x {item.product.name}</span>
                             </div>
                           ))}
                         </div>
                         <button
                           onClick={() => updateOrderStatus(order.id, OrderStatus.PREPARING)}
-                          className="w-full bg-orange-600 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-orange-100 active:scale-95 transition-all"
+                          className="w-full bg-orange-600 text-white py-2.5 rounded-xl font-black text-xs tracking-wide active:scale-95 transition-all"
                         >
                           Aceitar Pedido
                         </button>
@@ -675,38 +604,44 @@ export const RestaurantView: React.FC = () => {
 
                 {/* COLUNA: PREPARANDO */}
                 <div className="flex flex-col min-w-[320px] h-full">
-                  <div className="flex items-center justify-between mb-6 px-4">
-                    <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-3">
-                      <Utensils size={16} className="text-blue-500" /> Na Cozinha
+                  <div className="flex items-center gap-2 mb-4 px-1">
+                    <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                    <h3 className="text-xs font-black text-gray-500 uppercase tracking-[0.15em]">
+                      Na Cozinha ({getOrdersByStatus([OrderStatus.PREPARING]).length})
                     </h3>
-                    <span className="bg-blue-100 text-blue-600 text-[10px] font-black px-3 py-1 rounded-full">
-                      {getOrdersByStatus([OrderStatus.PREPARING]).length}
-                    </span>
                   </div>
-                  <div className="flex-1 bg-blue-50/30 rounded-[3rem] p-5 space-y-5 overflow-y-auto no-scrollbar border-2 border-dashed border-blue-100 shadow-inner">
+                  <div className="flex-1 space-y-3 overflow-y-auto no-scrollbar">
                     {getOrdersByStatus([OrderStatus.PREPARING]).map(order => (
                       <div
                         key={order.id}
-                        className="bg-white p-6 rounded-[2.5rem] shadow-sm animate-in zoom-in-95 border border-gray-50"
+                        className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 animate-in zoom-in-95"
                       >
-                        <div className="flex justify-between items-start mb-6">
-                          <span className="font-black text-gray-900 text-xl tracking-tighter">
-                            #{order.id.slice(-4)}
-                          </span>
-                          <span className="px-3 py-1 bg-blue-100 text-blue-600 rounded-lg text-[9px] font-black uppercase tracking-widest animate-pulse">
-                            Cozinhando
-                          </span>
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                                <span className="text-blue-600 font-black text-xs">
+                                  {order.customerName.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                              <span className="font-black text-gray-900 text-sm">{order.customerName}</span>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="font-black text-gray-900 text-sm">#{order.id.slice(-4)}</span>
+                            <p className="text-blue-500 text-[10px] font-black animate-pulse">Cozinhando</p>
+                          </div>
                         </div>
-                        <div className="space-y-3 mb-8 bg-gray-50 p-5 rounded-[1.5rem] border border-gray-100">
+                        <div className="border-t border-gray-50 pt-2 space-y-1 mb-3">
                           {order.items.map((item, idx) => (
-                            <div key={idx} className="text-sm font-bold text-gray-700">
-                              {item.quantity}x {item.product.name}
+                            <div key={idx} className="flex justify-between text-xs text-gray-600">
+                              <span>{item.quantity}x {item.product.name}</span>
                             </div>
                           ))}
                         </div>
                         <button
                           onClick={() => updateOrderStatus(order.id, OrderStatus.READY)}
-                          className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-100 active:scale-95 transition-all"
+                          className="w-full bg-blue-600 text-white py-2.5 rounded-xl font-black text-xs tracking-wide active:scale-95 transition-all"
                         >
                           Marcar como Pronto
                         </button>
@@ -717,46 +652,54 @@ export const RestaurantView: React.FC = () => {
 
                 {/* COLUNA: PRONTOS */}
                 <div className="flex flex-col min-w-[320px] h-full">
-                  <div className="flex items-center justify-between mb-6 px-4">
-                    <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-3">
-                      <CheckCircle size={16} className="text-green-500" /> Prontos
+                  <div className="flex items-center gap-2 mb-4 px-1">
+                    <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                    <h3 className="text-xs font-black text-gray-500 uppercase tracking-[0.15em]">
+                      Prontos ({getOrdersByStatus([OrderStatus.READY, OrderStatus.OUT_FOR_DELIVERY]).length})
                     </h3>
-                    <span className="bg-green-100 text-green-600 text-[10px] font-black px-3 py-1 rounded-full">
-                      {getOrdersByStatus([OrderStatus.READY, OrderStatus.OUT_FOR_DELIVERY]).length}
-                    </span>
                   </div>
-                  <div className="flex-1 bg-green-50/30 rounded-[3rem] p-5 space-y-5 overflow-y-auto no-scrollbar border-2 border-dashed border-green-100 shadow-inner">
+                  <div className="flex-1 space-y-3 overflow-y-auto no-scrollbar">
                     {getOrdersByStatus([OrderStatus.READY, OrderStatus.OUT_FOR_DELIVERY]).map(
                       order => (
                         <div
                           key={order.id}
-                          className="bg-white p-6 rounded-[2.5rem] shadow-sm animate-in zoom-in-95 border border-gray-50"
+                          className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 animate-in zoom-in-95"
                         >
-                          <div className="flex justify-between items-start mb-6">
-                            <span className="font-black text-gray-900 text-xl tracking-tighter">
-                              #{order.id.slice(-4)}
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <Bike
-                                size={16}
-                                className={order.driverId ? 'text-green-500' : 'text-gray-300'}
-                              />
-                              <span
-                                className={`text-[9px] font-black uppercase tracking-widest ${order.driverId ? 'text-green-600' : 'text-orange-500'}`}
-                              >
-                                {order.status === OrderStatus.OUT_FOR_DELIVERY
-                                  ? 'Em Trânsito'
-                                  : order.driverId
-                                    ? 'Entregador Chegando'
-                                    : 'Buscando Motoboy'}
-                              </span>
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <div className="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center">
+                                  <span className="text-green-600 font-black text-xs">
+                                    {order.customerName.charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                                <span className="font-black text-gray-900 text-sm">{order.customerName}</span>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="font-black text-gray-900 text-sm">#{order.id.slice(-4)}</span>
+                              <div className="flex items-center gap-1 justify-end mt-0.5">
+                                <Bike
+                                  size={12}
+                                  className={order.driverId ? 'text-green-500' : 'text-gray-300'}
+                                />
+                                <span
+                                  className={`text-[9px] font-black uppercase ${order.driverId ? 'text-green-600' : 'text-orange-500'}`}
+                                >
+                                  {order.status === OrderStatus.OUT_FOR_DELIVERY
+                                    ? 'Em Trânsito'
+                                    : order.driverId
+                                      ? 'A caminho'
+                                      : 'Buscando'}
+                                </span>
+                              </div>
                             </div>
                           </div>
-                          <div className="bg-gray-900 p-6 rounded-[2rem] text-center shadow-lg">
-                            <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] mb-2">
+                          <div className="bg-gray-900 px-4 py-3 rounded-xl text-center">
+                            <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">
                               Código de Coleta
                             </p>
-                            <span className="text-3xl text-white font-black tracking-[8px]">
+                            <span className="text-2xl text-white font-black tracking-[6px]">
                               {order.pickupCode}
                             </span>
                           </div>
@@ -765,47 +708,6 @@ export const RestaurantView: React.FC = () => {
                     )}
                   </div>
                 </div>
-
-                {/* COLUNA: DEVOLUÇÕES */}
-                {getOrdersByStatus([OrderStatus.RETURNING]).length > 0 && (
-                  <div className="flex flex-col min-w-[320px] h-full">
-                    <div className="flex items-center justify-between mb-6 px-4">
-                      <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-3">
-                        <span className="text-orange-500">↩</span> Devoluções
-                      </h3>
-                      <span className="bg-orange-100 text-orange-600 text-[10px] font-black px-3 py-1 rounded-full">
-                        {getOrdersByStatus([OrderStatus.RETURNING]).length}
-                      </span>
-                    </div>
-                    <div className="flex-1 bg-orange-50/30 rounded-[3rem] p-5 space-y-5 overflow-y-auto no-scrollbar border-2 border-dashed border-orange-200 shadow-inner">
-                      {getOrdersByStatus([OrderStatus.RETURNING]).map(order => (
-                        <div key={order.id} className="bg-white p-6 rounded-[2.5rem] shadow-sm animate-in zoom-in-95 border border-orange-100">
-                          <div className="flex justify-between items-start mb-4">
-                            <span className="font-black text-gray-900 text-xl tracking-tighter">#{order.id.slice(-4)}</span>
-                            <span className="text-[9px] font-black uppercase tracking-widest text-orange-500">Retornando</span>
-                          </div>
-                          <p className="text-sm text-gray-500 mb-1 font-medium">{order.customerName}</p>
-                          {order.failureReason && (
-                            <p className="text-xs text-gray-400 mb-4">Motivo: {order.failureReason}</p>
-                          )}
-                          <button
-                            onClick={async () => {
-                              if (!window.confirm('Confirmar que você recebeu o pedido devolvido pelo entregador?')) return;
-                              try {
-                                await confirmReturn(order.id);
-                              } catch (e: any) {
-                                alert(e.message || 'Erro ao confirmar devolução.');
-                              }
-                            }}
-                            className="w-full py-3 bg-orange-500 text-white rounded-2xl font-black text-sm"
-                          >
-                            ✓ Confirmar recebimento da devolução
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -827,7 +729,7 @@ export const RestaurantView: React.FC = () => {
                     setShowProductForm(true);
                     window.scrollTo(0, 0);
                   }}
-                  className="flex items-center gap-3 bg-orange-600 text-white px-8 py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl shadow-orange-100 active:scale-95 transition-all"
+                  className="flex items-center gap-3 bg-orange-600 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-wide active:scale-95 transition-all"
                 >
                   <Plus size={20} /> Novo Prato
                 </button>
@@ -835,7 +737,7 @@ export const RestaurantView: React.FC = () => {
 
               <div className="flex flex-col xl:flex-row gap-12 items-start">
                 {showProductForm && (
-                  <div className="w-full xl:w-[450px] bg-white p-10 rounded-[3.5rem] shadow-xl shadow-gray-100 border border-gray-50 sticky top-10 h-fit">
+                  <div className="w-full xl:w-[450px] bg-white p-8 rounded-2xl shadow-sm border border-gray-100 sticky top-10 h-fit">
                     <div className="flex justify-between items-start mb-10">
                       <h3 className="text-2xl font-black text-gray-900 flex items-center gap-4">
                         {editingProduct ? (
@@ -952,7 +854,7 @@ export const RestaurantView: React.FC = () => {
                     </div>
                     <button
                       onClick={handleSaveItem}
-                      className="w-full bg-gray-900 text-white py-6 rounded-[2rem] font-black text-sm uppercase tracking-widest active:scale-95 transition-all shadow-xl"
+                      className="w-full bg-gray-900 text-white py-3.5 rounded-xl font-black text-sm uppercase tracking-wide active:scale-95 transition-all"
                     >
                       Salvar Cardápio
                     </button>
@@ -971,61 +873,45 @@ export const RestaurantView: React.FC = () => {
                   {myRestaurant.menu.map(item => (
                     <div
                       key={item.id}
-                      className={`bg-white p-6 rounded-[3.5rem] border border-gray-50 shadow-sm flex flex-col group hover:shadow-2xl transition-all h-full ${item.available === false ? 'opacity-60' : ''}`}
+                      className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col group hover:shadow-md transition-all h-full overflow-hidden"
                     >
-                      <div className="relative h-56 rounded-[2.5rem] overflow-hidden mb-8 shadow-inner">
+                      <div className="relative h-44 overflow-hidden">
                         <img
                           src={item.image}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
-                        {item.available === false && (
-                          <div className="absolute inset-0 bg-gray-900/40 flex items-center justify-center">
-                            <span className="bg-red-500 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg">
-                              Esgotado
-                            </span>
-                          </div>
-                        )}
-                        <div className="absolute top-4 right-4 flex gap-2">
-                          <button
-                            onClick={() => updateProduct(myRestaurant.id, item.id, { available: item.available === false })}
-                            title={item.available === false ? 'Reativar produto' : 'Marcar como esgotado'}
-                            className={`p-3 backdrop-blur-md rounded-2xl shadow-xl hover:bg-white transition active:scale-90 ${
-                              item.available === false
-                                ? 'bg-red-500 text-white'
-                                : 'bg-white/95 text-green-600'
-                            }`}
-                          >
-                            {item.available === false ? <EyeOff size={18} /> : <Eye size={18} />}
-                          </button>
+                        <div className="absolute top-3 right-3 flex gap-1.5">
                           <button
                             onClick={() => handleEditProduct(item)}
-                            className="p-3 bg-white/95 backdrop-blur-md text-blue-600 rounded-2xl shadow-xl hover:bg-white transition active:scale-90"
+                            className="p-2 bg-white/95 backdrop-blur-md text-blue-600 rounded-xl shadow-md hover:bg-white transition active:scale-90"
                           >
-                            <Edit2 size={18} />
+                            <Edit2 size={16} />
                           </button>
                           <button
                             onClick={() => deleteProduct(myRestaurant.id, item.id)}
-                            className="p-3 bg-white/95 backdrop-blur-md text-red-600 rounded-2xl shadow-xl hover:bg-white transition active:scale-90"
+                            className="p-2 bg-white/95 backdrop-blur-md text-red-600 rounded-xl shadow-md hover:bg-white transition active:scale-90"
                           >
-                            <Trash2 size={18} />
+                            <Trash2 size={16} />
                           </button>
                         </div>
                       </div>
-                      <h4 className="font-black text-gray-900 text-xl mb-2 px-2">{item.name}</h4>
-                      <p className="text-gray-400 text-xs font-bold line-clamp-2 mb-8 px-2 leading-relaxed">
-                        {item.description}
-                      </p>
-                      <div className="mt-auto bg-gray-50 p-6 rounded-[2rem] flex justify-between items-center border border-gray-100">
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                          Venda
-                        </span>
-                        <div className="flex justify-between items-end mt-2">
-                          <p className="text-sm font-black text-gray-900">
-                            R$ {item.price.toFixed(2)}
-                          </p>
-                          <p className="text-[9px] text-gray-400 font-bold">
-                            (Sua parte: R$ {(item.price * (1 - (currentUserProfile?.customFeePct !== undefined ? currentUserProfile.customFeePct / 100 : (platformSettings?.restaurantFeePct ?? 0.08)))).toFixed(2)})
-                          </p>
+                      <div className="p-4 flex flex-col flex-1">
+                        <h4 className="font-black text-gray-900 text-base mb-1">{item.name}</h4>
+                        <p className="text-gray-400 text-xs line-clamp-2 mb-3 leading-relaxed flex-1">
+                          {item.description}
+                        </p>
+                        <div className="border-t border-gray-100 pt-3 flex justify-between items-center">
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-wide">
+                            Venda
+                          </span>
+                          <div className="text-right">
+                            <p className="text-sm font-black text-gray-900">
+                              R$ {item.price.toFixed(2)}
+                            </p>
+                            <p className="text-[9px] text-gray-400 font-bold">
+                              Repasse: R$ {(item.price * (1 - (currentUserProfile?.customFeePct !== undefined ? currentUserProfile.customFeePct / 100 : (platformSettings?.restaurantFeePct ?? 0.08)))).toFixed(2)}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1046,7 +932,7 @@ export const RestaurantView: React.FC = () => {
                 </p>
               </header>
 
-              <div className="bg-white p-8 rounded-[3rem] shadow-xl shadow-gray-100 border border-gray-50 mb-8">
+              <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm mb-8">
                 <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-3">
                   {editingPromo ? <Edit2 size={20} /> : <Plus size={20} />}
                   {editingPromo ? 'Editar Promoção' : 'Nova Promoção'}
@@ -1211,7 +1097,7 @@ export const RestaurantView: React.FC = () => {
                 {(myRestaurant.promotions || []).map(promo => (
                   <div
                     key={promo.id}
-                    className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm flex justify-between items-center"
+                    className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex justify-between items-center"
                   >
                     <div>
                       <div className="flex items-center gap-3">
@@ -1298,9 +1184,6 @@ export const RestaurantView: React.FC = () => {
               OUT_FOR_DELIVERY: { label: 'Em Entrega', color: 'text-purple-600 bg-purple-50' },
               DELIVERED: { label: 'Entregue', color: 'text-gray-600 bg-gray-100' },
               CANCELLED: { label: 'Cancelado', color: 'text-red-600 bg-red-50' },
-              DELIVERY_FAILED: { label: 'Não entregue', color: 'text-red-700 bg-red-100' },
-              RETURNING: { label: 'Devolvendo', color: 'text-orange-600 bg-orange-50' },
-              RETURNED: { label: 'Devolvido', color: 'text-gray-500 bg-gray-100' },
             };
 
             return (
@@ -1310,35 +1193,35 @@ export const RestaurantView: React.FC = () => {
                   <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest">Desempenho completo da sua loja</p>
                 </header>
 
-                {/* KPI Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {/* KPI Cards — hero numbers in a single row */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex divide-x divide-gray-100">
                   {[
-                    { label: 'Total Pedidos', value: myOrders.length, color: 'text-gray-900', suffix: '' },
-                    { label: 'Entregues', value: delivered.length, color: 'text-green-600', suffix: '' },
-                    { label: 'Cancelados', value: cancelledCount, color: 'text-red-500', suffix: '' },
-                    { label: 'Avaliação', value: avgRestRating.toFixed(1), color: 'text-amber-500', suffix: '⭐' },
+                    { label: 'Total Pedidos', value: myOrders.length, color: 'text-gray-900' },
+                    { label: 'Entregues', value: delivered.length, color: 'text-green-600' },
+                    { label: 'Cancelados', value: cancelledCount, color: 'text-red-500' },
+                    { label: 'Avaliação', value: avgRestRating.toFixed(1), color: 'text-amber-500' },
                   ].map(k => (
-                    <div key={k.label} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{k.label}</p>
-                      <p className={`text-3xl font-black ${k.color}`}>{k.value}{k.suffix}</p>
+                    <div key={k.label} className="flex-1 p-5 text-center">
+                      <p className={`text-3xl font-black ${k.color} leading-none mb-1`}>{k.value}</p>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{k.label}</p>
                     </div>
                   ))}
                 </div>
 
                 {/* Revenue cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-gradient-to-br from-orange-500 to-red-500 p-8 rounded-[2.5rem] text-white shadow-lg shadow-orange-100">
-                    <p className="text-xs font-black uppercase tracking-widest text-orange-100 mb-3">Faturamento Líquido</p>
-                    <p className="text-4xl font-black">{fmt(totalRevenue)}</p>
-                    <p className="text-orange-100 text-xs font-bold mt-2">Valor que você recebe (após taxa)</p>
+                  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-wide mb-2">Faturamento Líquido</p>
+                    <p className="text-4xl font-black text-green-600">{fmt(totalRevenue)}</p>
+                    <p className="text-gray-400 text-xs font-bold mt-1">Valor que você recebe (após taxa)</p>
                   </div>
-                  <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Volume Bruto (GMV)</p>
+                  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-wide mb-2">Volume Bruto (GMV)</p>
                     <p className="text-3xl font-black text-gray-900 mb-3">{fmt(totalGMV)}</p>
                     <div className="space-y-1.5 text-xs font-bold">
                       <div className="flex justify-between">
                         <span className="text-gray-400">Taxa plataforma</span>
-                        <span className="text-red-400">- {fmt(totalGMV - totalRevenue)}</span>
+                        <span className="text-red-500">- {fmt(totalGMV - totalRevenue)}</span>
                       </div>
                       <div className="flex justify-between border-t border-gray-100 pt-1.5">
                         <span className="text-gray-700">Ticket médio</span>
@@ -1351,7 +1234,7 @@ export const RestaurantView: React.FC = () => {
                 {/* Best & Worst sellers */}
                 {allProducts.length > 0 && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm">
+                    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
                       <h3 className="font-black text-gray-900 mb-5 flex items-center gap-2"><Award size={18} className="text-amber-500" /> Mais Vendidos</h3>
                       <div className="space-y-4">
                         {topProducts.map((p, i) => (
@@ -1361,14 +1244,14 @@ export const RestaurantView: React.FC = () => {
                               <span className="text-xs font-black text-orange-500">{p.qty}×</span>
                             </div>
                             <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-gradient-to-r from-orange-400 to-orange-600 rounded-full" style={{ width: `${(p.qty/maxQty)*100}%` }} />
+                              <div className="h-full bg-orange-500 rounded-full" style={{ width: `${(p.qty/maxQty)*100}%` }} />
                             </div>
                             <p className="text-[10px] text-gray-400 mt-0.5">{fmt(p.revenue)} em receita</p>
                           </div>
                         ))}
                       </div>
                     </div>
-                    <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm">
+                    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
                       <h3 className="font-black text-gray-900 mb-5 flex items-center gap-2"><TrendingDown size={18} className="text-red-400" /> Menos Vendidos</h3>
                       <div className="space-y-4">
                         {worstProducts.length === 0
@@ -1390,7 +1273,7 @@ export const RestaurantView: React.FC = () => {
 
                 {/* Ratings */}
                 {ratedOrders.length > 0 && (
-                  <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm">
+                  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
                     <h3 className="font-black text-gray-900 mb-5 flex items-center gap-2"><Star size={18} className="text-amber-500" /> Avaliações da Loja ({ratedOrders.length})</h3>
                     <div className="flex items-center gap-6 mb-6">
                       <span className="text-5xl font-black text-gray-900">{avgRestRating.toFixed(1)}</span>
@@ -1406,7 +1289,7 @@ export const RestaurantView: React.FC = () => {
                         const stars = (order.rating as any)?.restaurantStars || (order.rating as any)?.stars || 0;
                         const comment = (order.rating as any)?.comment || order.feedback || '';
                         return (
-                          <div key={order.id} className="p-4 bg-amber-50 rounded-2xl">
+                          <div key={order.id} className="py-3 border-b border-gray-100 last:border-0">
                             <div className="flex justify-between items-start">
                               <div>
                                 <p className="font-bold text-gray-800 text-sm">{order.customerName}</p>
@@ -1425,8 +1308,8 @@ export const RestaurantView: React.FC = () => {
                 )}
 
                 {/* Detailed order history — who bought + who delivered */}
-                <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm">
-                  <h3 className="font-black text-gray-900 mb-6">📋 Registro de Vendas</h3>
+                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                  <h3 className="font-black text-gray-900 mb-6">Registro de Vendas</h3>
                   <div className="space-y-3">
                     {myOrders.length === 0 ? (
                       <p className="text-center py-8 text-gray-400 font-bold">Nenhum pedido ainda.</p>
@@ -1472,13 +1355,13 @@ export const RestaurantView: React.FC = () => {
 
           {activeTab === 'profile' && (
             <div className="max-w-4xl mx-auto py-10 animate-in zoom-in-95 duration-500">
-              <div className="bg-white rounded-[4rem] p-12 shadow-xl shadow-gray-100 border border-gray-50 relative">
-                <div className="absolute top-0 left-0 w-full h-2 bg-orange-600"></div>
-                <div className="flex flex-col md:flex-row gap-12 items-center md:items-start mb-16">
+              <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm relative">
+                <div className="absolute top-0 left-0 w-1 h-full bg-orange-600 rounded-l-2xl"></div>
+                <div className="flex flex-col md:flex-row gap-8 items-center md:items-start mb-10 pl-4">
                   <div className="relative">
                     <img
                       src={myRestaurant.image}
-                      className="w-48 h-48 rounded-[3rem] object-cover shadow-2xl border-8 border-white ring-1 ring-gray-100"
+                      className="w-36 h-36 rounded-2xl object-cover border border-gray-200"
                     />
                     <input
                       type="file"
@@ -1489,7 +1372,7 @@ export const RestaurantView: React.FC = () => {
                     />
                     <button
                       onClick={() => restaurantImageInputRef.current?.click()}
-                      className="absolute bottom-0 right-0 bg-gray-950 text-white p-3 rounded-2xl shadow-2xl active:scale-95 border-4 border-white"
+                      className="absolute bottom-0 right-0 bg-gray-900 text-white p-2 rounded-xl shadow-md active:scale-95 border-2 border-white"
                     >
                       <Edit2 size={16} />
                     </button>
@@ -1499,20 +1382,20 @@ export const RestaurantView: React.FC = () => {
                     <p className="text-gray-400 font-bold uppercase text-[10px] tracking-[0.2em] mb-6">
                       {myRestaurant.category} • {currentUserProfile.email}
                     </p>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-orange-50/50 p-4 rounded-3xl border border-orange-100">
-                        <p className="text-[8px] font-black text-orange-400 uppercase tracking-widest mb-1">
+                    <div className="flex gap-3">
+                      <div className="bg-orange-50 px-3 py-2 rounded-xl border border-orange-100">
+                        <p className="text-[9px] font-black text-orange-400 uppercase tracking-wide mb-0.5">
                           Status
                         </p>
-                        <p className="font-black text-orange-600 text-sm">
+                        <p className="font-black text-orange-600 text-xs">
                           {currentUserProfile.status}
                         </p>
                       </div>
-                      <div className="bg-gray-50 p-4 rounded-3xl border border-gray-100">
-                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">
+                      <div className="bg-gray-50 px-3 py-2 rounded-xl border border-gray-100">
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-wide mb-0.5">
                           Repasse
                         </p>
-                        <p className="font-black text-gray-900 text-sm">85% Livre</p>
+                        <p className="font-black text-gray-900 text-xs">85% Livre</p>
                       </div>
                     </div>
                   </div>
@@ -1523,31 +1406,21 @@ export const RestaurantView: React.FC = () => {
                     <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-4">
                       Dados da Operação
                     </h4>
-                    <div className="bg-gray-50 p-6 rounded-[2.5rem] space-y-4">
-                      <div className="flex items-start gap-4 text-gray-600">
-                        <Clock size={18} className="mt-0.5 shrink-0" />
-                        {myRestaurant.openingHours && myRestaurant.openingHours.length > 0 ? (
-                          <div className="text-xs font-bold space-y-0.5">
-                            {['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map((name, d) => {
-                              const s = myRestaurant.openingHours!.find(x => x.day === d);
-                              if (!s || s.closed) return <span key={d} className="block text-gray-300">{name}: Fechado</span>;
-                              return <span key={d} className="block">{name}: {s.open}–{s.close}</span>;
-                            })}
-                          </div>
-                        ) : (
-                          <span className="text-sm font-bold">
-                            {currentUserProfile.workingHours || 'Não definido'}
-                          </span>
-                        )}
+                    <div className="bg-gray-50 p-4 rounded-xl space-y-3">
+                      <div className="flex items-center gap-3 text-gray-600">
+                        <Clock size={16} />
+                        <span className="text-sm font-bold">
+                          {currentUserProfile.workingHours || 'Não definido'}
+                        </span>
                       </div>
-                      <div className="flex items-center gap-4 text-gray-600">
-                        <MapPin size={18} />
+                      <div className="flex items-center gap-3 text-gray-600">
+                        <MapPin size={16} />
                         <span className="text-sm font-bold truncate">
                           {myRestaurant.address || 'Não definido'}
                         </span>
                       </div>
-                      <div className="flex items-start gap-4 text-gray-600">
-                        <AlignLeft size={18} className="mt-1" />
+                      <div className="flex items-start gap-3 text-gray-600">
+                        <AlignLeft size={16} className="mt-0.5" />
                         <span className="text-xs font-bold leading-relaxed">
                           {currentUserProfile.description || 'Sem descrição.'}
                         </span>
@@ -1558,19 +1431,19 @@ export const RestaurantView: React.FC = () => {
                     <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-4">
                       Responsável
                     </h4>
-                    <div className="bg-gray-50 p-6 rounded-[2.5rem] space-y-4">
-                      <div className="flex items-center gap-4 text-gray-600">
-                        <User size={18} />
+                    <div className="bg-gray-50 p-4 rounded-xl space-y-3">
+                      <div className="flex items-center gap-3 text-gray-600">
+                        <User size={16} />
                         <span className="text-sm font-bold">{currentUserProfile.name}</span>
                       </div>
-                      <div className="flex items-center gap-4 text-gray-600">
-                        <Package size={18} />
+                      <div className="flex items-center gap-3 text-gray-600">
+                        <Package size={16} />
                         <span className="text-sm font-bold">
                           CPF: {currentUserProfile.cpf || '---'}
                         </span>
                       </div>
-                      <div className="flex items-center gap-4 text-gray-600">
-                        <Wallet size={18} />
+                      <div className="flex items-center gap-3 text-gray-600">
+                        <Wallet size={16} />
                         <span className="text-sm font-bold">
                           PIX: {currentUserProfile.pixKey || '---'}
                         </span>
@@ -1581,7 +1454,7 @@ export const RestaurantView: React.FC = () => {
 
                 <button
                   onClick={() => setShowEditModal(true)}
-                  className="w-full bg-gray-900 text-white py-6 rounded-[2rem] font-black uppercase text-xs tracking-[0.3em] active:scale-95 transition-all shadow-xl flex items-center justify-center gap-4"
+                  className="w-full bg-gray-900 text-white py-3.5 rounded-xl font-black uppercase text-xs tracking-wide active:scale-95 transition-all flex items-center justify-center gap-3"
                 >
                   <Edit2 size={18} /> Editar Perfil da Loja
                 </button>
@@ -1591,7 +1464,7 @@ export const RestaurantView: React.FC = () => {
 
           {activeTab === 'support' && (
             <div className="max-w-2xl mx-auto py-10 animate-in fade-in duration-500">
-              <div className="bg-white rounded-[3rem] p-10 shadow-xl shadow-gray-100 border border-gray-50">
+              <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
                 <div className="text-center mb-10">
                   <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-6">
                     <MessageCircle size={40} className="text-orange-600" />
@@ -1605,14 +1478,6 @@ export const RestaurantView: React.FC = () => {
                 </div>
 
                 <div className="space-y-6">
-                  <button
-                    onClick={() => setShowTutorial(true)}
-                    className="w-full flex items-center justify-center gap-3 py-4 bg-orange-50 border-2 border-orange-100 text-orange-600 rounded-[2rem] font-black uppercase text-sm tracking-widest active:scale-95 transition-all"
-                  >
-                    <HelpCircle size={20} />
-                    Ver tutorial do app
-                  </button>
-
                   <div>
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4 mb-2 block">
                       Descreva seu problema ou dúvida
@@ -1628,7 +1493,7 @@ export const RestaurantView: React.FC = () => {
                   <button
                     onClick={handleSendSupport}
                     disabled={isSaving || !supportMessage.trim()}
-                    className="w-full bg-orange-600 text-white py-6 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+                    className="w-full bg-orange-600 text-white py-3.5 rounded-xl font-black uppercase text-xs tracking-wide flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
                   >
                     {isSaving ? (
                       <Loader className="animate-spin" size={20} />
@@ -1650,7 +1515,7 @@ export const RestaurantView: React.FC = () => {
         </div>
 
         {/* BARRA INFERIOR MOBILE */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-gray-100 px-8 py-6 flex justify-around items-center z-40 rounded-t-[3rem] shadow-[0_-10px_30px_-10px_rgba(0,0,0,0.05)]">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-4 flex justify-around items-center z-40">
           <button
             onClick={() => setActiveTab('orders')}
             className={`flex flex-col items-center gap-1.5 transition-all active:scale-90 ${activeTab === 'orders' ? 'text-orange-600 scale-110' : 'text-gray-300'}`}
@@ -1748,7 +1613,7 @@ export const RestaurantView: React.FC = () => {
           onClick={() => setShowEditModal(false)}
         >
           <div
-            className="bg-white w-full md:max-w-2xl rounded-t-[3.5rem] md:rounded-[3.5rem] p-10 shadow-2xl animate-in slide-in-from-bottom duration-500 max-h-[90vh] flex flex-col relative"
+            className="bg-white w-full md:max-w-2xl rounded-t-2xl md:rounded-2xl p-8 shadow-xl animate-in slide-in-from-bottom duration-500 max-h-[90vh] flex flex-col relative"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-8 shrink-0">
@@ -1801,67 +1666,12 @@ export const RestaurantView: React.FC = () => {
                     Localização no mapa definida ✓
                   </p>
                 )}
-                <div>
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4 mb-3 block">
-                    Horário de Funcionamento
-                  </label>
-                  {openingHoursSchedule.length > 0 && (
-                    <div className="bg-gray-50 rounded-2xl overflow-hidden divide-y divide-gray-100">
-                      {openingHoursSchedule.map((sched, idx) => {
-                        const DAY_NAMES = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-                        return (
-                          <div key={sched.day} className="flex items-center gap-3 px-4 py-3">
-                            <span className="text-xs font-black text-gray-500 w-8 shrink-0">
-                              {DAY_NAMES[sched.day]}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const updated = [...openingHoursSchedule];
-                                updated[idx] = { ...updated[idx], closed: !updated[idx].closed };
-                                setOpeningHoursSchedule(updated);
-                              }}
-                              className={`text-[9px] font-black px-2.5 py-1 rounded-lg transition-all shrink-0 ${
-                                sched.closed
-                                  ? 'bg-red-100 text-red-500'
-                                  : 'bg-green-100 text-green-600'
-                              }`}
-                            >
-                              {sched.closed ? 'Fechado' : 'Aberto'}
-                            </button>
-                            {!sched.closed ? (
-                              <>
-                                <input
-                                  type="time"
-                                  value={sched.open}
-                                  onChange={e => {
-                                    const updated = [...openingHoursSchedule];
-                                    updated[idx] = { ...updated[idx], open: e.target.value };
-                                    setOpeningHoursSchedule(updated);
-                                  }}
-                                  className="flex-1 p-2 bg-white rounded-xl font-bold text-xs border border-gray-200 outline-none focus:border-orange-200 min-w-0"
-                                />
-                                <span className="text-gray-400 text-xs shrink-0">até</span>
-                                <input
-                                  type="time"
-                                  value={sched.close}
-                                  onChange={e => {
-                                    const updated = [...openingHoursSchedule];
-                                    updated[idx] = { ...updated[idx], close: e.target.value };
-                                    setOpeningHoursSchedule(updated);
-                                  }}
-                                  className="flex-1 p-2 bg-white rounded-xl font-bold text-xs border border-gray-200 outline-none focus:border-orange-200 min-w-0"
-                                />
-                              </>
-                            ) : (
-                              <span className="flex-1 text-center text-gray-300 text-xs font-bold">—</span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                <input
+                  value={storeWorkingHours}
+                  onChange={e => setStoreWorkingHours(e.target.value)}
+                  placeholder="Horário (ex: 08:00 às 22:00)"
+                  className="w-full p-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-orange-100"
+                />
                 <textarea
                   value={storeDescription}
                   onChange={e => setStoreDescription(e.target.value)}
@@ -1913,7 +1723,7 @@ export const RestaurantView: React.FC = () => {
             <button
               onClick={handleUpdateStoreProfile}
               disabled={isSaving}
-              className="w-full bg-orange-600 text-white py-6 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+              className="w-full bg-orange-600 text-white py-3.5 rounded-xl font-black uppercase text-xs tracking-wide flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
             >
               {isSaving ? <Loader className="animate-spin" size={20} /> : <Save size={20} />} Salvar
               Alterações
@@ -1922,6 +1732,5 @@ export const RestaurantView: React.FC = () => {
         </div>
       )}
     </div>
-    </>
   );
 };
