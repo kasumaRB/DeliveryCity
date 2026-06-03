@@ -1563,7 +1563,10 @@ export const RestaurantView: React.FC = () => {
         </div>
 
         {/* BARRA INFERIOR MOBILE */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-4 flex justify-around items-center z-40">
+        <nav
+          className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 pt-4 flex justify-around items-center z-40"
+          style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
+        >
           <button
             onClick={() => setActiveTab('orders')}
             className={`flex flex-col items-center gap-1.5 transition-all active:scale-90 ${activeTab === 'orders' ? 'text-orange-600 scale-110' : 'text-gray-300'}`}

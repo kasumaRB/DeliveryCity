@@ -1224,7 +1224,10 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
       )}
 
       {/* NAVEGAÇÃO MOBILE FIXA (Z-INDEX 50 PARA FICAR POR CIMA DE TUDO) */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-gray-100 px-8 py-6 flex justify-around items-center z-50 lg:hidden rounded-t-[2.5rem] shadow-[0_-10px_40px_-5px_rgba(0,0,0,0.08)]">
+      <nav
+        className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-gray-100 px-8 pt-6 flex justify-around items-center z-50 lg:hidden rounded-t-[2.5rem] shadow-[0_-10px_40px_-5px_rgba(0,0,0,0.08)]"
+        style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}
+      >
         <button
           onClick={() => {
             setActiveTab('home');

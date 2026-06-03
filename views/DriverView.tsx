@@ -1021,7 +1021,10 @@ export const DriverView: React.FC = () => {
       </main>
 
       {/* Bottom Navigation — linha fina no topo da tab ativa */}
-      <nav className="bg-gray-950 border-t border-gray-800/60 px-4 py-2 flex justify-around items-center shrink-0">
+      <nav
+        className="bg-gray-950 border-t border-gray-800/60 px-4 pt-2 flex justify-around items-center shrink-0"
+        style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom))' }}
+      >
         {(
           [
             { tab: 'home', icon: Home, label: 'Início' },
