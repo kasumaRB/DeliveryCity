@@ -27,6 +27,10 @@ import {
   Award,
   Filter,
   Star,
+  Phone,
+  RotateCcw,
+  Package,
+  CheckCircle,
 } from 'lucide-react';
 import { UserRole, UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
@@ -267,7 +271,8 @@ const AdminSidebar: React.FC<{
   onTabClick: (tab: any) => void;
   onSignOut: () => void;
   profiles: UserProfile[];
-}> = ({ activeTab, onTabClick, onSignOut, profiles }) => (
+  failureCount?: number;
+}> = ({ activeTab, onTabClick, onSignOut, profiles, failureCount = 0 }) => (
   <aside className="bg-white flex flex-col h-full border-r border-gray-100">
     <div className="p-6 flex items-center justify-center border-b border-gray-100">
       <img src={Logo} alt="Logo" className="h-12 md:h-14 w-auto object-contain" />
@@ -283,8 +288,8 @@ const AdminSidebar: React.FC<{
           badge: profiles.filter(p => p.status === 'PENDING').length,
         },
         { id: 'partners', label: 'Parceiros', icon: Store },
-        { id: 'support', label: 'Suporte', icon: MessageSquare,
-          badge: profiles.filter(() => true).length > 0 ? undefined : undefined },
+        { id: 'support', label: 'Suporte', icon: MessageSquare, badge: undefined },
+        { id: 'failures', label: 'Devoluções', icon: AlertTriangle, badge: failureCount || undefined },
         { id: 'reviews', label: 'Avaliações', icon: Star },
         { id: 'settings', label: 'Configurações', icon: DollarSign },
         { id: 'system', label: 'Status & Logs', icon: Terminal },
@@ -334,7 +339,7 @@ export const AdminView: React.FC = () => {
   } = useAppStore();
 
   const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'users' | 'requests' | 'partners' | 'support' | 'reviews' | 'settings' | 'system' | 'orders'
+    'dashboard' | 'users' | 'requests' | 'partners' | 'support' | 'reviews' | 'settings' | 'system' | 'orders' | 'failures'
   >('dashboard');
   const [userSearch, setUserSearch] = useState('');
   const [viewingUser, setViewingUser] = useState<UserProfile | null>(null);
@@ -350,6 +355,8 @@ export const AdminView: React.FC = () => {
     Record<string, 'approving' | 'blocking' | null>
   >({});
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
+  const [authorizingReturnId, setAuthorizingReturnId] = useState<string | null>(null);
+  const [ordersStatusFilter, setOrdersStatusFilter] = useState<string>('ALL');
 
   useEffect(() => {
     if (activeTab === 'support') {
@@ -436,6 +443,7 @@ export const AdminView: React.FC = () => {
           onTabClick={t => setActiveTab(t)}
           onSignOut={signOut}
           profiles={profiles}
+          failureCount={orders.filter(o => o.status === 'DELIVERY_FAILED').length}
         />
       </div>
 
@@ -454,6 +462,7 @@ export const AdminView: React.FC = () => {
               }}
               onSignOut={signOut}
               profiles={profiles}
+              failureCount={orders.filter(o => o.status === 'DELIVERY_FAILED').length}
             />
           </div>
         </div>
@@ -1132,6 +1141,275 @@ export const AdminView: React.FC = () => {
                       })}
                     </div>
                   )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {activeTab === 'failures' && (() => {
+            const failedOrders = orders.filter(o =>
+              ['DELIVERY_FAILED', 'RETURNING', 'RETURNED'].includes(o.status)
+            ).sort((a, b) => b.timestamp - a.timestamp);
+
+            return (
+              <div className="space-y-6 animate-in fade-in">
+                <div>
+                  <h3 className="text-2xl font-black text-gray-900 tracking-tighter">Devoluções</h3>
+                  <p className="text-gray-400 text-sm mt-1">Acompanhe as entregas não concluídas e autorize devoluções.</p>
+                </div>
+
+                {failedOrders.length === 0 ? (
+                  <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center shadow-sm">
+                    <CheckCircle size={40} className="mx-auto mb-4 text-green-400" />
+                    <p className="font-black text-gray-700 text-lg">Nenhuma falha de entrega</p>
+                    <p className="text-gray-400 text-sm mt-1">Todas as entregas estão em ordem.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {failedOrders.map(order => {
+                      const driver = profiles.find(p => p.id === order.driverId);
+                      const statusColors: Record<string, string> = {
+                        DELIVERY_FAILED: 'bg-red-50 border-red-200',
+                        RETURNING: 'bg-orange-50 border-orange-200',
+                        RETURNED: 'bg-gray-50 border-gray-200',
+                      };
+                      const statusLabels: Record<string, string> = {
+                        DELIVERY_FAILED: '⚠️ Não entregue',
+                        RETURNING: '🔄 Devolvendo',
+                        RETURNED: '📦 Devolvido',
+                      };
+                      return (
+                        <div key={order.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${statusColors[order.status] || 'border-gray-100'}`}>
+                          {/* Header */}
+                          <div className="px-6 py-4 flex items-start justify-between gap-4 border-b border-gray-100">
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg ${
+                                  order.status === 'DELIVERY_FAILED' ? 'bg-red-100 text-red-700'
+                                  : order.status === 'RETURNING' ? 'bg-orange-100 text-orange-700'
+                                  : 'bg-gray-100 text-gray-500'
+                                }`}>{statusLabels[order.status] || order.status}</span>
+                                <span className="text-gray-400 text-xs">#{order.id.slice(-6)}</span>
+                              </div>
+                              <p className="font-black text-gray-900">{order.restaurantName}</p>
+                              <p className="text-gray-500 text-sm">{new Date(order.timestamp).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="font-black text-gray-900 text-lg">R$ {order.total.toFixed(2)}</p>
+                              <p className="text-gray-400 text-xs">a reembolsar</p>
+                            </div>
+                          </div>
+
+                          <div className="px-6 py-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* Cliente */}
+                            <div>
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Cliente</p>
+                              <p className="font-bold text-gray-900 text-sm">{order.customerName}</p>
+                              {order.customerPhone ? (
+                                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                  <a
+                                    href={`tel:${order.customerPhone.replace(/\D/g, '')}`}
+                                    className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-xl hover:bg-blue-100 transition-all"
+                                  >
+                                    <Phone size={12} /> Ligar
+                                  </a>
+                                  <a
+                                    href={`https://wa.me/55${order.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${order.customerName}! Sou do suporte da DeliveryCity. Seu pedido de ${order.restaurantName} não pôde ser entregue. Podemos ajudar?`)}`}
+                                    target="_blank" rel="noopener noreferrer"
+                                    className="flex items-center gap-1.5 text-xs font-bold text-green-700 bg-green-50 px-3 py-1.5 rounded-xl hover:bg-green-100 transition-all"
+                                  >
+                                    <MessageSquare size={12} /> WhatsApp
+                                  </a>
+                                </div>
+                              ) : (
+                                <p className="text-gray-400 text-xs mt-1 italic">Telefone não disponível</p>
+                              )}
+                            </div>
+
+                            {/* Entregador */}
+                            <div>
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Entregador</p>
+                              <p className="font-bold text-gray-900 text-sm">{driver?.name || order.driverName || '—'}</p>
+                              {driver?.phoneNumber && (
+                                <a
+                                  href={`tel:${driver.phoneNumber.replace(/\D/g, '')}`}
+                                  className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-xl hover:bg-blue-100 transition-all mt-2 w-fit"
+                                >
+                                  <Phone size={12} /> Ligar
+                                </a>
+                              )}
+                            </div>
+
+                            {/* Motivo */}
+                            <div>
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Motivo Relatado</p>
+                              <p className="text-gray-700 text-sm font-medium">{order.failureReason || '—'}</p>
+                            </div>
+                          </div>
+
+                          {/* Ação — só para DELIVERY_FAILED */}
+                          {order.status === 'DELIVERY_FAILED' && (
+                            <div className="px-6 pb-5">
+                              <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+                                <div>
+                                  <p className="text-sm font-black text-orange-800">Autorizar devolução ao restaurante</p>
+                                  <p className="text-orange-600 text-xs mt-0.5">Tente contatar o cliente antes. Se não houver resposta, autorize a devolução.</p>
+                                </div>
+                                <button
+                                  disabled={authorizingReturnId === order.id}
+                                  onClick={async () => {
+                                    setAuthorizingReturnId(order.id);
+                                    try {
+                                      if (order.driverId) {
+                                        await supabase.functions.invoke('send-push-notification', {
+                                          body: {
+                                            userId: order.driverId,
+                                            title: '✅ Devolução autorizada',
+                                            body: `Suporte autorizou. Devolva o pedido #${order.id.slice(-4)} ao restaurante ${order.restaurantName}.`,
+                                            data: { orderId: order.id, type: 'RETURN_AUTHORIZED' },
+                                          },
+                                        });
+                                      }
+                                      // Registra no ticket de suporte
+                                      await supabase.from('support_tickets').insert({
+                                        user_id: order.driverId || order.customerId,
+                                        user_name: driver?.name || 'Admin',
+                                        user_role: 'DRIVER',
+                                        message: `[ADMIN] Devolução autorizada — Pedido #${order.id}. Motivo: ${order.failureReason || 'não informado'}`,
+                                        status: 'RESOLVED',
+                                        created_at: new Date().toISOString(),
+                                      }).then(null, () => {});
+                                      alert('Notificação enviada ao entregador!');
+                                    } catch (e: any) {
+                                      alert('Erro ao enviar notificação: ' + (e?.message || 'tente novamente'));
+                                    } finally {
+                                      setAuthorizingReturnId(null);
+                                    }
+                                  }}
+                                  className="flex items-center gap-2 px-5 py-2.5 bg-orange-600 text-white rounded-xl font-black text-sm whitespace-nowrap disabled:opacity-50 active:scale-95 transition-all"
+                                >
+                                  {authorizingReturnId === order.id
+                                    ? <><Loader size={14} className="animate-spin" /> Enviando...</>
+                                    : <><RotateCcw size={14} /> Autorizar devolução</>
+                                  }
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {order.status === 'RETURNING' && (
+                            <div className="px-6 pb-5">
+                              <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-center gap-3">
+                                <RotateCcw size={16} className="text-blue-500 animate-spin" style={{ animationDuration: '3s' }} />
+                                <p className="text-sm font-bold text-blue-700">Entregador a caminho do restaurante — aguardando confirmação de recebimento.</p>
+                              </div>
+                            </div>
+                          )}
+
+                          {order.status === 'RETURNED' && (
+                            <div className="px-6 pb-5">
+                              <div className="bg-green-50 border border-green-100 rounded-xl px-4 py-3 flex items-center gap-3">
+                                <Package size={16} className="text-green-500" />
+                                <p className="text-sm font-bold text-green-700">Pedido devolvido ao restaurante. Reembolso em processamento.</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {activeTab === 'orders' && (() => {
+            const statusOptions = [
+              { value: 'ALL', label: 'Todos' },
+              { value: 'PENDING', label: 'Pendentes' },
+              { value: 'PREPARING', label: 'Preparando' },
+              { value: 'READY', label: 'Prontos' },
+              { value: 'OUT_FOR_DELIVERY', label: 'Em Entrega' },
+              { value: 'DELIVERED', label: 'Entregues' },
+              { value: 'CANCELLED', label: 'Cancelados' },
+              { value: 'DELIVERY_FAILED', label: 'Não entregues' },
+              { value: 'RETURNING', label: 'Devolvendo' },
+              { value: 'RETURNED', label: 'Devolvidos' },
+            ];
+            const statusMap: Record<string, { label: string; color: string }> = {
+              PENDING: { label: 'Aguardando', color: 'text-yellow-600 bg-yellow-50' },
+              PENDING_PAYMENT: { label: 'Aguard. Pgto', color: 'text-orange-600 bg-orange-50' },
+              PREPARING: { label: 'Preparando', color: 'text-blue-600 bg-blue-50' },
+              READY: { label: 'Pronto', color: 'text-green-600 bg-green-50' },
+              OUT_FOR_DELIVERY: { label: 'Em Entrega', color: 'text-purple-600 bg-purple-50' },
+              DELIVERED: { label: 'Entregue', color: 'text-gray-600 bg-gray-100' },
+              CANCELLED: { label: 'Cancelado', color: 'text-red-600 bg-red-50' },
+              DELIVERY_FAILED: { label: 'Não entregue', color: 'text-red-700 bg-red-100' },
+              RETURNING: { label: 'Devolvendo', color: 'text-orange-600 bg-orange-50' },
+              RETURNED: { label: 'Devolvido', color: 'text-gray-500 bg-gray-100' },
+            };
+            const filtered = ordersStatusFilter === 'ALL'
+              ? orders
+              : orders.filter(o => o.status === ordersStatusFilter);
+
+            return (
+              <div className="space-y-6 animate-in fade-in">
+                <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+                  <h3 className="text-2xl font-black text-gray-900 tracking-tighter">Todos os Pedidos</h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {statusOptions.map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setOrdersStatusFilter(opt.value)}
+                        className={`text-xs font-black px-3 py-1.5 rounded-xl transition-all ${
+                          ordersStatusFilter === opt.value
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-white text-gray-500 border border-gray-200 hover:border-purple-300'
+                        }`}
+                      >
+                        {opt.label}
+                        {opt.value !== 'ALL' && (
+                          <span className="ml-1 opacity-60">
+                            ({orders.filter(o => o.status === opt.value).length})
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="divide-y divide-gray-50">
+                    {filtered.slice(0, 50).map(o => {
+                      const s = statusMap[o.status] || { label: o.status, color: 'text-gray-500 bg-gray-100' };
+                      const driver = profiles.find(p => p.id === o.driverId);
+                      return (
+                        <div key={o.id} className="px-6 py-4 flex items-center justify-between gap-4 hover:bg-gray-50/50 transition-colors">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-black text-gray-900 text-sm">{o.restaurantName}</p>
+                              <span className="text-gray-300 text-xs">#{o.id.slice(-6)}</span>
+                            </div>
+                            <p className="text-gray-400 text-xs mt-0.5">
+                              {o.customerName}
+                              {driver && <span className="text-gray-300"> · 🏍️ {driver.name}</span>}
+                              {' · '}{new Date(o.timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                            {o.failureReason && (
+                              <p className="text-red-400 text-[10px] mt-0.5 italic">Motivo: {o.failureReason}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg ${s.color}`}>{s.label}</span>
+                            <span className="font-black text-gray-900 text-sm">R$ {o.total.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {filtered.length === 0 && (
+                      <p className="px-6 py-12 text-center text-gray-400 font-bold">Nenhum pedido com esse status.</p>
+                    )}
+                  </div>
                 </div>
               </div>
             );
