@@ -608,8 +608,8 @@ export const DriverView: React.FC = () => {
 
   if (activeTab === 'profile')
     return (
-      <div className="min-h-dvh bg-gray-950 flex justify-center overflow-x-hidden">
-        <div className="w-full md:max-w-2xl bg-gray-900 text-white safe-area-top md:border-x md:border-gray-800/60">
+      <div className="h-dvh bg-gray-950 flex justify-center items-start overflow-y-auto overflow-x-hidden">
+        <div className="w-full md:max-w-2xl min-h-full bg-gray-900 text-white safe-area-top md:border-x md:border-gray-800/60">
           <DriverProfile onBack={() => setActiveTab('home')} />
         </div>
       </div>
