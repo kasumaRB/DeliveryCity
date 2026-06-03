@@ -521,12 +521,6 @@ export const RestaurantView: React.FC = () => {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setActiveTab('profile')}
-            className={`p-2.5 rounded-xl border transition-all ${activeTab === 'profile' ? 'bg-orange-50 border-orange-100 text-orange-600' : 'bg-gray-50 border-gray-100 text-gray-400'}`}
-          >
-            <User size={20} />
-          </button>
-          <button
             onClick={signOut}
             className="p-2.5 bg-gray-50 border border-gray-100 rounded-xl text-gray-400"
           >
