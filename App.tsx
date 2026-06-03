@@ -18,6 +18,11 @@ class ErrorBoundary extends React.Component<
     this.state = { hasError: false, error: '' };
   }
   static getDerivedStateFromError(error: Error) {
+    const isChunkError = /Loading chunk|Failed to fetch dynamically imported|Importing a module script failed/i.test(error.message);
+    if (isChunkError) {
+      window.location.reload();
+      return { hasError: false, error: '' };
+    }
     return { hasError: true, error: error.message };
   }
   componentDidCatch(error: Error, info: React.ErrorInfo) {
