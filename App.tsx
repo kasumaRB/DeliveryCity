@@ -6,7 +6,7 @@ import { DriverView } from './views/DriverView';
 import { AdminView } from './views/AdminView';
 import { AuthView } from './views/AuthView';
 import { UserRole } from './types';
-import { Clock, LogOut, Phone, XCircle, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Clock, LogOut, Phone, XCircle, RefreshCw, AlertTriangle, Loader } from 'lucide-react';
 import { useAndroidBack } from './hooks/useAndroidBack';
 
 class ErrorBoundary extends React.Component<
@@ -94,6 +94,7 @@ const BlockedView: React.FC<{ onSignOut: () => void }> = ({ onSignOut }) => (
 const AppContent: React.FC = () => {
   const { isLoading, currentUserProfile, signOut, session, refreshData } = useAppStore();
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   useAndroidBack(() => {
     if (showProfileModal) { setShowProfileModal(false); return true; }
@@ -114,10 +115,18 @@ const AppContent: React.FC = () => {
             Não foi possível carregar seu perfil. Verifique sua conexão e tente novamente.
           </p>
           <button
-            onClick={() => refreshData()}
-            className="w-full bg-orange-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-orange-700 transition shadow-xl shadow-orange-100 active:scale-95 flex items-center justify-center gap-2"
+            onClick={async () => {
+              setIsRetrying(true);
+              await refreshData();
+              setIsRetrying(false);
+            }}
+            disabled={isRetrying}
+            className="w-full bg-orange-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-orange-700 transition shadow-xl shadow-orange-100 active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70"
           >
-            <RefreshCw size={14} /> Tentar novamente
+            {isRetrying
+              ? <><Loader size={14} className="animate-spin" /> Carregando...</>
+              : <><RefreshCw size={14} /> Tentar novamente</>
+            }
           </button>
           <button
             onClick={signOut}

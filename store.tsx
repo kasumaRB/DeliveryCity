@@ -1363,7 +1363,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               .eq('id', currentUserProfile.id);
           await fetchData();
         },
-        refreshData: fetchData,
+        refreshData: () => fetchData(true),
         requestPasswordReset: async e => await supabase.auth.resetPasswordForEmail(e),
         toggleFavorite,
         cancelOrder,
