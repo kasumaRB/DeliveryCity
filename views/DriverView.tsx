@@ -49,7 +49,7 @@ import Logo from '../assets/Logo.png';
 import Nome from '../assets/Nome.png';
 
 const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
-  const { currentUserProfile, updateUserProfile, orders } = useAppStore();
+  const { currentUserProfile, updateUserProfile, orders, signOut } = useAppStore();
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [vehicle, setVehicle] = useState(currentUserProfile?.vehicleType || 'Moto');
@@ -134,7 +134,7 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const vehicleIcons: Record<string, string> = { Moto: '🏍️', Bicicleta: '🚲', Carro: '🚗' };
 
   return (
-    <div className="animate-in fade-in pb-8">
+    <div className="animate-in fade-in" style={{ paddingBottom: 'max(40px, env(safe-area-inset-bottom))' }}>
       {/* Hero */}
       <div className="bg-gradient-to-br from-gray-900 via-blue-950 to-gray-900 px-6 pt-6 pb-10 relative">
         <button
@@ -296,6 +296,14 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         >
           {isSaving ? <Loader className="animate-spin" size={20} /> : <Save size={20} />}
           Salvar Alterações
+        </button>
+
+        {/* Sair */}
+        <button
+          onClick={() => { if (window.confirm('Deseja sair da conta?')) signOut(); }}
+          className="w-full py-4 flex items-center justify-center gap-2 text-red-400 font-bold text-sm hover:text-red-300 transition-colors"
+        >
+          <LogOut size={18} /> Sair da Conta
         </button>
       </div>
 
