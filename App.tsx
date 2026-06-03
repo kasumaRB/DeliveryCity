@@ -134,9 +134,8 @@ const AppContent: React.FC = () => {
   React.useEffect(() => {
     if (currentUserProfile) { setStuckTooLong(false); return; }
     if (!isOnLoadingScreen) { setStuckTooLong(false); return; }
-    // 12s: maior que o timeout de segurança do store (8s) + retry (1.5s),
-    // para só aparecer em travamentos reais e não competir com a recuperação normal.
-    const t = setTimeout(() => setStuckTooLong(true), 12000);
+    // 5s: tempo suficiente para distinguir travamento real de conexão lenta normal.
+    const t = setTimeout(() => setStuckTooLong(true), 5000);
     return () => clearTimeout(t);
   }, [isOnLoadingScreen, currentUserProfile]);
 
