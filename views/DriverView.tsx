@@ -608,7 +608,7 @@ export const DriverView: React.FC = () => {
 
   if (activeTab === 'profile')
     return (
-      <div className="min-h-screen bg-gray-900 text-white">
+      <div className="min-h-screen bg-gray-900 text-white overflow-x-hidden safe-area-top">
         <DriverProfile onBack={() => setActiveTab('home')} />
       </div>
     );
@@ -629,7 +629,7 @@ export const DriverView: React.FC = () => {
         onClose={() => { markSeen('DRIVER'); updateUserProfile(currentUserProfile!.id, { driverTutorialSeen: true }).catch(() => {}); setShowTutorial(false); }}
       />
     )}
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col h-screen overflow-hidden safe-area-top safe-area-bottom">
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col h-screen overflow-hidden safe-area-top">
 
       {/* Top Bar — limpo, logo + status */}
       <header className="bg-gray-950 border-b border-gray-800/60 px-5 py-3 flex justify-between items-center shrink-0">
@@ -643,7 +643,7 @@ export const DriverView: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto pb-24">
+      <main className="flex-1 overflow-y-auto overflow-x-hidden pb-28">
 
         {/* HOME TAB */}
         {activeTab === 'home' && (
@@ -768,16 +768,16 @@ export const DriverView: React.FC = () => {
                         className="py-4 border-b border-gray-800/80 last:border-0"
                         style={{ opacity: acceptingOrderId === order.id ? 0.5 : 1 }}
                       >
-                        <div className="flex items-start justify-between mb-1">
-                          <span className="font-black text-white text-base">{order.restaurantName}</span>
-                          <span className="text-green-400 font-black text-lg">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <span className="font-black text-white text-base min-w-0 truncate">{order.restaurantName}</span>
+                          <span className="text-green-400 font-black text-lg shrink-0">
                             + {formatCurrency(order.driverNetEarnings || order.deliveryFee * (1 - (platformSettings?.driverFeePct ?? 0.08)))}
                           </span>
                         </div>
                         <p className="text-gray-500 text-xs mb-3">
                           {order.customerAddress} · {order.totalDist}
                         </p>
-                        <div className="flex gap-2 mb-3">
+                        <div className="flex flex-wrap gap-2 mb-3">
                           <span className="text-[10px] bg-gray-800 text-gray-400 px-2 py-1 rounded-md">
                             ~{order.timeMins} min
                           </span>
@@ -1036,7 +1036,7 @@ export const DriverView: React.FC = () => {
       {/* Bottom Navigation — linha fina no topo da tab ativa */}
       <nav
         className="bg-gray-950 border-t border-gray-800/60 px-4 pt-2 flex justify-around items-center shrink-0"
-        style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom))' }}
+        style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}
       >
         {(
           [
