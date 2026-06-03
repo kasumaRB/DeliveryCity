@@ -103,24 +103,28 @@ const AppContent: React.FC = () => {
   const [loadFailed, setLoadFailed] = useState(false);
   const hasAutoRetried = React.useRef(false);
 
-  // Uma única tentativa automática silenciosa após o carregamento inicial falhar
+  // Ref para acessar o perfil atual dentro de callbacks assíncronos
+  const currentUserProfileRef = React.useRef(currentUserProfile);
   React.useEffect(() => {
-    if (session && !isLoading && !currentUserProfile && !hasAutoRetried.current) {
-      hasAutoRetried.current = true;
-      const t = setTimeout(async () => {
-        try {
-          await refreshData();
-        } catch (_) {}
-        // Se ainda sem perfil após retry, mostra tela de erro
-        setLoadFailed(true);
-      }, 800);
-      return () => clearTimeout(t);
-    }
-    // Se perfil carregou, reseta flags
+    currentUserProfileRef.current = currentUserProfile;
     if (currentUserProfile) {
       hasAutoRetried.current = false;
       setLoadFailed(false);
     }
+  }, [currentUserProfile]);
+
+  // Uma única tentativa automática silenciosa após carregamento inicial falhar
+  React.useEffect(() => {
+    if (!session || isLoading || currentUserProfile || hasAutoRetried.current) return;
+    hasAutoRetried.current = true;
+    const t = setTimeout(async () => {
+      try { await refreshData(); } catch (_) {}
+      // Aguarda React commitar o novo estado antes de decidir
+      setTimeout(() => {
+        if (!currentUserProfileRef.current) setLoadFailed(true);
+      }, 300);
+    }, 1500);
+    return () => clearTimeout(t);
   }, [session, isLoading, currentUserProfile]);
 
   useAndroidBack(() => {
