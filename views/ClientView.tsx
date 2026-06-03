@@ -10,6 +10,7 @@ import {
   OrderStatus,
   OrderRating,
   SavedCard,
+  UserRole,
 } from '../types';
 import { TutorialModal, hasSeen, markSeen } from '../components/TutorialModal';
 import { useAndroidBack } from '../hooks/useAndroidBack';
@@ -139,7 +140,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
   // Tutorial
   const [showTutorial, setShowTutorial] = useState(false);
   useEffect(() => {
-    if (currentUserProfile && !hasSeen('CLIENT')) setShowTutorial(true);
+    if (currentUserProfile && currentUserProfile.role === UserRole.CLIENT && !hasSeen('CLIENT')) setShowTutorial(true);
   }, [currentUserProfile?.id]);
 
   useAndroidBack(() => {
