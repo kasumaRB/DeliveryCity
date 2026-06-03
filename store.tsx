@@ -95,6 +95,9 @@ interface AppContextType {
   reportFailedDelivery: (orderId: string, reason: string) => Promise<void>;
   startReturn: (orderId: string) => Promise<void>;
   confirmReturn: (orderId: string) => Promise<void>;
+  generateReturnCode: (orderId: string) => Promise<string>;
+  confirmReturnWithCode: (orderId: string, code: string) => Promise<void>;
+  sendAdminMessage: (toUserId: string, toName: string, toRole: string, message: string, orderId?: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -168,6 +171,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     favoriteRestaurantIds: Array.isArray(p.favorite_restaurant_ids) ? p.favorite_restaurant_ids : [],
     driverTutorialSeen: p.driver_tutorial_seen === true,
     clientTutorialSeen: p.client_tutorial_seen === true,
+    driverScore: p.driver_score !== undefined ? Number(p.driver_score) : 100,
   });
 
   const mapOrder = (o: any): Order => ({
@@ -202,6 +206,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     customerAvatarUrl: o.customer_avatar_url ?? undefined,
     failureReason: o.failure_reason ?? undefined,
     driverName: o.driver_name ?? undefined,
+    returnCode: o.return_code ?? undefined,
   });
 
   const setupNotifications = async (userId?: string) => {
@@ -1115,22 +1120,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .select('id').maybeSingle();
     if (error || !updated) throw new Error('Não foi possível registrar a falha de entrega.');
 
-    // Reembolso automático via Asaas (best-effort: não bloqueia o fluxo se falhar)
-    supabase.functions.invoke('refund-asaas-payment', { body: { orderId } }).catch(() => {});
-
     await fetchData();
 
+    // Notifica o cliente que o suporte entrará em contato
     if (order.customerId) {
       supabase.functions.invoke('send-push-notification', {
         body: {
           userId: order.customerId,
           title: '⚠️ Problema na entrega',
-          body: 'Seu entregador não conseguiu concluir a entrega. O reembolso será processado em breve.',
+          body: 'Seu pedido não pôde ser entregue. Nossa equipe de suporte entrará em contato em breve.',
           data: { orderId, type: 'DELIVERY_FAILED' },
         },
       }).catch(() => {});
     }
 
+    // Cria ticket no suporte para o admin ver
     supabase.from('support_tickets').insert({
       user_id: session!.user.id,
       user_name: currentUserProfile?.name,
@@ -1138,6 +1142,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       message: `[AUTO] Entrega não concluída — Pedido #${orderId}. Motivo: ${reason}`,
       status: 'OPEN',
       created_at: new Date().toISOString(),
+      order_id: orderId,
     }).then(null, () => {});
   };
 
@@ -1157,7 +1162,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           body: {
             userId: rest.owner_id,
             title: '🔄 Devolução a caminho',
-            body: `Pedido #${orderId.slice(-4)} não pôde ser entregue. O entregador está retornando com o pedido.`,
+            body: `Pedido #${orderId.slice(-4)} não pôde ser entregue. O entregador está retornando. Prepare o código de devolução.`,
             data: { orderId, type: 'RETURNING' },
           },
         }).catch(() => {});
@@ -1165,12 +1170,82 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Restaurante gera código de 6 dígitos para o entregador confirmar a devolução presencialmente
+  const generateReturnCode = async (orderId: string): Promise<string> => {
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const { error } = await supabase.from('orders')
+      .update({ return_code: code })
+      .eq('id', orderId).eq('status', OrderStatus.RETURNING);
+    if (error) throw new Error(error.message);
+    await fetchData();
+    return code;
+  };
+
+  // Entregador digita o código no app para confirmar que devolveu ao restaurante
+  const confirmReturnWithCode = async (orderId: string, code: string): Promise<void> => {
+    const { data: order, error: fetchErr } = await supabase.from('orders')
+      .select('return_code, customer_id, asaas_payment_id, status')
+      .eq('id', orderId).maybeSingle();
+    if (fetchErr || !order) throw new Error('Pedido não encontrado.');
+    if (order.status !== OrderStatus.RETURNING) throw new Error('Pedido não está em devolução.');
+    if (!order.return_code) throw new Error('O restaurante ainda não gerou o código de devolução.');
+    if (order.return_code.trim() !== code.trim()) throw new Error('Código inválido. Verifique com o restaurante.');
+
+    const { error } = await supabase.from('orders')
+      .update({ status: OrderStatus.RETURNED })
+      .eq('id', orderId).eq('status', OrderStatus.RETURNING);
+    if (error) throw new Error(error.message);
+
+    await fetchData();
+
+    // Reembolso ao cliente — agora que a devolução foi fisicamente confirmada
+    supabase.functions.invoke('refund-asaas-payment', { body: { orderId } }).catch(() => {});
+
+    if (order.customer_id) {
+      supabase.functions.invoke('send-push-notification', {
+        body: {
+          userId: order.customer_id,
+          title: '💚 Reembolso em processamento',
+          body: 'Sua devolução foi confirmada. O reembolso será creditado em breve.',
+          data: { orderId, type: 'RETURNED' },
+        },
+      }).catch(() => {});
+    }
+  };
+
+  // Admin força confirmação de devolução sem código (override manual)
   const confirmReturn = async (orderId: string) => {
     const { error } = await supabase.from('orders')
       .update({ status: OrderStatus.RETURNED })
       .eq('id', orderId).eq('status', OrderStatus.RETURNING);
     if (error) throw new Error(error.message);
     await fetchData();
+    supabase.functions.invoke('refund-asaas-payment', { body: { orderId } }).catch(() => {});
+  };
+
+  // Admin envia mensagem interna para qualquer usuário (cliente, entregador, restaurante)
+  const sendAdminMessage = async (toUserId: string, toName: string, toRole: string, message: string, orderId?: string) => {
+    const { error } = await supabase.from('support_tickets').insert({
+      user_id: toUserId,
+      user_name: toName,
+      user_role: toRole,
+      message,
+      status: 'OPEN',
+      from_admin: true,
+      order_id: orderId || null,
+      created_at: new Date().toISOString(),
+    });
+    if (error) throw new Error(error.message);
+
+    // Push para o destinatário
+    supabase.functions.invoke('send-push-notification', {
+      body: {
+        userId: toUserId,
+        title: '💬 Mensagem do suporte',
+        body: message.length > 80 ? message.slice(0, 77) + '...' : message,
+        data: { type: 'ADMIN_MESSAGE', orderId },
+      },
+    }).catch(() => {});
   };
 
   return (
@@ -1395,6 +1470,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         reportFailedDelivery,
         startReturn,
         confirmReturn,
+        generateReturnCode,
+        confirmReturnWithCode,
+        sendAdminMessage,
       }}
     >
       {children}

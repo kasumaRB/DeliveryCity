@@ -337,6 +337,7 @@ export const DriverView: React.FC = () => {
     confirmDelivery,
     reportFailedDelivery,
     startReturn,
+    confirmReturnWithCode,
     signOut,
     processSyncQueue,
     calculateDistance,
@@ -375,6 +376,10 @@ export const DriverView: React.FC = () => {
   const [failureReason, setFailureReason] = useState('');
   const [isReportingFailed, setIsReportingFailed] = useState(false);
   const [failedConfirmed, setFailedConfirmed] = useState(false);
+  // Código de devolução
+  const [returnCode, setReturnCode] = useState('');
+  const [isConfirmingReturn, setIsConfirmingReturn] = useState(false);
+  const [returnCodeError, setReturnCodeError] = useState('');
   const [currentPos, setCurrentPos] = useState<{ lat: number; lng: number } | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
@@ -733,19 +738,56 @@ export const DriverView: React.FC = () => {
                   </div>
                 )}
 
-                {/* RETURNING — Devolvendo */}
+                {/* RETURNING — Devolvendo: entregador digita o código do restaurante */}
                 {activeOrder.status === 'RETURNING' && (
-                  <div className="bg-gray-800/40 rounded-2xl p-5 border-l-2 border-gray-600">
+                  <div className="bg-gray-800/40 rounded-2xl p-5 border-l-2 border-orange-500 space-y-4">
                     <div className="flex items-center gap-3">
                       <RotateCcw size={20} className="text-orange-400 animate-spin" style={{ animationDuration: '3s' }} />
                       <div>
                         <p className="text-white font-black">Devolvendo ao restaurante</p>
-                        <p className="text-gray-500 text-sm">Aguarde a confirmação após entregar o pedido.</p>
+                        <p className="text-gray-400 text-sm">Entregue o pedido e peça o código de devolução.</p>
                       </div>
                     </div>
-                    <span className="mt-3 inline-block text-orange-400 text-[10px] font-black tracking-widest uppercase">
-                      #{activeOrder.id.slice(-4)}
-                    </span>
+
+                    <div className="bg-gray-900/60 rounded-xl p-4">
+                      <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-3">
+                        Código de devolução
+                      </p>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={returnCode}
+                        onChange={e => { setReturnCode(e.target.value.replace(/\D/g, '')); setReturnCodeError(''); }}
+                        placeholder="______"
+                        className="w-full text-center text-3xl font-black tracking-[0.4em] bg-transparent text-white border-b-2 border-orange-500/50 focus:border-orange-400 outline-none py-2 placeholder:text-gray-700"
+                      />
+                      {returnCodeError && (
+                        <p className="text-red-400 text-xs text-center mt-2 font-bold">{returnCodeError}</p>
+                      )}
+                    </div>
+
+                    <button
+                      disabled={returnCode.length < 4 || isConfirmingReturn}
+                      onClick={async () => {
+                        setIsConfirmingReturn(true);
+                        setReturnCodeError('');
+                        try {
+                          await confirmReturnWithCode(activeOrder.id, returnCode);
+                          setReturnCode('');
+                        } catch (e: any) {
+                          setReturnCodeError(e.message || 'Código inválido. Verifique com o restaurante.');
+                        } finally {
+                          setIsConfirmingReturn(false);
+                        }
+                      }}
+                      className="w-full py-4 bg-orange-500 text-white rounded-xl font-black text-sm tracking-wide flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-40"
+                    >
+                      {isConfirmingReturn
+                        ? <><Loader size={16} className="animate-spin" /> Verificando...</>
+                        : <><CheckCircle size={16} /> Confirmar devolução</>
+                      }
+                    </button>
                   </div>
                 )}
               </div>

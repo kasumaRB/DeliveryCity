@@ -76,6 +76,7 @@ export interface UserProfile {
   favoriteRestaurantIds?: string[];
   driverTutorialSeen?: boolean;
   clientTutorialSeen?: boolean;
+  driverScore?: number;
 }
 
 // Horário estruturado por dia da semana
@@ -174,6 +175,7 @@ export interface Order {
   customerPhone?: string;
   customerAvatarUrl?: string;
   failureReason?: string;
+  returnCode?: string;
 }
 
 export interface OrderRating {

@@ -335,6 +335,7 @@ export const AdminView: React.FC = () => {
     refreshData,
     loginAsTestUser,
     orders,
+    sendAdminMessage,
     restaurants,
   } = useAppStore();
 
@@ -357,6 +358,10 @@ export const AdminView: React.FC = () => {
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
   const [authorizingReturnId, setAuthorizingReturnId] = useState<string | null>(null);
   const [ordersStatusFilter, setOrdersStatusFilter] = useState<string>('ALL');
+  const [messagingOrderId, setMessagingOrderId] = useState<string | null>(null);
+  const [messageTarget, setMessageTarget] = useState<'client' | 'driver' | 'restaurant' | null>(null);
+  const [messageText, setMessageText] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
 
   useEffect(() => {
     if (activeTab === 'support') {
@@ -1168,16 +1173,20 @@ export const AdminView: React.FC = () => {
                   <div className="space-y-4">
                     {failedOrders.map(order => {
                       const driver = profiles.find(p => p.id === order.driverId);
+                      const restaurant = restaurants.find(r => r.id === order.restaurantId);
+                      const restaurantOwner = profiles.find(p => p.id === restaurant?.ownerId);
                       const statusColors: Record<string, string> = {
-                        DELIVERY_FAILED: 'bg-red-50 border-red-200',
-                        RETURNING: 'bg-orange-50 border-orange-200',
-                        RETURNED: 'bg-gray-50 border-gray-200',
+                        DELIVERY_FAILED: 'border-red-200',
+                        RETURNING: 'border-orange-200',
+                        RETURNED: 'border-gray-200',
                       };
                       const statusLabels: Record<string, string> = {
                         DELIVERY_FAILED: '⚠️ Não entregue',
                         RETURNING: '🔄 Devolvendo',
                         RETURNED: '📦 Devolvido',
                       };
+                      const isMessaging = messagingOrderId === order.id;
+
                       return (
                         <div key={order.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${statusColors[order.status] || 'border-gray-100'}`}>
                           {/* Header */}
@@ -1200,60 +1209,177 @@ export const AdminView: React.FC = () => {
                             </div>
                           </div>
 
-                          <div className="px-6 py-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {/* Motivo */}
+                          {order.failureReason && (
+                            <div className="px-6 pt-3">
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Motivo relatado</p>
+                              <p className="text-gray-700 text-sm font-medium bg-gray-50 rounded-xl px-3 py-2">{order.failureReason}</p>
+                            </div>
+                          )}
+
+                          {/* Contatos das 3 partes */}
+                          <div className="px-6 pt-4 pb-2 grid grid-cols-1 md:grid-cols-3 gap-4">
                             {/* Cliente */}
-                            <div>
-                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Cliente</p>
-                              <p className="font-bold text-gray-900 text-sm">{order.customerName}</p>
-                              {order.customerPhone ? (
-                                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                  <a
-                                    href={`tel:${order.customerPhone.replace(/\D/g, '')}`}
-                                    className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-xl hover:bg-blue-100 transition-all"
-                                  >
-                                    <Phone size={12} /> Ligar
+                            <div className="bg-gray-50 rounded-xl p-3">
+                              <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">👤 Cliente</p>
+                              <p className="font-black text-gray-900 text-sm">{order.customerName}</p>
+                              <div className="flex flex-wrap gap-1.5 mt-2">
+                                <button
+                                  onClick={() => {
+                                    setMessagingOrderId(order.id);
+                                    setMessageTarget('client');
+                                    setMessageText('');
+                                  }}
+                                  className="flex items-center gap-1 text-[10px] font-black text-purple-600 bg-purple-50 px-2 py-1 rounded-lg hover:bg-purple-100 transition-all"
+                                >
+                                  <MessageSquare size={10} /> Chat
+                                </button>
+                                {order.customerPhone && <>
+                                  <a href={`tel:${order.customerPhone.replace(/\D/g, '')}`}
+                                    className="flex items-center gap-1 text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-lg hover:bg-blue-100 transition-all">
+                                    <Phone size={10} /> Ligar
                                   </a>
-                                  <a
-                                    href={`https://wa.me/55${order.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${order.customerName}! Sou do suporte da DeliveryCity. Seu pedido de ${order.restaurantName} não pôde ser entregue. Podemos ajudar?`)}`}
+                                  <a href={`https://wa.me/55${order.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${order.customerName}! Suporte DeliveryCity. Seu pedido de ${order.restaurantName} não pôde ser entregue. Como posso ajudar?`)}`}
                                     target="_blank" rel="noopener noreferrer"
-                                    className="flex items-center gap-1.5 text-xs font-bold text-green-700 bg-green-50 px-3 py-1.5 rounded-xl hover:bg-green-100 transition-all"
-                                  >
-                                    <MessageSquare size={12} /> WhatsApp
+                                    className="flex items-center gap-1 text-[10px] font-black text-green-700 bg-green-50 px-2 py-1 rounded-lg hover:bg-green-100 transition-all">
+                                    <MessageSquare size={10} /> WhatsApp
                                   </a>
-                                </div>
-                              ) : (
-                                <p className="text-gray-400 text-xs mt-1 italic">Telefone não disponível</p>
-                              )}
+                                </>}
+                              </div>
                             </div>
 
                             {/* Entregador */}
-                            <div>
-                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Entregador</p>
-                              <p className="font-bold text-gray-900 text-sm">{driver?.name || order.driverName || '—'}</p>
-                              {driver?.phoneNumber && (
-                                <a
-                                  href={`tel:${driver.phoneNumber.replace(/\D/g, '')}`}
-                                  className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-xl hover:bg-blue-100 transition-all mt-2 w-fit"
-                                >
-                                  <Phone size={12} /> Ligar
-                                </a>
+                            <div className="bg-gray-50 rounded-xl p-3">
+                              <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">🏍️ Entregador</p>
+                              <p className="font-black text-gray-900 text-sm">{driver?.name || order.driverName || '—'}</p>
+                              {driver && (
+                                <div className="flex items-center gap-1 mt-1">
+                                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${(driver.driverScore ?? 100) >= 80 ? 'bg-green-100 text-green-700' : (driver.driverScore ?? 100) >= 50 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                                    Score {driver.driverScore ?? 100}
+                                  </span>
+                                </div>
                               )}
+                              <div className="flex flex-wrap gap-1.5 mt-2">
+                                {driver && (
+                                  <button
+                                    onClick={() => {
+                                      setMessagingOrderId(order.id);
+                                      setMessageTarget('driver');
+                                      setMessageText('');
+                                    }}
+                                    className="flex items-center gap-1 text-[10px] font-black text-purple-600 bg-purple-50 px-2 py-1 rounded-lg hover:bg-purple-100 transition-all"
+                                  >
+                                    <MessageSquare size={10} /> Chat
+                                  </button>
+                                )}
+                                {driver?.phoneNumber && (
+                                  <a href={`tel:${driver.phoneNumber.replace(/\D/g, '')}`}
+                                    className="flex items-center gap-1 text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-lg hover:bg-blue-100 transition-all">
+                                    <Phone size={10} /> Ligar
+                                  </a>
+                                )}
+                              </div>
                             </div>
 
-                            {/* Motivo */}
-                            <div>
-                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Motivo Relatado</p>
-                              <p className="text-gray-700 text-sm font-medium">{order.failureReason || '—'}</p>
+                            {/* Restaurante */}
+                            <div className="bg-gray-50 rounded-xl p-3">
+                              <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">🏪 Restaurante</p>
+                              <p className="font-black text-gray-900 text-sm">{order.restaurantName}</p>
+                              <div className="flex flex-wrap gap-1.5 mt-2">
+                                {restaurantOwner && (
+                                  <button
+                                    onClick={() => {
+                                      setMessagingOrderId(order.id);
+                                      setMessageTarget('restaurant');
+                                      setMessageText('');
+                                    }}
+                                    className="flex items-center gap-1 text-[10px] font-black text-purple-600 bg-purple-50 px-2 py-1 rounded-lg hover:bg-purple-100 transition-all"
+                                  >
+                                    <MessageSquare size={10} /> Chat
+                                  </button>
+                                )}
+                                {restaurant?.phoneNumber && (
+                                  <a href={`tel:${restaurant.phoneNumber.replace(/\D/g, '')}`}
+                                    className="flex items-center gap-1 text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-lg hover:bg-blue-100 transition-all">
+                                    <Phone size={10} /> Ligar
+                                  </a>
+                                )}
+                              </div>
                             </div>
                           </div>
 
-                          {/* Ação — só para DELIVERY_FAILED */}
+                          {/* Painel de mensagem interna */}
+                          {isMessaging && messageTarget && (
+                            <div className="px-6 pb-4">
+                              <div className="bg-purple-50 border border-purple-100 rounded-xl p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                  <p className="text-xs font-black text-purple-700 uppercase tracking-widest">
+                                    Mensagem para {messageTarget === 'client' ? order.customerName : messageTarget === 'driver' ? (driver?.name || 'entregador') : order.restaurantName}
+                                  </p>
+                                  <button onClick={() => { setMessagingOrderId(null); setMessageTarget(null); }} className="text-gray-400 hover:text-gray-600">
+                                    <X size={14} />
+                                  </button>
+                                </div>
+                                <textarea
+                                  value={messageText}
+                                  onChange={e => setMessageText(e.target.value)}
+                                  placeholder="Digite sua mensagem..."
+                                  rows={3}
+                                  className="w-full text-sm border border-purple-200 rounded-xl p-3 outline-none focus:border-purple-400 resize-none font-medium"
+                                />
+                                <div className="flex gap-2 mt-2">
+                                  {['Seu pedido não foi entregue. Tentamos contato.', 'Por favor, aguarde. Estamos resolvendo.', 'Devolução autorizada. O entregador levará o pedido ao restaurante.'].map(preset => (
+                                    <button key={preset} onClick={() => setMessageText(preset)}
+                                      className="text-[10px] font-bold text-purple-600 bg-white border border-purple-200 px-2 py-1 rounded-lg hover:bg-purple-50 transition-all">
+                                      {preset.slice(0, 28)}...
+                                    </button>
+                                  ))}
+                                </div>
+                                <button
+                                  disabled={!messageText.trim() || sendingMessage}
+                                  onClick={async () => {
+                                    setSendingMessage(true);
+                                    try {
+                                      let toUserId = '';
+                                      let toName = '';
+                                      let toRole = '';
+                                      if (messageTarget === 'client' && order.customerId) {
+                                        toUserId = order.customerId; toName = order.customerName; toRole = 'CLIENT';
+                                      } else if (messageTarget === 'driver' && order.driverId) {
+                                        toUserId = order.driverId; toName = driver?.name || 'Entregador'; toRole = 'DRIVER';
+                                      } else if (messageTarget === 'restaurant' && restaurantOwner?.id) {
+                                        toUserId = restaurantOwner.id; toName = order.restaurantName; toRole = 'RESTAURANT';
+                                      }
+                                      if (toUserId) {
+                                        await sendAdminMessage(toUserId, toName, toRole, messageText, order.id);
+                                        setMessageText('');
+                                        setMessagingOrderId(null);
+                                        setMessageTarget(null);
+                                      }
+                                    } catch (e: any) {
+                                      alert('Erro: ' + e.message);
+                                    } finally {
+                                      setSendingMessage(false);
+                                    }
+                                  }}
+                                  className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 bg-purple-600 text-white rounded-xl font-black text-sm disabled:opacity-40 active:scale-95 transition-all"
+                                >
+                                  {sendingMessage ? <><Loader size={14} className="animate-spin" /> Enviando...</> : <><MessageSquare size={14} /> Enviar mensagem</>}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Protocolo de escalação — só para DELIVERY_FAILED */}
                           {order.status === 'DELIVERY_FAILED' && (
                             <div className="px-6 pb-5">
-                              <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-                                <div>
-                                  <p className="text-sm font-black text-orange-800">Autorizar devolução ao restaurante</p>
-                                  <p className="text-orange-600 text-xs mt-0.5">Tente contatar o cliente antes. Se não houver resposta, autorize a devolução.</p>
+                              <div className="bg-orange-50 border border-orange-100 rounded-xl p-4">
+                                <p className="text-xs font-black text-orange-800 mb-3">📋 Protocolo de atendimento</p>
+                                <div className="space-y-1.5 text-xs text-orange-700 font-medium mb-4">
+                                  <p>1. Envie mensagem pelo chat interno (botão "Chat")</p>
+                                  <p>2. Se não responder → ligue para o cliente</p>
+                                  <p>3. Sem resposta → envie WhatsApp</p>
+                                  <p>4. Sem comunicação → autorize a devolução abaixo</p>
                                 </div>
                                 <button
                                   disabled={authorizingReturnId === order.id}
@@ -1265,32 +1391,32 @@ export const AdminView: React.FC = () => {
                                           body: {
                                             userId: order.driverId,
                                             title: '✅ Devolução autorizada',
-                                            body: `Suporte autorizou. Devolva o pedido #${order.id.slice(-4)} ao restaurante ${order.restaurantName}.`,
+                                            body: `Suporte autorizou. Leve o pedido #${order.id.slice(-4)} ao restaurante ${order.restaurantName}.`,
                                             data: { orderId: order.id, type: 'RETURN_AUTHORIZED' },
                                           },
                                         });
                                       }
-                                      // Registra no ticket de suporte
                                       await supabase.from('support_tickets').insert({
                                         user_id: order.driverId || order.customerId,
                                         user_name: driver?.name || 'Admin',
                                         user_role: 'DRIVER',
                                         message: `[ADMIN] Devolução autorizada — Pedido #${order.id}. Motivo: ${order.failureReason || 'não informado'}`,
                                         status: 'RESOLVED',
+                                        from_admin: true,
+                                        order_id: order.id,
                                         created_at: new Date().toISOString(),
                                       }).then(null, () => {});
-                                      alert('Notificação enviada ao entregador!');
+                                      setAuthorizingReturnId(null);
                                     } catch (e: any) {
-                                      alert('Erro ao enviar notificação: ' + (e?.message || 'tente novamente'));
-                                    } finally {
+                                      alert('Erro: ' + (e?.message || 'tente novamente'));
                                       setAuthorizingReturnId(null);
                                     }
                                   }}
-                                  className="flex items-center gap-2 px-5 py-2.5 bg-orange-600 text-white rounded-xl font-black text-sm whitespace-nowrap disabled:opacity-50 active:scale-95 transition-all"
+                                  className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-orange-600 text-white rounded-xl font-black text-sm disabled:opacity-50 active:scale-95 transition-all"
                                 >
                                   {authorizingReturnId === order.id
-                                    ? <><Loader size={14} className="animate-spin" /> Enviando...</>
-                                    : <><RotateCcw size={14} /> Autorizar devolução</>
+                                    ? <><Loader size={14} className="animate-spin" /> Notificando entregador...</>
+                                    : <><RotateCcw size={14} /> Autorizar devolução ao restaurante</>
                                   }
                                 </button>
                               </div>
@@ -1301,7 +1427,10 @@ export const AdminView: React.FC = () => {
                             <div className="px-6 pb-5">
                               <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-center gap-3">
                                 <RotateCcw size={16} className="text-blue-500 animate-spin" style={{ animationDuration: '3s' }} />
-                                <p className="text-sm font-bold text-blue-700">Entregador a caminho do restaurante — aguardando confirmação de recebimento.</p>
+                                <div>
+                                  <p className="text-sm font-bold text-blue-700">Entregador a caminho do restaurante</p>
+                                  <p className="text-xs text-blue-500">O restaurante gerará um código de devolução e o entregador confirmará no app.</p>
+                                </div>
                               </div>
                             </div>
                           )}
@@ -1310,7 +1439,10 @@ export const AdminView: React.FC = () => {
                             <div className="px-6 pb-5">
                               <div className="bg-green-50 border border-green-100 rounded-xl px-4 py-3 flex items-center gap-3">
                                 <Package size={16} className="text-green-500" />
-                                <p className="text-sm font-bold text-green-700">Pedido devolvido ao restaurante. Reembolso em processamento.</p>
+                                <div>
+                                  <p className="text-sm font-bold text-green-700">Devolução confirmada por código</p>
+                                  <p className="text-xs text-green-500">Reembolso disparado automaticamente para o cliente.</p>
+                                </div>
                               </div>
                             </div>
                           )}

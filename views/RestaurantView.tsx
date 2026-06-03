@@ -108,6 +108,7 @@ export const RestaurantView: React.FC = () => {
     refreshData,
     platformSettings,
     confirmReturn,
+    generateReturnCode,
   } = useAppStore();
 
   const myRestaurant = restaurants.find(r => r.ownerId === currentUserProfile?.id);
@@ -118,6 +119,7 @@ export const RestaurantView: React.FC = () => {
   >('orders');
   const [mobileKanbanTab, setMobileKanbanTab] = useState<'pending' | 'preparing' | 'ready' | 'returning'>('pending');
   const [confirmingReturnId, setConfirmingReturnId] = useState<string | null>(null);
+  const [generatingCodeId, setGeneratingCodeId] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [itemFormName, setItemFormName] = useState('');
   const [itemFormOwnerPrice, setItemFormOwnerPrice] = useState('');
@@ -792,21 +794,30 @@ export const RestaurantView: React.FC = () => {
                             </div>
                           ))}
                         </div>
-                        <button
-                          disabled={confirmingReturnId === order.id}
-                          onClick={async () => {
-                            setConfirmingReturnId(order.id);
-                            try { await confirmReturn(order.id); }
-                            catch (e: any) { alert(e.message || 'Erro ao confirmar devolução.'); }
-                            finally { setConfirmingReturnId(null); }
-                          }}
-                          className="w-full bg-orange-600 text-white py-2.5 rounded-xl font-black text-xs tracking-wide active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                        >
-                          {confirmingReturnId === order.id
-                            ? <><Loader size={14} className="animate-spin" /> Confirmando...</>
-                            : '✓ Confirmar recebimento'
-                          }
-                        </button>
+                        {/* Código de devolução — gerado pelo restaurante, digitado pelo entregador */}
+                        {order.returnCode ? (
+                          <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-4 text-center">
+                            <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-1">Código de devolução</p>
+                            <p className="text-4xl font-black text-orange-700 tracking-[0.3em]">{order.returnCode}</p>
+                            <p className="text-[10px] text-orange-400 mt-2">Mostre ao entregador. Ele digitará no aplicativo.</p>
+                          </div>
+                        ) : (
+                          <button
+                            disabled={generatingCodeId === order.id}
+                            onClick={async () => {
+                              setGeneratingCodeId(order.id);
+                              try { await generateReturnCode(order.id); }
+                              catch (e: any) { alert(e.message || 'Erro ao gerar código.'); }
+                              finally { setGeneratingCodeId(null); }
+                            }}
+                            className="w-full bg-orange-600 text-white py-2.5 rounded-xl font-black text-xs tracking-wide active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                          >
+                            {generatingCodeId === order.id
+                              ? <><Loader size={14} className="animate-spin" /> Gerando...</>
+                              : '🔑 Gerar código de devolução'
+                            }
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
