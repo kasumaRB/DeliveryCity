@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppStore } from '../store';
 import { supabase } from '../lib/supabase';
+import { DeleteAccountModal } from '../components/DeleteAccountModal';
 import { Order, OrderStatus, UserAddress } from '../types';
 import { AddressModal } from '../components/AddressModal';
 import { TutorialModal, hasSeen, markSeen } from '../components/TutorialModal';
@@ -68,6 +69,7 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   );
   const [baseAddressData, setBaseAddressData] = useState<UserAddress | null>(baseAddr || null);
   const [showBaseModal, setShowBaseModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const myDeliveries = useMemo(() =>
     orders.filter(o => o.driverId === currentUserProfile?.id && o.status === OrderStatus.DELIVERED),
@@ -305,6 +307,13 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         >
           <LogOut size={18} /> Sair da Conta
         </button>
+        <button
+          onClick={() => setShowDeleteModal(true)}
+          className="w-full py-2 text-red-300 hover:text-red-500 font-bold text-[11px] uppercase tracking-widest transition-colors"
+        >
+          Excluir minha conta
+        </button>
+        {showDeleteModal && <DeleteAccountModal onClose={() => setShowDeleteModal(false)} />}
       </div>
 
       {showBaseModal && (

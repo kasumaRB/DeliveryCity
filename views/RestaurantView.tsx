@@ -3,6 +3,7 @@ import { useAppStore } from '../store';
 import { supabase } from '../lib/supabase';
 import { OrderStatus, Product, UserRole, Promotion, UserAddress, DaySchedule } from '../types';
 import { AddressModal } from '../components/AddressModal';
+import { DeleteAccountModal } from '../components/DeleteAccountModal';
 
 const resizeImage = (file: File, maxWidth: number, maxHeight: number): Promise<File> => {
   return new Promise((resolve, reject) => {
@@ -173,6 +174,7 @@ export const RestaurantView: React.FC = () => {
   >('COUPON');
   const [promoProductIds, setPromoProductIds] = useState<string[]>([]);
   const [promoMaxUsage, setPromoMaxUsage] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // Sincroniza os campos do formulário APENAS quando o modal de edição é ABERTO.
   // NÃO depende de myRestaurant/currentUserProfile para evitar que atualizações
@@ -502,13 +504,22 @@ export const RestaurantView: React.FC = () => {
             </button>
           ))}
         </nav>
-        <button
-          onClick={signOut}
-          className="mt-auto flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-red-500 transition-colors font-bold text-sm"
-        >
-          <LogOut size={18} /> Sair
-        </button>
+        <div className="mt-auto flex flex-col gap-1">
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="flex items-center gap-3 px-4 py-2 text-red-300 hover:text-red-500 transition-colors font-bold text-xs uppercase tracking-widest"
+          >
+            Excluir minha conta
+          </button>
+          <button
+            onClick={signOut}
+            className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-red-500 transition-colors font-bold text-sm"
+          >
+            <LogOut size={18} /> Sair
+          </button>
+        </div>
       </aside>
+      {showDeleteModal && <DeleteAccountModal onClose={() => setShowDeleteModal(false)} />}
 
       {/* HEADER MOBILE */}
       <header className="md:hidden bg-white/80 backdrop-blur-md border-b border-gray-100 px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
