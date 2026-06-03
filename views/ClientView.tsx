@@ -71,6 +71,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     profiles,
     toggleFavorite,
     cancelOrder,
+    updateUserProfile,
   } = store || {};
 
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
@@ -140,11 +141,16 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
   // Tutorial
   const [showTutorial, setShowTutorial] = useState(false);
   useEffect(() => {
-    if (currentUserProfile && currentUserProfile.role === UserRole.CLIENT && !hasSeen('CLIENT')) setShowTutorial(true);
+    if (!currentUserProfile || currentUserProfile.role !== UserRole.CLIENT) return;
+    if (currentUserProfile.clientTutorialSeen || hasSeen('CLIENT')) {
+      markSeen('CLIENT');
+      return;
+    }
+    setShowTutorial(true);
   }, [currentUserProfile?.id]);
 
   useAndroidBack(() => {
-    if (showTutorial)            { markSeen('CLIENT'); setShowTutorial(false);       return true; }
+    if (showTutorial)            { markSeen('CLIENT'); if (currentUserProfile) updateUserProfile!(currentUserProfile.id, { clientTutorialSeen: true }).catch(() => {}); setShowTutorial(false); return true; }
     if (receiptOrder)            { setReceiptOrder(null);                            return true; }
     if (pixModal)                { setPixModal(null);                                return true; }
     if (isAddressModalOpen)      { setIsAddressModalOpen(false);                     return true; }
@@ -589,7 +595,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
       <TutorialModal
         slides={clientSlides}
         accentColor="orange"
-        onClose={() => { markSeen('CLIENT'); setShowTutorial(false); }}
+        onClose={() => { markSeen('CLIENT'); if (currentUserProfile) updateUserProfile!(currentUserProfile.id, { clientTutorialSeen: true }).catch(() => {}); setShowTutorial(false); }}
       />
     )}
     <div className="h-screen bg-gray-50 flex flex-col lg:flex-row overflow-hidden relative safe-area-top safe-area-bottom">
