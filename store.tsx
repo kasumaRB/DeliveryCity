@@ -1367,7 +1367,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               .eq('id', currentUserProfile.id);
           await fetchData();
         },
-        refreshData: () => fetchData(true),
+        refreshData: async () => {
+          // Força refresh do token JWT antes de buscar dados — evita falha silenciosa
+          // quando o token expirou após deploy (queries retornam null sem lançar erro)
+          try { await supabase.auth.refreshSession(); } catch (_) { /* ignora */ }
+          return fetchData(true);
+        },
         requestPasswordReset: async e => await supabase.auth.resetPasswordForEmail(e),
         toggleFavorite,
         cancelOrder,

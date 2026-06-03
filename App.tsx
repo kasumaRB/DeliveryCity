@@ -100,6 +100,16 @@ const AppContent: React.FC = () => {
   const { isLoading, currentUserProfile, signOut, session, refreshData } = useAppStore();
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+  const autoRetried = React.useRef(false);
+
+  // Auto-retry silencioso uma vez: cobre o caso de token expirado após deploy
+  // sem expor a tela de erro para o usuário
+  React.useEffect(() => {
+    if (session && !isLoading && !currentUserProfile && !autoRetried.current) {
+      autoRetried.current = true;
+      refreshData().catch(() => {});
+    }
+  }, [session, isLoading, currentUserProfile]);
 
   useAndroidBack(() => {
     if (showProfileModal) { setShowProfileModal(false); return true; }
@@ -122,8 +132,8 @@ const AppContent: React.FC = () => {
           <button
             onClick={async () => {
               setIsRetrying(true);
-              await refreshData();
-              setIsRetrying(false);
+              try { await refreshData(); } catch (_) { /* fetchData já captura erros */ }
+              finally { setIsRetrying(false); }
             }}
             disabled={isRetrying}
             className="w-full bg-orange-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-orange-700 transition shadow-xl shadow-orange-100 active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70"
