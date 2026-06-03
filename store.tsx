@@ -265,19 +265,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // o que tornava o throttle de 2s inoperante e causava refetch excessivo)
   const lastFetchTimeRef = useRef(0);
   const cachedDataRef = useRef<{ restaurants?: any[]; orders?: any[]; profiles?: any[] }>({});
+  // Guard: impede chamadas concorrentes de fetchData (causa principal do travamento)
+  const fetchInProgressRef = useRef(false);
+  // Guard: impede que INITIAL_SESSION + SIGNED_IN disparem carga dupla simultaneamente
+  const isAuthHandlingRef = useRef(false);
 
   const fetchData = async (force = false, sessionOverride?: Session | null) => {
     const now = Date.now();
     if (!force && now - lastFetchTimeRef.current < 2000) return;
+    // Impede chamadas concorrentes — causa principal do travamento no "Sincronizando..."
+    if (fetchInProgressRef.current) {
+      devLog('[DEV] fetchData ignorado: já em execução');
+      return;
+    }
+    fetchInProgressRef.current = true;
     lastFetchTimeRef.current = now;
     const cachedData = cachedDataRef.current;
 
+    // Timeout de 8s nas queries: se o Supabase demorar (cold start etc.), rejeita e libera o guard
+    const queryTimeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Query timeout após 8s')), 8000)
+    );
+
     try {
-      const [restData, orderData, profileData, settingsData] = await Promise.all([
-        supabase.from('restaurants').select('*').order('rating', { ascending: false }),
-        supabase.from('orders').select('*').order('timestamp', { ascending: false }).limit(100),
-        supabase.from('profiles').select('*'),
-        supabase.from('platform_settings').select('*').maybeSingle(),
+      const [restData, orderData, profileData, settingsData] = await Promise.race([
+        Promise.all([
+          supabase.from('restaurants').select('*').order('rating', { ascending: false }),
+          supabase.from('orders').select('*').order('timestamp', { ascending: false }).limit(100),
+          supabase.from('profiles').select('*'),
+          supabase.from('platform_settings').select('*').maybeSingle(),
+        ]),
+        queryTimeout,
       ]);
 
       devLog('[DEV] Dados carregados:', {
@@ -411,6 +429,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsSupabaseConnected(false);
     } finally {
       setIsLoading(false);
+      fetchInProgressRef.current = false;
     }
   };
 
@@ -538,6 +557,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       // Quando retorna do redirect OAuth ou recarrega a janela do app
       if (['INITIAL_SESSION', 'SIGNED_IN'].includes(event)) {
+        // Guard: se INITIAL_SESSION e SIGNED_IN dispararem juntos (acontece no Supabase),
+        // o segundo evento atualiza a sessão mas pula o fetchData para evitar chamadas paralelas.
+        if (isAuthHandlingRef.current) {
+          devLog('[DEV] Auth duplicado ignorado:', event);
+          setSession(newSession);
+          return;
+        }
+        isAuthHandlingRef.current = true;
         setIsLoading(true);
         setSession(newSession);
 
@@ -547,10 +574,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (savedCart && savedCart.length > 0) setCart(savedCart);
         }
 
-        // Timeout de segurança: desbloqueia a UI após 8s caso o fetchData trave
+        // Timeout de segurança: desbloqueia a UI caso o fetchData trave além do AbortController
         const loadingTimeout = setTimeout(() => {
           setIsLoading(false);
-        }, 8000);
+        }, 10000);
 
         try {
           // 🔒 FIX SESSÃO: passa newSession diretamente para evitar race condition em getSession()
@@ -591,6 +618,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } finally {
           clearTimeout(loadingTimeout);
           setIsLoading(false);
+          isAuthHandlingRef.current = false;
         }
       } else if (event === 'TOKEN_REFRESHED') {
         setSession(newSession);
