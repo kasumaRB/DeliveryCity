@@ -74,6 +74,7 @@ export interface UserProfile {
   customFeePct?: number;
   savedCards?: SavedCard[];
   favoriteRestaurantIds?: string[];
+  driverTutorialSeen?: boolean;
 }
 
 // Horário estruturado por dia da semana

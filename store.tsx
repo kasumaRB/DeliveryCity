@@ -166,6 +166,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     customFeePct: p.custom_fee_pct ? Number(p.custom_fee_pct) : undefined,
     savedCards: Array.isArray(p.saved_cards) ? p.saved_cards : [],
     favoriteRestaurantIds: Array.isArray(p.favorite_restaurant_ids) ? p.favorite_restaurant_ids : [],
+    driverTutorialSeen: p.driver_tutorial_seen === true,
   });
 
   const mapOrder = (o: any): Order => ({
@@ -936,6 +937,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (data.customFeePct !== undefined) up.custom_fee_pct = data.customFeePct;
     if (data.savedCards !== undefined) up.saved_cards = data.savedCards;
     if (data.favoriteRestaurantIds !== undefined) up.favorite_restaurant_ids = data.favoriteRestaurantIds;
+    if (data.driverTutorialSeen !== undefined) up.driver_tutorial_seen = data.driverTutorialSeen;
     if (data.currentLocation !== undefined) up.current_location = data.currentLocation;
 
     // Captura role ANTES do fetchData (closure stale após setState assíncrono)

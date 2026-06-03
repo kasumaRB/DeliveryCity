@@ -351,11 +351,16 @@ export const DriverView: React.FC = () => {
   const [supportWhatsapp, setSupportWhatsapp] = useState<string | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
   useEffect(() => {
-    if (currentUserProfile && !hasSeen('DRIVER')) setShowTutorial(true);
+    if (!currentUserProfile) return;
+    if (currentUserProfile.driverTutorialSeen || hasSeen('DRIVER')) {
+      markSeen('DRIVER'); // sincroniza localStorage caso venha do banco
+      return;
+    }
+    setShowTutorial(true);
   }, [currentUserProfile?.id]);
 
   useAndroidBack(() => {
-    if (showTutorial)          { markSeen('DRIVER'); setShowTutorial(false); return true; }
+    if (showTutorial)          { markSeen('DRIVER'); updateUserProfile(currentUserProfile!.id, { driverTutorialSeen: true }).catch(() => {}); setShowTutorial(false); return true; }
     if (showCodeInput)         { setShowCodeInput(false);                   return true; }
     if (activeTab !== 'home')  { setActiveTab('home');                      return true; }
     return false; // minimiza
@@ -621,7 +626,7 @@ export const DriverView: React.FC = () => {
       <TutorialModal
         slides={driverSlides}
         accentColor="blue"
-        onClose={() => { markSeen('DRIVER'); setShowTutorial(false); }}
+        onClose={() => { markSeen('DRIVER'); updateUserProfile(currentUserProfile!.id, { driverTutorialSeen: true }).catch(() => {}); setShowTutorial(false); }}
       />
     )}
     <div className="min-h-screen bg-gray-900 text-white flex flex-col h-screen overflow-hidden safe-area-top safe-area-bottom">
