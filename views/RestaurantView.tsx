@@ -1532,7 +1532,7 @@ export const RestaurantView: React.FC = () => {
                                 if (!s || s.closed) return null;
                                 return <span key={idx} className="block">{label}: {s.open} – {s.close}</span>;
                               })
-                            : (currentUserProfile.workingHours || 'Não definido')
+                            : <span className="text-gray-400 italic">Horário não configurado</span>
                           }
                         </div>
                       </div>
