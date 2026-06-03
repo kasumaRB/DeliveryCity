@@ -10,6 +10,13 @@
   --sal: env(safe-area-inset-left);
 }
 
+/* Tipografia fluida: a fonte-base escala com a largura da tela.
+   Como o Tailwind mede texto/espaçamento/botões em rem, TUDO escala junto.
+   ~14px em telas pequenas → ~16px em celulares comuns → até 18px em telas grandes. */
+html {
+  font-size: clamp(14px, 3.6vw + 2px, 18px);
+}
+
 html,
 body,
 #root {
