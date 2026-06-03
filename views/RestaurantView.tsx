@@ -1232,19 +1232,21 @@ export const RestaurantView: React.FC = () => {
                   <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest">Desempenho completo da sua loja</p>
                 </header>
 
-                {/* KPI Cards — hero numbers in a single row */}
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex divide-x divide-gray-100">
-                  {[
-                    { label: 'Total Pedidos', value: myOrders.length, color: 'text-gray-900' },
-                    { label: 'Entregues', value: delivered.length, color: 'text-green-600' },
-                    { label: 'Cancelados', value: cancelledCount, color: 'text-red-500' },
-                    { label: 'Avaliação', value: avgRestRating.toFixed(1), color: 'text-amber-500' },
-                  ].map(k => (
-                    <div key={k.label} className="flex-1 p-5 text-center">
-                      <p className={`text-3xl font-black ${k.color} leading-none mb-1`}>{k.value}</p>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{k.label}</p>
-                    </div>
-                  ))}
+                {/* KPI Cards — 2×2 no mobile, 1×4 no desktop */}
+                <div className="rounded-2xl border border-gray-100 shadow-sm overflow-hidden bg-gray-100">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-px">
+                    {[
+                      { label: 'Pedidos', value: myOrders.length, color: 'text-gray-900' },
+                      { label: 'Entregues', value: delivered.length, color: 'text-green-600' },
+                      { label: 'Cancelados', value: cancelledCount, color: 'text-red-500' },
+                      { label: 'Avaliação', value: avgRestRating.toFixed(1), color: 'text-amber-500' },
+                    ].map(k => (
+                      <div key={k.label} className="bg-white p-5 text-center">
+                        <p className={`text-3xl font-black ${k.color} leading-none mb-1`}>{k.value}</p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{k.label}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Revenue cards */}
