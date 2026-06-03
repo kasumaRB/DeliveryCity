@@ -1184,7 +1184,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Entregador digita o código no app para confirmar que devolveu ao restaurante
   const confirmReturnWithCode = async (orderId: string, code: string): Promise<void> => {
     const { data: order, error: fetchErr } = await supabase.from('orders')
-      .select('return_code, customer_id, asaas_payment_id, status')
+      .select('return_code, customer_id, status')
       .eq('id', orderId).maybeSingle();
     if (fetchErr || !order) throw new Error('Pedido não encontrado.');
     if (order.status !== OrderStatus.RETURNING) throw new Error('Pedido não está em devolução.');
@@ -1197,30 +1197,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (error) throw new Error(error.message);
 
     await fetchData();
-
-    // Reembolso ao cliente — agora que a devolução foi fisicamente confirmada
-    supabase.functions.invoke('refund-asaas-payment', { body: { orderId } }).catch(() => {});
-
-    if (order.customer_id) {
-      supabase.functions.invoke('send-push-notification', {
-        body: {
-          userId: order.customer_id,
-          title: '💚 Reembolso em processamento',
-          body: 'Sua devolução foi confirmada. O reembolso será creditado em breve.',
-          data: { orderId, type: 'RETURNED' },
-        },
-      }).catch(() => {});
-    }
+    // Reembolso já foi processado quando o admin autorizou a devolução
   };
 
-  // Admin força confirmação de devolução sem código (override manual)
+  // Admin força confirmação sem código (override manual)
   const confirmReturn = async (orderId: string) => {
     const { error } = await supabase.from('orders')
       .update({ status: OrderStatus.RETURNED })
       .eq('id', orderId).eq('status', OrderStatus.RETURNING);
     if (error) throw new Error(error.message);
     await fetchData();
-    supabase.functions.invoke('refund-asaas-payment', { body: { orderId } }).catch(() => {});
+    // Reembolso já processado na autorização
   };
 
   // Admin envia mensagem interna para qualquer usuário (cliente, entregador, restaurante)

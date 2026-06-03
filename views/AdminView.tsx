@@ -1386,37 +1386,56 @@ export const AdminView: React.FC = () => {
                                   onClick={async () => {
                                     setAuthorizingReturnId(order.id);
                                     try {
+                                      // 1. Processa o reembolso imediatamente
+                                      await supabase.functions.invoke('refund-asaas-payment', { body: { orderId: order.id } });
+
+                                      // 2. Notifica o cliente que o reembolso foi aprovado
+                                      if (order.customerId) {
+                                        supabase.functions.invoke('send-push-notification', {
+                                          body: {
+                                            userId: order.customerId,
+                                            title: '💚 Reembolso aprovado',
+                                            body: 'O suporte aprovou seu reembolso. O valor será creditado em breve.',
+                                            data: { orderId: order.id, type: 'REFUND_APPROVED' },
+                                          },
+                                        }).catch(() => {});
+                                      }
+
+                                      // 3. Notifica o entregador para devolver o pedido
                                       if (order.driverId) {
-                                        await supabase.functions.invoke('send-push-notification', {
+                                        supabase.functions.invoke('send-push-notification', {
                                           body: {
                                             userId: order.driverId,
                                             title: '✅ Devolução autorizada',
-                                            body: `Suporte autorizou. Leve o pedido #${order.id.slice(-4)} ao restaurante ${order.restaurantName}.`,
+                                            body: `Leve o pedido #${order.id.slice(-4)} ao restaurante ${order.restaurantName}. Peça o código de devolução.`,
                                             data: { orderId: order.id, type: 'RETURN_AUTHORIZED' },
                                           },
-                                        });
+                                        }).catch(() => {});
                                       }
-                                      await supabase.from('support_tickets').insert({
+
+                                      // 4. Registra o evento
+                                      supabase.from('support_tickets').insert({
                                         user_id: order.driverId || order.customerId,
                                         user_name: driver?.name || 'Admin',
                                         user_role: 'DRIVER',
-                                        message: `[ADMIN] Devolução autorizada — Pedido #${order.id}. Motivo: ${order.failureReason || 'não informado'}`,
+                                        message: `[ADMIN] Devolução autorizada + reembolso processado — Pedido #${order.id}. Motivo: ${order.failureReason || 'não informado'}`,
                                         status: 'RESOLVED',
                                         from_admin: true,
                                         order_id: order.id,
                                         created_at: new Date().toISOString(),
                                       }).then(null, () => {});
+
                                       setAuthorizingReturnId(null);
                                     } catch (e: any) {
-                                      alert('Erro: ' + (e?.message || 'tente novamente'));
+                                      alert('Erro ao processar reembolso: ' + (e?.message || 'tente novamente'));
                                       setAuthorizingReturnId(null);
                                     }
                                   }}
                                   className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-orange-600 text-white rounded-xl font-black text-sm disabled:opacity-50 active:scale-95 transition-all"
                                 >
                                   {authorizingReturnId === order.id
-                                    ? <><Loader size={14} className="animate-spin" /> Notificando entregador...</>
-                                    : <><RotateCcw size={14} /> Autorizar devolução ao restaurante</>
+                                    ? <><Loader size={14} className="animate-spin" /> Processando reembolso...</>
+                                    : <><RotateCcw size={14} /> Autorizar devolução + reembolsar cliente</>
                                   }
                                 </button>
                               </div>
@@ -1440,8 +1459,8 @@ export const AdminView: React.FC = () => {
                               <div className="bg-green-50 border border-green-100 rounded-xl px-4 py-3 flex items-center gap-3">
                                 <Package size={16} className="text-green-500" />
                                 <div>
-                                  <p className="text-sm font-bold text-green-700">Devolução confirmada por código</p>
-                                  <p className="text-xs text-green-500">Reembolso disparado automaticamente para o cliente.</p>
+                                  <p className="text-sm font-bold text-green-700">Devolução concluída ✓</p>
+                                  <p className="text-xs text-green-500">Entregador confirmou via código. Reembolso já foi processado na autorização.</p>
                                 </div>
                               </div>
                             </div>
