@@ -100,14 +100,19 @@ const AppContent: React.FC = () => {
   const { isLoading, currentUserProfile, signOut, session, refreshData } = useAppStore();
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+  const retryCountRef = React.useRef(0);
   const autoRetried = React.useRef(false);
 
-  // Auto-retry silencioso uma vez: cobre o caso de token expirado após deploy
-  // sem expor a tela de erro para o usuário
+  // Auto-retry até 3 vezes com backoff antes de mostrar a tela de erro
   React.useEffect(() => {
-    if (session && !isLoading && !currentUserProfile && !autoRetried.current) {
+    if (session && !isLoading && !currentUserProfile && retryCountRef.current < 3) {
+      const delay = retryCountRef.current === 0 ? 0 : retryCountRef.current * 1500;
+      retryCountRef.current += 1;
       autoRetried.current = true;
-      refreshData().catch(() => {});
+      const t = setTimeout(() => {
+        refreshData().catch(() => {});
+      }, delay);
+      return () => clearTimeout(t);
     }
   }, [session, isLoading, currentUserProfile]);
 
@@ -116,9 +121,8 @@ const AppContent: React.FC = () => {
     return false; // minimiza app
   });
 
-  // FIX: sessão existe mas perfil não carregou — fetchData falhou (rede/timing)
-  // Mostra retry em vez de cair silenciosamente na ClientView genérica (loop de login)
-  if (session && !isLoading && !currentUserProfile) {
+  // Sessão existe mas perfil não carregou — aguarda os 3 auto-retries antes de mostrar erro
+  if (session && !isLoading && !currentUserProfile && retryCountRef.current >= 3) {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#F8F9FC] p-8 text-center animate-in fade-in duration-500">
         <div className="bg-white p-12 rounded-[3.5rem] shadow-2xl shadow-orange-100 flex flex-col items-center max-w-sm w-full">
@@ -132,7 +136,8 @@ const AppContent: React.FC = () => {
           <button
             onClick={async () => {
               setIsRetrying(true);
-              try { await refreshData(); } catch (_) { /* fetchData já captura erros */ }
+              retryCountRef.current = 0;
+              try { await refreshData(); } catch (_) {}
               finally { setIsRetrying(false); }
             }}
             disabled={isRetrying}
@@ -144,12 +149,24 @@ const AppContent: React.FC = () => {
             }
           </button>
           <button
-            onClick={signOut}
+            onClick={async () => {
+              // Limpa todo o cache local e força novo login
+              ['deliverycity_cache_restaurants', 'deliverycity_cache_orders', 'deliverycity_cache_profiles', 'deliverycity_cache_version'].forEach(k => localStorage.removeItem(k));
+              await signOut();
+            }}
             className="mt-3 w-full text-gray-400 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-100 transition active:scale-95 flex items-center justify-center gap-2"
           >
-            <LogOut size={14} /> Sair
+            <LogOut size={14} /> Reconectar (limpar cache)
           </button>
         </div>
+      </div>
+    );
+  }
+  // Ainda tentando auto-retry — mostra loading em vez da tela de erro
+  if (session && !isLoading && !currentUserProfile && retryCountRef.current < 3) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-[#F8F9FC]">
+        <Loader size={32} className="text-orange-500 animate-spin" />
       </div>
     );
   }

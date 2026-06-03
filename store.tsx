@@ -32,6 +32,23 @@ const STORAGE_KEY_RESTAURANTS = 'deliverycity_cache_restaurants';
 const STORAGE_KEY_ORDERS = 'deliverycity_cache_orders';
 const STORAGE_KEY_PROFILES = 'deliverycity_cache_profiles';
 
+// Incrementar aqui a cada deploy que mude o schema do cache local
+const CACHE_VERSION = '4';
+const CACHE_VERSION_KEY = 'deliverycity_cache_version';
+
+// Limpa caches locais se a versão mudou (ex: após deploy com schema novo)
+if (typeof window !== 'undefined') {
+  const storedVersion = localStorage.getItem(CACHE_VERSION_KEY);
+  if (storedVersion !== CACHE_VERSION) {
+    localStorage.removeItem(STORAGE_KEY_RESTAURANTS);
+    localStorage.removeItem(STORAGE_KEY_ORDERS);
+    localStorage.removeItem(STORAGE_KEY_PROFILES);
+    localStorage.setItem(CACHE_VERSION_KEY, CACHE_VERSION);
+  }
+}
+
+const AUTH_ERROR_CODES = new Set(['401', 'PGRST301', 'invalid_jwt', 'JWT expired', 'not_authorized']);
+
 interface AppContextType {
   restaurants: Restaurant[];
   orders: Order[];
@@ -354,6 +371,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (typeof window !== 'undefined') {
           (window as any).lastSyncError = 'PROFILE ERROR: ' + profileData.error.message;
         }
+        // Se for erro de autenticação, faz logout automático para limpar sessão inválida
+        const errMsg = profileData.error.message || '';
+        const errCode = String(profileData.error.code || '');
+        if (AUTH_ERROR_CODES.has(errCode) || /jwt|expired|unauthorized|invalid.*token/i.test(errMsg)) {
+          console.warn('[AUTH] Sessão inválida detectada — fazendo logout automático');
+          localStorage.removeItem(STORAGE_KEY_RESTAURANTS);
+          localStorage.removeItem(STORAGE_KEY_ORDERS);
+          localStorage.removeItem(STORAGE_KEY_PROFILES);
+          await supabase.auth.signOut();
+          return;
+        }
       }
 
       if (settingsData.data) {
@@ -370,6 +398,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.error('Erro ao sincronizar dados:', err);
       if (typeof window !== 'undefined') {
         (window as any).lastSyncError = err?.message || String(err);
+      }
+      const errMsg = err?.message || String(err);
+      if (/jwt|expired|unauthorized|invalid.*token|not_authorized/i.test(errMsg)) {
+        console.warn('[AUTH] Erro de autenticação no fetchData — logout automático');
+        localStorage.removeItem(STORAGE_KEY_RESTAURANTS);
+        localStorage.removeItem(STORAGE_KEY_ORDERS);
+        localStorage.removeItem(STORAGE_KEY_PROFILES);
+        await supabase.auth.signOut().catch(() => {});
+        return;
       }
       setIsSupabaseConnected(false);
     } finally {
