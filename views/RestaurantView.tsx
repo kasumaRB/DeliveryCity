@@ -115,6 +115,7 @@ export const RestaurantView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<
     'orders' | 'menu' | 'promotions' | 'stats' | 'profile' | 'support'
   >('orders');
+  const [mobileKanbanTab, setMobileKanbanTab] = useState<'pending' | 'preparing' | 'ready'>('pending');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [itemFormName, setItemFormName] = useState('');
   const [itemFormOwnerPrice, setItemFormOwnerPrice] = useState('');
@@ -548,9 +549,32 @@ export const RestaurantView: React.FC = () => {
                 </div>
               </header>
 
-              <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-8 min-h-0 overflow-x-auto pb-4 no-scrollbar">
+              {/* MOBILE: Seletor de coluna */}
+              <div className="flex lg:hidden gap-1 mb-4 bg-gray-100 p-1 rounded-xl">
+                {([
+                  { id: 'pending', label: 'Pendentes', count: getOrdersByStatus([OrderStatus.PENDING]).length, color: 'bg-orange-500' },
+                  { id: 'preparing', label: 'Cozinha', count: getOrdersByStatus([OrderStatus.PREPARING]).length, color: 'bg-blue-500' },
+                  { id: 'ready', label: 'Prontos', count: getOrdersByStatus([OrderStatus.READY, OrderStatus.OUT_FOR_DELIVERY]).length, color: 'bg-green-500' },
+                ] as const).map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setMobileKanbanTab(tab.id)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-black transition-all ${
+                      mobileKanbanTab === tab.id ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400'
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${tab.color}`} />
+                    {tab.label}
+                    {tab.count > 0 && (
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full text-white ${tab.color}`}>{tab.count}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-8 min-h-0 pb-4 no-scrollbar">
                 {/* COLUNA: PENDENTES */}
-                <div className="flex flex-col min-w-[320px] h-full">
+                <div className={`flex flex-col h-full ${mobileKanbanTab !== 'pending' ? 'hidden lg:flex' : 'flex'}`}>
                   <div className="flex items-center gap-2 mb-4 px-1">
                     <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
                     <h3 className="text-xs font-black text-gray-500 uppercase tracking-[0.15em]">
@@ -603,7 +627,7 @@ export const RestaurantView: React.FC = () => {
                 </div>
 
                 {/* COLUNA: PREPARANDO */}
-                <div className="flex flex-col min-w-[320px] h-full">
+                <div className={`flex flex-col h-full ${mobileKanbanTab !== 'preparing' ? 'hidden lg:flex' : 'flex'}`}>
                   <div className="flex items-center gap-2 mb-4 px-1">
                     <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
                     <h3 className="text-xs font-black text-gray-500 uppercase tracking-[0.15em]">
@@ -651,7 +675,7 @@ export const RestaurantView: React.FC = () => {
                 </div>
 
                 {/* COLUNA: PRONTOS */}
-                <div className="flex flex-col min-w-[320px] h-full">
+                <div className={`flex flex-col h-full ${mobileKanbanTab !== 'ready' ? 'hidden lg:flex' : 'flex'}`}>
                   <div className="flex items-center gap-2 mb-4 px-1">
                     <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
                     <h3 className="text-xs font-black text-gray-500 uppercase tracking-[0.15em]">

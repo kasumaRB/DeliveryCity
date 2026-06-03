@@ -591,9 +591,9 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
         onClose={() => { markSeen('CLIENT'); setShowTutorial(false); }}
       />
     )}
-    <div className="h-screen bg-gray-50 flex flex-col md:flex-row overflow-hidden relative safe-area-top safe-area-bottom">
+    <div className="h-screen bg-gray-50 flex flex-col lg:flex-row overflow-hidden relative safe-area-top safe-area-bottom">
       {/* SIDEBAR DESKTOP */}
-      <aside className="hidden md:flex w-64 bg-white border-r border-gray-100 flex-col p-6 sticky top-0 h-screen z-30">
+      <aside className="hidden lg:flex w-64 bg-white border-r border-gray-100 flex-col p-6 sticky top-0 h-screen z-30">
         <div className="mb-10 flex items-center gap-3 px-2">
           <img src={Logo} alt="Logo" className="h-8 w-auto object-contain" />
           <img src={Nome} alt="DeliveryCity" className="h-4 w-auto object-contain opacity-70" />
@@ -1214,7 +1214,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
           href={`https://wa.me/55${supportWhatsapp}?text=${encodeURIComponent('Olá! Preciso de ajuda com um pedido no DeliveryCity.')}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="fixed bottom-28 left-6 z-40 bg-green-500 text-white p-4 rounded-full shadow-2xl shadow-green-300 flex items-center justify-center active:scale-90 hover:bg-green-400 transition-all md:hidden"
+          className="fixed bottom-28 left-6 z-40 bg-green-500 text-white p-4 rounded-full shadow-2xl shadow-green-300 flex items-center justify-center active:scale-90 hover:bg-green-400 transition-all lg:hidden"
           title="Falar com o suporte"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
@@ -1224,7 +1224,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
       )}
 
       {/* NAVEGAÇÃO MOBILE FIXA (Z-INDEX 50 PARA FICAR POR CIMA DE TUDO) */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-gray-100 px-8 py-6 flex justify-around items-center z-50 md:hidden rounded-t-[2.5rem] shadow-[0_-10px_40px_-5px_rgba(0,0,0,0.08)]">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-gray-100 px-8 py-6 flex justify-around items-center z-50 lg:hidden rounded-t-[2.5rem] shadow-[0_-10px_40px_-5px_rgba(0,0,0,0.08)]">
         <button
           onClick={() => {
             setActiveTab('home');

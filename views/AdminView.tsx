@@ -505,15 +505,15 @@ export const AdminView: React.FC = () => {
                 </div>
 
                 {/* KPIs - Linha 1: Contadores */}
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                  <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-gray-100">
+                <div className="rounded-2xl border border-gray-100 shadow-sm overflow-hidden bg-gray-100">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-px">
                     {[
                       { icon: Users, color: 'text-purple-600', bg: 'bg-purple-50', value: profiles.length, label: 'Usuários Cadastrados' },
                       { icon: Store, color: 'text-orange-600', bg: 'bg-orange-50', value: restaurants.length, label: 'Lojas Ativas' },
                       { icon: Bike, color: 'text-green-600', bg: 'bg-green-50', value: profiles.filter(p => p.role === 'DRIVER').length, label: 'Entregadores' },
                       { icon: LayoutDashboard, color: 'text-blue-600', bg: 'bg-blue-50', value: todayOrders.length, label: 'Pedidos Hoje' },
                     ].map((kpi, i) => (
-                      <div key={i} className="p-6">
+                      <div key={i} className="bg-white p-5">
                         <div className={`w-10 h-10 rounded-xl ${kpi.bg} ${kpi.color} flex items-center justify-center mb-3`}>
                           <kpi.icon size={20} />
                         </div>
@@ -885,24 +885,24 @@ export const AdminView: React.FC = () => {
                 </div>
 
                 {/* Filters */}
-                <div className="flex flex-wrap gap-3">
-                  <div className="flex gap-2">
+                <div className="space-y-2">
+                  <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                     {(['ALL', 'OPEN', 'RESOLVED'] as const).map(f => (
                       <button key={f} onClick={() => setSupportFilter(f)}
-                        className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                        className={`shrink-0 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
                           supportFilter === f ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
                         }`}>
                         {f === 'ALL' ? 'Todos' : f === 'OPEN' ? 'Abertos' : 'Resolvidos'}
                       </button>
                     ))}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                     {(['ALL', 'RESTAURANT', 'DRIVER', 'CLIENT'] as const).map(r => (
                       <button key={r} onClick={() => setSupportRoleFilter(r)}
-                        className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                        className={`shrink-0 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
                           supportRoleFilter === r ? 'bg-purple-600 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
                         }`}>
-                        {r === 'ALL' ? 'Todos os papéis' : r === 'RESTAURANT' ? '🏪 Lojista' : r === 'DRIVER' ? '🏍️ Entregador' : '👤 Cliente'}
+                        {r === 'ALL' ? 'Todos' : r === 'RESTAURANT' ? '🏪 Lojista' : r === 'DRIVER' ? '🏍️ Entregador' : '👤 Cliente'}
                       </button>
                     ))}
                   </div>
@@ -1028,13 +1028,13 @@ export const AdminView: React.FC = () => {
 
                 {/* KPIs globais */}
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                  <div className="grid grid-cols-3 divide-x divide-gray-100">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
                     {[
                       { label: 'Média Geral', value: globalAvg.toFixed(1) + ' ⭐', color: 'text-amber-500' },
                       { label: 'Total de Avaliações', value: ratedOrders.length, color: 'text-purple-600' },
                       { label: 'Restaurantes Avaliados', value: byRestaurant.length, color: 'text-blue-600' },
                     ].map(k => (
-                      <div key={k.label} className="p-6 text-center">
+                      <div key={k.label} className="p-5 text-center">
                         <p className={`text-3xl font-black ${k.color}`}>{k.value}</p>
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">{k.label}</p>
                       </div>
