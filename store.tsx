@@ -631,6 +631,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clearOfflineCart();
         setSession(null);
         setIsLoading(false);
+        // Reseta os guards para que o próximo SIGNED_IN funcione normalmente
+        isAuthHandlingRef.current = false;
+        fetchInProgressRef.current = false;
       }
     });
     return () => {
@@ -1499,9 +1502,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           await fetchData();
         },
         refreshData: async () => {
-          // Força refresh do token JWT antes de buscar dados — evita falha silenciosa
-          // quando o token expirou após deploy (queries retornam null sem lançar erro)
-          try { await supabase.auth.refreshSession(); } catch (_) { /* ignora */ }
+          // Não chama refreshSession() aqui: dispararia TOKEN_REFRESHED → fetchData via
+          // event listener → fetchInProgressRef=true → esta chamada seria ignorada pelo guard.
+          // O Supabase renova o token automaticamente nas queries quando necessário.
           return fetchData(true);
         },
         requestPasswordReset: async e => await supabase.auth.resetPasswordForEmail(e),
