@@ -608,7 +608,7 @@ export const DriverView: React.FC = () => {
 
   if (activeTab === 'profile')
     return (
-      <div className="min-h-screen bg-gray-900 text-white overflow-x-hidden safe-area-top">
+      <div className="min-h-dvh bg-gray-900 text-white overflow-x-hidden safe-area-top">
         <DriverProfile onBack={() => setActiveTab('home')} />
       </div>
     );
@@ -629,7 +629,7 @@ export const DriverView: React.FC = () => {
         onClose={() => { markSeen('DRIVER'); updateUserProfile(currentUserProfile!.id, { driverTutorialSeen: true }).catch(() => {}); setShowTutorial(false); }}
       />
     )}
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col h-screen overflow-hidden safe-area-top">
+    <div className="bg-gray-900 text-white flex flex-col h-dvh overflow-hidden safe-area-top">
 
       {/* Top Bar — limpo, logo + status */}
       <header className="bg-gray-950 border-b border-gray-800/60 px-5 py-3 flex justify-between items-center shrink-0">

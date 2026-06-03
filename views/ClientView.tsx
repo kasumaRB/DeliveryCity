@@ -598,7 +598,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
         onClose={() => { markSeen('CLIENT'); if (currentUserProfile) updateUserProfile!(currentUserProfile.id, { clientTutorialSeen: true }).catch(() => {}); setShowTutorial(false); }}
       />
     )}
-    <div className="h-screen bg-gray-50 flex flex-col lg:flex-row overflow-hidden relative safe-area-top safe-area-bottom">
+    <div className="h-dvh bg-gray-50 flex flex-col lg:flex-row overflow-hidden relative safe-area-top">
       {/* SIDEBAR DESKTOP */}
       <aside className="hidden lg:flex w-64 bg-white border-r border-gray-100 flex-col p-6 sticky top-0 h-screen z-30">
         <div className="mb-10 flex items-center gap-3 px-2">
