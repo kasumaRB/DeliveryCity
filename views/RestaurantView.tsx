@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppStore } from '../store';
 import { supabase } from '../lib/supabase';
-import { OrderStatus, Product, UserRole, Promotion, UserAddress } from '../types';
+import { OrderStatus, Product, UserRole, Promotion, UserAddress, DaySchedule } from '../types';
 import { AddressModal } from '../components/AddressModal';
 
 const resizeImage = (file: File, maxWidth: number, maxHeight: number): Promise<File> => {
@@ -141,6 +141,15 @@ export const RestaurantView: React.FC = () => {
   const [storeWorkingHours, setStoreWorkingHours] = useState(
     currentUserProfile?.workingHours || ''
   );
+
+  const defaultSchedule = (): DaySchedule[] =>
+    ([0,1,2,3,4,5,6] as DaySchedule['day'][]).map(d => ({ day: d, open: '06:00', close: '20:00', closed: false }));
+
+  const [scheduleHours, setScheduleHours] = useState<DaySchedule[]>(() =>
+    (myRestaurant?.openingHours && myRestaurant.openingHours.length > 0)
+      ? myRestaurant.openingHours
+      : defaultSchedule()
+  );
   const [respName, setRespName] = useState(currentUserProfile?.name || '');
   const [respPhone, setRespPhone] = useState(currentUserProfile?.phoneNumber || '');
   const [respCpf, setRespCpf] = useState(currentUserProfile?.cpf || '');
@@ -172,6 +181,11 @@ export const RestaurantView: React.FC = () => {
       setStoreCoords(myRestaurant.coords || null);
       setStoreDescription(currentUserProfile.description || '');
       setStoreWorkingHours(currentUserProfile.workingHours || '');
+      setScheduleHours(
+        (myRestaurant.openingHours && myRestaurant.openingHours.length > 0)
+          ? myRestaurant.openingHours
+          : defaultSchedule()
+      );
       setRespName(currentUserProfile.name);
       setRespPhone(currentUserProfile.phoneNumber || '');
       setRespCpf(currentUserProfile.cpf || '');
@@ -330,6 +344,7 @@ export const RestaurantView: React.FC = () => {
         updateRestaurant(myRestaurant.id, {
           name: storeName,
           address: storeAddress,
+          openingHours: scheduleHours,
           ...(storeCoords ? { coords: storeCoords } : {}),
         }),
         updateUserProfile(currentUserProfile.id, {
@@ -1431,11 +1446,18 @@ export const RestaurantView: React.FC = () => {
                       Dados da Operação
                     </h4>
                     <div className="bg-gray-50 p-4 rounded-xl space-y-3">
-                      <div className="flex items-center gap-3 text-gray-600">
-                        <Clock size={16} />
-                        <span className="text-sm font-bold">
-                          {currentUserProfile.workingHours || 'Não definido'}
-                        </span>
+                      <div className="flex items-start gap-3 text-gray-600">
+                        <Clock size={16} className="mt-0.5 shrink-0" />
+                        <div className="text-xs font-bold leading-relaxed">
+                          {myRestaurant.openingHours && myRestaurant.openingHours.length > 0
+                            ? (['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'] as const).map((label, idx) => {
+                                const s = myRestaurant.openingHours!.find(x => x.day === idx);
+                                if (!s || s.closed) return null;
+                                return <span key={idx} className="block">{label}: {s.open} – {s.close}</span>;
+                              })
+                            : (currentUserProfile.workingHours || 'Não definido')
+                          }
+                        </div>
                       </div>
                       <div className="flex items-center gap-3 text-gray-600">
                         <MapPin size={16} />
@@ -1690,12 +1712,50 @@ export const RestaurantView: React.FC = () => {
                     Localização no mapa definida ✓
                   </p>
                 )}
-                <input
-                  value={storeWorkingHours}
-                  onChange={e => setStoreWorkingHours(e.target.value)}
-                  placeholder="Horário (ex: 08:00 às 22:00)"
-                  className="w-full p-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-orange-100"
-                />
+                {/* Editor de horários por dia da semana */}
+                <div className="bg-gray-50 rounded-2xl overflow-hidden border border-gray-100">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 pt-4 pb-2">
+                    Horário de Funcionamento
+                  </p>
+                  <div className="divide-y divide-gray-100">
+                    {(['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'] as const).map((label, idx) => {
+                      const day = idx as DaySchedule['day'];
+                      const entry = scheduleHours.find(s => s.day === day) ?? { day, open: '06:00', close: '20:00', closed: false };
+                      const update = (patch: Partial<DaySchedule>) =>
+                        setScheduleHours(prev => {
+                          const exists = prev.find(s => s.day === day);
+                          if (exists) return prev.map(s => s.day === day ? { ...s, ...patch } : s);
+                          return [...prev, { ...entry, ...patch }];
+                        });
+                      return (
+                        <div key={day} className={`flex items-center gap-3 px-4 py-3 transition-colors ${entry.closed ? 'opacity-40' : ''}`}>
+                          <input
+                            type="checkbox"
+                            checked={!entry.closed}
+                            onChange={e => update({ closed: !e.target.checked })}
+                            className="w-4 h-4 accent-orange-500 shrink-0 cursor-pointer"
+                          />
+                          <span className="text-xs font-black text-gray-700 w-7 shrink-0">{label}</span>
+                          <input
+                            type="time"
+                            value={entry.open}
+                            disabled={entry.closed}
+                            onChange={e => update({ open: e.target.value })}
+                            className="flex-1 p-2 bg-white rounded-xl text-xs font-bold outline-none border border-gray-200 focus:border-orange-300 disabled:cursor-not-allowed text-center"
+                          />
+                          <span className="text-gray-300 text-xs font-bold shrink-0">até</span>
+                          <input
+                            type="time"
+                            value={entry.close}
+                            disabled={entry.closed}
+                            onChange={e => update({ close: e.target.value })}
+                            className="flex-1 p-2 bg-white rounded-xl text-xs font-bold outline-none border border-gray-200 focus:border-orange-300 disabled:cursor-not-allowed text-center"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
                 <textarea
                   value={storeDescription}
                   onChange={e => setStoreDescription(e.target.value)}
