@@ -100,17 +100,17 @@ const AppContent: React.FC = () => {
   const { isLoading, currentUserProfile, signOut, session, refreshData } = useAppStore();
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [autoRetrying, setAutoRetrying] = useState(false);
   const retryCountRef = React.useRef(0);
-  const autoRetried = React.useRef(false);
 
   // Auto-retry até 3 vezes com backoff antes de mostrar a tela de erro
   React.useEffect(() => {
     if (session && !isLoading && !currentUserProfile && retryCountRef.current < 3) {
-      const delay = retryCountRef.current === 0 ? 0 : retryCountRef.current * 1500;
+      const delay = retryCountRef.current === 0 ? 300 : retryCountRef.current * 1500;
       retryCountRef.current += 1;
-      autoRetried.current = true;
+      setAutoRetrying(true);
       const t = setTimeout(() => {
-        refreshData().catch(() => {});
+        refreshData().catch(() => {}).finally(() => setAutoRetrying(false));
       }, delay);
       return () => clearTimeout(t);
     }
@@ -122,7 +122,7 @@ const AppContent: React.FC = () => {
   });
 
   // Sessão existe mas perfil não carregou — aguarda os 3 auto-retries antes de mostrar erro
-  if (session && !isLoading && !currentUserProfile && retryCountRef.current >= 3) {
+  if (session && !isLoading && !currentUserProfile && retryCountRef.current >= 3 && !autoRetrying) {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#F8F9FC] p-8 text-center animate-in fade-in duration-500">
         <div className="bg-white p-12 rounded-[3.5rem] shadow-2xl shadow-orange-100 flex flex-col items-center max-w-sm w-full">
@@ -162,15 +162,6 @@ const AppContent: React.FC = () => {
       </div>
     );
   }
-  // Ainda tentando auto-retry — mostra loading em vez da tela de erro
-  if (session && !isLoading && !currentUserProfile && retryCountRef.current < 3) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-[#F8F9FC]">
-        <Loader size={32} className="text-orange-500 animate-spin" />
-      </div>
-    );
-  }
-
   // Sem sessão e sem loading = não logado
   if (!session && !isLoading) {
     return (
@@ -187,8 +178,8 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // Carregando
-  if (isLoading) {
+  // Carregando (inicial ou auto-retry em progresso)
+  if (isLoading || autoRetrying) {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#F8F9FC] animate-in fade-in duration-500">
         <div className="bg-white p-12 rounded-[3.5rem] shadow-2xl shadow-orange-100 flex flex-col items-center">
