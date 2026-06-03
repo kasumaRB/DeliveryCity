@@ -107,6 +107,7 @@ export const RestaurantView: React.FC = () => {
     updateUserProfile,
     refreshData,
     platformSettings,
+    confirmReturn,
   } = useAppStore();
 
   const myRestaurant = restaurants.find(r => r.ownerId === currentUserProfile?.id);
@@ -115,7 +116,8 @@ export const RestaurantView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<
     'orders' | 'menu' | 'promotions' | 'stats' | 'profile' | 'support'
   >('orders');
-  const [mobileKanbanTab, setMobileKanbanTab] = useState<'pending' | 'preparing' | 'ready'>('pending');
+  const [mobileKanbanTab, setMobileKanbanTab] = useState<'pending' | 'preparing' | 'ready' | 'returning'>('pending');
+  const [confirmingReturnId, setConfirmingReturnId] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [itemFormName, setItemFormName] = useState('');
   const [itemFormOwnerPrice, setItemFormOwnerPrice] = useState('');
@@ -565,20 +567,21 @@ export const RestaurantView: React.FC = () => {
               </header>
 
               {/* MOBILE: Seletor de coluna */}
-              <div className="flex lg:hidden gap-1 mb-4 bg-gray-100 p-1 rounded-xl">
+              <div className="flex lg:hidden gap-1 mb-4 bg-gray-100 p-1 rounded-xl overflow-x-auto no-scrollbar">
                 {([
                   { id: 'pending', label: 'Pendentes', count: getOrdersByStatus([OrderStatus.PENDING]).length, color: 'bg-orange-500' },
                   { id: 'preparing', label: 'Cozinha', count: getOrdersByStatus([OrderStatus.PREPARING]).length, color: 'bg-blue-500' },
                   { id: 'ready', label: 'Prontos', count: getOrdersByStatus([OrderStatus.READY, OrderStatus.OUT_FOR_DELIVERY]).length, color: 'bg-green-500' },
+                  { id: 'returning', label: 'Devoluções', count: getOrdersByStatus([OrderStatus.RETURNING]).length, color: 'bg-red-500' },
                 ] as const).map(tab => (
                   <button
                     key={tab.id}
                     onClick={() => setMobileKanbanTab(tab.id)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-black transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-black transition-all whitespace-nowrap ${
                       mobileKanbanTab === tab.id ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400'
                     }`}
                   >
-                    <span className={`w-1.5 h-1.5 rounded-full ${tab.color}`} />
+                    <span className={`w-1.5 h-1.5 rounded-full ${tab.color} shrink-0`} />
                     {tab.label}
                     {tab.count > 0 && (
                       <span className={`text-[9px] px-1.5 py-0.5 rounded-full text-white ${tab.color}`}>{tab.count}</span>
@@ -587,7 +590,7 @@ export const RestaurantView: React.FC = () => {
                 ))}
               </div>
 
-              <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-8 min-h-0 pb-4 no-scrollbar">
+              <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-6 min-h-0 pb-4 no-scrollbar">
                 {/* COLUNA: PENDENTES */}
                 <div className={`flex flex-col h-full ${mobileKanbanTab !== 'pending' ? 'hidden lg:flex' : 'flex'}`}>
                   <div className="flex items-center gap-2 mb-4 px-1">
@@ -745,6 +748,67 @@ export const RestaurantView: React.FC = () => {
                         </div>
                       )
                     )}
+                  </div>
+                </div>
+                {/* COLUNA: DEVOLUÇÕES */}
+                <div className={`flex flex-col h-full ${mobileKanbanTab !== 'returning' ? 'hidden lg:flex' : 'flex'}`}>
+                  <div className="flex items-center gap-2 mb-4 px-1">
+                    <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                    <h3 className="text-xs font-black text-gray-500 uppercase tracking-[0.15em]">
+                      Devoluções ({getOrdersByStatus([OrderStatus.RETURNING]).length})
+                    </h3>
+                  </div>
+                  <div className="flex-1 space-y-3 overflow-y-auto no-scrollbar">
+                    {getOrdersByStatus([OrderStatus.RETURNING]).length === 0 ? (
+                      <p className="text-gray-300 text-xs text-center pt-6">Sem devoluções</p>
+                    ) : getOrdersByStatus([OrderStatus.RETURNING]).map(order => (
+                      <div
+                        key={order.id}
+                        className="bg-white rounded-2xl border border-orange-100 shadow-sm p-4 animate-in zoom-in-95"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className="w-7 h-7 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+                                <span className="text-orange-600 font-black text-xs">
+                                  {order.customerName.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                              <span className="font-black text-gray-900 text-sm">{order.customerName}</span>
+                            </div>
+                            {order.failureReason && (
+                              <p className="text-red-400 text-[10px] font-medium mt-0.5">Motivo: {order.failureReason}</p>
+                            )}
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="font-black text-gray-900 text-sm">#{order.id.slice(-4)}</span>
+                            <p className="text-orange-500 text-[9px] font-black animate-pulse mt-0.5">A caminho</p>
+                          </div>
+                        </div>
+                        <div className="border-t border-gray-50 pt-2 space-y-1 mb-3">
+                          {order.items.map((item, idx) => (
+                            <div key={idx} className="flex justify-between text-xs text-gray-600">
+                              <span>{item.quantity}x {item.product.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <button
+                          disabled={confirmingReturnId === order.id}
+                          onClick={async () => {
+                            setConfirmingReturnId(order.id);
+                            try { await confirmReturn(order.id); }
+                            catch (e: any) { alert(e.message || 'Erro ao confirmar devolução.'); }
+                            finally { setConfirmingReturnId(null); }
+                          }}
+                          className="w-full bg-orange-600 text-white py-2.5 rounded-xl font-black text-xs tracking-wide active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                          {confirmingReturnId === order.id
+                            ? <><Loader size={14} className="animate-spin" /> Confirmando...</>
+                            : '✓ Confirmar recebimento'
+                          }
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
