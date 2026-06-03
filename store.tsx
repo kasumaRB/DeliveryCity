@@ -761,7 +761,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // ═══════════════════════════════════════════════════════
       const { data: restaurantData, error: restError } = await supabase
         .from('restaurants')
-        .select('id, name, menu, owner_id, asaas_account_id')
+        .select('id, name, menu, owner_id')
         .eq('id', restaurantId)
         .single();
 
