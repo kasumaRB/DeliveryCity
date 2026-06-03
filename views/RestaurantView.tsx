@@ -761,7 +761,7 @@ export const RestaurantView: React.FC = () => {
 
               <div className="flex flex-col xl:flex-row gap-12 items-start">
                 {showProductForm && (
-                  <div className="w-full xl:w-[450px] bg-white p-8 rounded-2xl shadow-sm border border-gray-100 sticky top-10 h-fit">
+                  <div className="w-full xl:w-[450px] bg-white p-8 rounded-2xl shadow-sm border border-gray-100 xl:sticky xl:top-10 h-fit">
                     <div className="flex justify-between items-start mb-10">
                       <h3 className="text-2xl font-black text-gray-900 flex items-center gap-4">
                         {editingProduct ? (
