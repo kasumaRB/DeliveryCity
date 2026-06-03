@@ -1387,7 +1387,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateUserProfile,
         setupNotifications,
         deleteUserProfile: async id => {
-          await supabase.from('profiles').delete().eq('id', id);
+          // Deleta o perfil (RLS permite para admin)
+          const { error: profileErr } = await supabase.from('profiles').delete().eq('id', id);
+          if (profileErr) throw new Error('Erro ao deletar perfil: ' + profileErr.message);
+          // Deleta o usuário do auth via Edge Function (requer service role)
+          await supabase.functions.invoke('delete-auth-user', { body: { userId: id } }).catch(() => {});
           await fetchData();
         },
         updateRestaurant: async (id, d) => {

@@ -689,15 +689,42 @@ export const AdminView: React.FC = () => {
                               <button
                                 onClick={() => setViewingUser(p)}
                                 className="p-2.5 text-gray-400 bg-gray-100 rounded-xl hover:text-purple-600 hover:bg-purple-50 transition-all"
+                                title="Ver dossiê"
                               >
                                 <Eye size={16} />
                               </button>
                               <button
-                                onClick={() => {
-                                  if (window.confirm('Apagar usuário?')) deleteUserProfile(p.id);
+                                disabled={p.role === UserRole.ADMIN || !!approvalLoading[p.id]}
+                                onClick={async () => {
+                                  const newStatus = p.status === 'BLOCKED' ? 'APPROVED' : 'BLOCKED';
+                                  const msg = newStatus === 'BLOCKED' ? 'Bloquear este usuário?' : 'Desbloquear este usuário?';
+                                  if (!window.confirm(msg)) return;
+                                  setApprovalLoading(prev => ({ ...prev, [p.id]: 'blocking' }));
+                                  try { await updateUserProfile(p.id, { status: newStatus as any }); }
+                                  catch (e: any) { alert('Erro: ' + e.message); }
+                                  finally { setApprovalLoading(prev => ({ ...prev, [p.id]: null })); }
+                                }}
+                                className={`p-2.5 rounded-xl border transition-all disabled:opacity-20 ${
+                                  p.status === 'BLOCKED'
+                                    ? 'text-green-600 bg-green-50 border-green-100 hover:bg-green-600 hover:text-white'
+                                    : 'text-orange-500 bg-orange-50 border-orange-100 hover:bg-orange-500 hover:text-white'
+                                }`}
+                                title={p.status === 'BLOCKED' ? 'Desbloquear' : 'Bloquear'}
+                              >
+                                {approvalLoading[p.id] === 'blocking'
+                                  ? <Loader size={16} className="animate-spin" />
+                                  : p.status === 'BLOCKED' ? <Shield size={16} /> : <Shield size={16} />
+                                }
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  if (!window.confirm(`Excluir permanentemente ${p.name}? Esta ação não pode ser desfeita.`)) return;
+                                  try { await deleteUserProfile(p.id); }
+                                  catch (e: any) { alert('Erro ao excluir: ' + e.message); }
                                 }}
                                 disabled={p.role === UserRole.ADMIN}
                                 className="p-2.5 text-red-400 bg-red-50 border border-red-100 rounded-xl hover:bg-red-600 hover:text-white transition-all disabled:opacity-20"
+                                title="Excluir conta"
                               >
                                 <Trash2 size={16} />
                               </button>
