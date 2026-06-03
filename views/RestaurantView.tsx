@@ -908,7 +908,7 @@ export const RestaurantView: React.FC = () => {
                   </div>
                   </div>
                 )}
-                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-8">
+                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
                   {myRestaurant.menu.map(item => (
                     <div
                       key={item.id}

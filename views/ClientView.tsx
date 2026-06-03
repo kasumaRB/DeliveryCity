@@ -728,7 +728,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                   </button>
                 </div>
               )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
                 {filteredStores.map(restaurant => {
                   const estFee = estimatedDeliveryFee(restaurant);
                   const isClosed = restaurant.isOpen === false;

@@ -608,8 +608,10 @@ export const DriverView: React.FC = () => {
 
   if (activeTab === 'profile')
     return (
-      <div className="min-h-dvh bg-gray-900 text-white overflow-x-hidden safe-area-top">
-        <DriverProfile onBack={() => setActiveTab('home')} />
+      <div className="min-h-dvh bg-gray-950 flex justify-center overflow-x-hidden">
+        <div className="w-full md:max-w-2xl bg-gray-900 text-white safe-area-top md:border-x md:border-gray-800/60">
+          <DriverProfile onBack={() => setActiveTab('home')} />
+        </div>
       </div>
     );
 
@@ -629,7 +631,8 @@ export const DriverView: React.FC = () => {
         onClose={() => { markSeen('DRIVER'); updateUserProfile(currentUserProfile!.id, { driverTutorialSeen: true }).catch(() => {}); setShowTutorial(false); }}
       />
     )}
-    <div className="bg-gray-900 text-white flex flex-col h-dvh overflow-hidden safe-area-top">
+    <div className="h-dvh bg-gray-950 flex justify-center overflow-hidden">
+    <div className="flex flex-col w-full md:max-w-2xl bg-gray-900 text-white overflow-hidden safe-area-top md:border-x md:border-gray-800/60">
 
       {/* Top Bar — limpo, logo + status */}
       <header className="bg-gray-950 border-b border-gray-800/60 px-5 py-3 flex justify-between items-center shrink-0">
@@ -1327,6 +1330,7 @@ export const DriverView: React.FC = () => {
           <span className="font-bold text-sm">Sem conexão — modo offline</span>
         </div>
       )}
+    </div>
     </div>
     </>
   );

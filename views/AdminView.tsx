@@ -506,7 +506,7 @@ export const AdminView: React.FC = () => {
 
                 {/* KPIs - Linha 1: Contadores */}
                 <div className="rounded-2xl border border-gray-100 shadow-sm overflow-hidden bg-gray-100">
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-px">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-px">
                     {[
                       { icon: Users, color: 'text-purple-600', bg: 'bg-purple-50', value: profiles.length, label: 'Usuários Cadastrados' },
                       { icon: Store, color: 'text-orange-600', bg: 'bg-orange-50', value: restaurants.length, label: 'Lojas Ativas' },
