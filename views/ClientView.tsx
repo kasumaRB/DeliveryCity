@@ -591,75 +591,74 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
         onClose={() => { markSeen('CLIENT'); setShowTutorial(false); }}
       />
     )}
-    <div className="h-screen bg-[#F8F9FC] flex flex-col md:flex-row overflow-hidden relative safe-area-top safe-area-bottom">
+    <div className="h-screen bg-gray-50 flex flex-col md:flex-row overflow-hidden relative safe-area-top safe-area-bottom">
       {/* SIDEBAR DESKTOP */}
-      <aside className="hidden md:flex w-72 bg-white border-r flex-col p-8 sticky top-0 h-screen z-30 shadow-xl shadow-gray-100">
-        <div className="mb-14 flex flex-col items-center">
-          <img src={Logo} alt="Logo" className="h-20 w-auto object-contain mb-4 drop-shadow-md" />
-          <img src={Nome} alt="DeliveryCity" className="h-5 w-auto object-contain opacity-80" />
+      <aside className="hidden md:flex w-64 bg-white border-r border-gray-100 flex-col p-6 sticky top-0 h-screen z-30">
+        <div className="mb-10 flex items-center gap-3 px-2">
+          <img src={Logo} alt="Logo" className="h-8 w-auto object-contain" />
+          <img src={Nome} alt="DeliveryCity" className="h-4 w-auto object-contain opacity-70" />
         </div>
-        <nav className="flex-1 space-y-3">
+        <nav className="flex-1 space-y-1">
           <button
             onClick={() => {
               setActiveTab('home');
               setSelectedRestaurant(null);
             }}
-            className={`w-full flex items-center gap-4 p-5 rounded-[2rem] font-bold transition-all ${activeTab === 'home' ? 'bg-orange-600 text-white shadow-xl shadow-orange-100' : 'text-gray-400 hover:bg-gray-50'}`}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'home' ? 'bg-orange-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
           >
-            <Home size={24} /> <span>Início</span>
+            <Home size={20} /> <span>Início</span>
           </button>
           <button
             onClick={() => setActiveTab('orders')}
-            className={`w-full flex items-center gap-4 p-5 rounded-[2rem] font-bold transition-all ${activeTab === 'orders' ? 'bg-orange-600 text-white shadow-xl shadow-orange-100' : 'text-gray-400 hover:bg-gray-50'}`}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'orders' ? 'bg-orange-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
           >
-            <List size={24} /> <span>Meus Pedidos</span>
+            <List size={20} /> <span>Meus Pedidos</span>
           </button>
           <button
             onClick={onOpenProfile}
-            className={`w-full flex items-center gap-4 p-5 rounded-[2rem] font-bold transition-all ${activeTab === 'profile' ? 'bg-orange-600 text-white shadow-xl shadow-orange-100' : 'text-gray-400 hover:bg-gray-50'}`}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'profile' ? 'bg-orange-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
           >
-            <User size={24} /> <span>Meu Perfil</span>
+            <User size={20} /> <span>Meu Perfil</span>
           </button>
           <button
             onClick={() => setShowTutorial(true)}
-            className="w-full flex items-center gap-4 p-5 rounded-[2rem] font-bold text-gray-400 hover:bg-gray-50 transition-all"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm text-gray-500 hover:bg-gray-50 transition-all"
           >
-            <HelpCircle size={24} /> <span>Tutorial</span>
+            <HelpCircle size={20} /> <span>Tutorial</span>
           </button>
         </nav>
       </aside>
 
       {/* CONTEÚDO PRINCIPAL COM PADDING INFERIOR PARA NÃO FICAR ATRÁS DO MENU */}
       <main className="flex-1 flex flex-col min-h-0 pb-36 md:pb-0 relative z-10 overflow-y-auto no-scrollbar">
-        {/* HEADER MOBILE AJUSTADO */}
-        <header className="bg-white/90 backdrop-blur-xl sticky top-0 z-[45] px-6 py-4 flex flex-col gap-4 border-b border-gray-100 shadow-sm">
+        {/* HEADER */}
+        <header className="bg-white border-b border-gray-100 sticky top-0 z-[45] px-6 py-4 flex flex-col gap-3">
           <div className="flex justify-between items-center w-full">
             {selectedRestaurant ? (
               <button
                 onClick={() => setSelectedRestaurant(null)}
-                className="p-2.5 bg-gray-50 text-gray-900 rounded-2xl border border-gray-100 active:scale-95 transition-all"
+                className="p-2 text-gray-700 hover:bg-gray-50 rounded-xl active:scale-95 transition-all"
               >
-                <ChevronLeft size={24} />
+                <ChevronLeft size={22} />
               </button>
             ) : (
               <div className="flex items-center gap-2">
-                <img src={Logo} alt="Logo" className="h-9 w-auto" />
-                <img src={Nome} alt="DeliveryCity" className="h-4 w-auto opacity-70" />
+                <img src={Logo} alt="Logo" className="h-8 w-auto" />
+                <img src={Nome} alt="DeliveryCity" className="h-3.5 w-auto opacity-60" />
               </div>
             )}
-            {/* REMOVIDO BOTÃO DE PERFIL DUPLICADO DAQUI */}
           </div>
 
           <button
             onClick={handleAddressButtonClick}
-            className="flex items-center gap-3 text-left w-full bg-gray-50 border border-gray-100 px-5 py-3 rounded-[1.2rem] active:scale-[0.98] transition-all"
+            className="flex items-center gap-3 text-left w-full bg-gray-50 border border-gray-100 px-4 py-2.5 rounded-xl active:scale-[0.98] transition-all"
           >
-            <MapPin size={16} className="text-orange-600 shrink-0" />
+            <MapPin size={15} className="text-orange-600 shrink-0" />
             <div className="flex flex-col flex-1 truncate">
               <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-0.5">
                 Entregar em
               </span>
-              <span className="truncate text-[11px] font-black text-gray-900">
+              <span className="truncate text-xs font-bold text-gray-900">
                 {selectedAddress
                   ? formatAddressDisplay(selectedAddress)
                   : currentUserProfile
@@ -671,49 +670,49 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
           </button>
         </header>
 
-        <div className="p-6 md:p-12 w-full max-w-7xl mx-auto">
+        <div className="p-5 md:p-10 w-full max-w-7xl mx-auto">
           {activeTab === 'home' && !selectedRestaurant && (
             <div className="animate-in fade-in slide-in-from-top-4 duration-700">
-              <h2 className="text-3xl md:text-5xl font-black text-gray-900 tracking-tighter mb-8">
+              <h2 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight mb-6">
                 Fome de quê?
               </h2>
-              <div className="relative mb-6 max-w-2xl">
+              <div className="relative mb-5 max-w-2xl">
                 <Search
-                  size={20}
-                  className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300"
+                  size={16}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
                 />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   placeholder="Buscar restaurante..."
-                  className="w-full bg-white border-2 border-transparent p-5 pl-16 rounded-[2rem] font-bold text-gray-700 outline-none shadow-xl shadow-gray-100 focus:border-orange-200 transition-all"
+                  className="w-full bg-white border border-gray-200 py-3 pl-11 pr-4 rounded-xl font-medium text-gray-700 outline-none focus:border-orange-300 transition-all text-sm"
                 />
               </div>
               {currentUserProfile && (
-                <div className="flex gap-3 mb-8">
+                <div className="flex gap-2 mb-6">
                   <button
                     onClick={() => setShowFavoritesOnly(false)}
-                    className={`px-5 py-2.5 rounded-2xl font-bold text-xs transition-all ${
+                    className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${
                       !showFavoritesOnly
-                        ? 'bg-orange-600 text-white shadow-lg shadow-orange-100'
-                        : 'bg-white text-gray-500 border border-gray-100'
+                        ? 'bg-orange-600 text-white'
+                        : 'bg-white text-gray-500 border border-gray-200'
                     }`}
                   >
                     Todos
                   </button>
                   <button
                     onClick={() => setShowFavoritesOnly(true)}
-                    className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl font-bold text-xs transition-all ${
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-xs transition-all ${
                       showFavoritesOnly
-                        ? 'bg-red-500 text-white shadow-lg shadow-red-100'
-                        : 'bg-white text-gray-500 border border-gray-100'
+                        ? 'bg-red-500 text-white'
+                        : 'bg-white text-gray-500 border border-gray-200'
                     }`}
                   >
-                    <Heart size={13} className={showFavoritesOnly ? 'fill-white' : ''} />
+                    <Heart size={12} className={showFavoritesOnly ? 'fill-white' : ''} />
                     Favoritos
                     {(currentUserProfile.favoriteRestaurantIds?.length ?? 0) > 0 && (
-                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-black ${
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${
                         showFavoritesOnly ? 'bg-white/20' : 'bg-red-100 text-red-500'
                       }`}>
                         {currentUserProfile.favoriteRestaurantIds!.length}
@@ -722,7 +721,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                   </button>
                 </div>
               )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {filteredStores.map(restaurant => {
                   const estFee = estimatedDeliveryFee(restaurant);
                   const isClosed = restaurant.isOpen === false;
@@ -739,52 +738,52 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                           setIsAddressSelectorOpen(true);
                         }
                       }}
-                      className={`bg-white rounded-[2.5rem] shadow-xl shadow-gray-100 border border-gray-50 overflow-hidden transition-all ${isClosed ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:-translate-y-1 active:scale-[0.98]'}`}
+                      className={`bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm transition-all ${isClosed ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98]'}`}
                     >
-                      <div className="h-48 relative">
+                      {/* Imagem do restaurante */}
+                      <div className="h-36 bg-gray-100 relative overflow-hidden">
                         <img src={restaurant.image} className={`w-full h-full object-cover ${isClosed ? 'grayscale' : ''}`} />
-                        <div className="absolute top-4 right-4 bg-white/95 px-2 py-1 rounded-xl text-[10px] font-black flex items-center gap-1 backdrop-blur-sm shadow-sm">
-                          {restaurant.rating.toFixed(1)}{' '}
-                          <Star size={12} className="fill-orange-500 text-orange-500" />
-                        </div>
+                        {/* Badge de categoria no canto */}
+                        <span className="absolute top-3 left-3 bg-white/90 backdrop-blur text-gray-700 text-[10px] font-black px-2 py-1 rounded-lg">
+                          {restaurant.category}
+                        </span>
                         {currentUserProfile && (
                           <button
                             onClick={e => {
                               e.stopPropagation();
                               toggleFavorite?.(restaurant.id);
                             }}
-                            className="absolute top-4 left-4 p-2 bg-white/90 backdrop-blur-sm rounded-xl shadow-sm active:scale-90 transition-all"
+                            className="absolute top-3 right-3 p-1.5 bg-white/90 backdrop-blur rounded-lg active:scale-90 transition-all"
                           >
                             <Heart
-                              size={16}
+                              size={14}
                               className={isFav ? 'fill-red-500 text-red-500' : 'text-gray-400'}
                             />
                           </button>
                         )}
                         {isClosed && (
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="bg-black/70 text-white text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full">
+                          <div className="absolute inset-0 flex items-center justify-center bg-white/20">
+                            <span className="bg-gray-900/80 text-white text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-lg">
                               Fechado
                             </span>
                           </div>
                         )}
                       </div>
-                      <div className="p-6">
-                        <h3 className="font-black text-gray-900 text-lg mb-1">{restaurant.name}</h3>
-                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-2">
-                          {restaurant.category}
-                        </p>
-                        {/* Taxa de entrega estimada */}
-                        <div className="flex items-center gap-2 text-[10px] font-black">
-                          <MapPin size={10} className="text-orange-400" />
-                          <span className="text-gray-500">
-                            {isClosed
-                              ? 'Estabelecimento fechado'
-                              : estFee !== null
-                                ? `Entrega ~R$ ${estFee.toFixed(2)}`
-                                : 'Defina seu endereço para ver o frete'}
-                          </span>
+                      <div className="p-4">
+                        <div className="flex items-start justify-between mb-1">
+                          <h3 className="font-black text-gray-900 text-base leading-tight">{restaurant.name}</h3>
+                          <div className="flex items-center gap-1 shrink-0 ml-2">
+                            <Star size={12} fill="currentColor" className="text-amber-500" />
+                            <span className="text-xs font-bold text-gray-700">{restaurant.rating.toFixed(1)}</span>
+                          </div>
                         </div>
+                        <p className="text-gray-400 text-xs">
+                          {isClosed
+                            ? 'Estabelecimento fechado'
+                            : estFee !== null
+                              ? `${estFee === 0 ? 'Entrega grátis' : `Entrega R$ ${estFee.toFixed(2)}`} · 30-45 min`
+                              : 'Defina seu endereço para ver o frete'}
+                        </p>
                       </div>
                     </div>
                   );
@@ -795,26 +794,27 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
 
           {activeTab === 'home' && selectedRestaurant && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="relative h-56 md:h-72 rounded-[2.5rem] overflow-hidden mb-8 shadow-2xl">
+              {/* Banner do restaurante — sem gradiente pesado */}
+              <div className="relative h-44 md:h-60 rounded-2xl overflow-hidden mb-6 border border-gray-100">
                 <img src={selectedRestaurant.image} className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex flex-col justify-end p-8">
-                  <h1 className="text-3xl md:text-5xl font-black text-white mb-1">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex flex-col justify-end p-6">
+                  <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight mb-0.5">
                     {selectedRestaurant.name}
                   </h1>
-                  <p className="text-white/70 font-bold text-sm">
-                    {selectedRestaurant.category} • 30-45 min
+                  <p className="text-white/70 text-xs font-medium">
+                    {selectedRestaurant.category} · 30-45 min
                   </p>
                 </div>
               </div>
 
               {selectedRestaurant.menu.some(p => p.category) && (
-                <div className="flex gap-3 overflow-x-auto pb-4 mb-6 -mt-4 px-2">
+                <div className="flex gap-2 overflow-x-auto pb-3 mb-5 no-scrollbar">
                   <button
                     onClick={() => setSelectedCategory('')}
-                    className={`px-6 py-3 rounded-2xl font-bold text-xs whitespace-nowrap transition-all ${
+                    className={`px-4 py-2 rounded-xl font-bold text-xs whitespace-nowrap transition-all ${
                       selectedCategory === ''
                         ? 'bg-orange-600 text-white'
-                        : 'bg-white text-gray-600 border border-gray-100'
+                        : 'bg-white text-gray-600 border border-gray-200'
                     }`}
                   >
                     Todos
@@ -824,10 +824,10 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                       <button
                         key={cat}
                         onClick={() => setSelectedCategory(cat as string)}
-                        className={`px-6 py-3 rounded-2xl font-bold text-xs whitespace-nowrap transition-all ${
+                        className={`px-4 py-2 rounded-xl font-bold text-xs whitespace-nowrap transition-all ${
                           selectedCategory === cat
                             ? 'bg-orange-600 text-white'
-                            : 'bg-white text-gray-600 border border-gray-100'
+                            : 'bg-white text-gray-600 border border-gray-200'
                         }`}
                       >
                         {cat as string}
@@ -838,29 +838,30 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
               )}
 
               {/* Busca de produtos */}
-              <div className="relative mb-6 max-w-lg">
+              <div className="relative mb-5 max-w-lg">
                 <Search
-                  size={16}
-                  className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300"
+                  size={15}
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
                 />
                 <input
                   type="text"
                   value={productSearch}
                   onChange={e => setProductSearch(e.target.value)}
                   placeholder="Buscar produto..."
-                  className="w-full bg-white border-2 border-transparent p-4 pl-12 rounded-2xl font-bold text-gray-700 outline-none shadow-lg shadow-gray-100 focus:border-orange-200 transition-all"
+                  className="w-full bg-white border border-gray-200 py-2.5 pl-10 pr-4 rounded-xl font-medium text-sm text-gray-700 outline-none focus:border-orange-300 transition-all"
                 />
                 {productSearch && (
                   <button
                     onClick={() => setProductSearch('')}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500"
                   >
-                    <X size={16} />
+                    <X size={14} />
                   </button>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Lista de produtos — layout horizontal simples */}
+              <div className="divide-y divide-gray-100">
                 {selectedRestaurant.menu
                   .filter(p => !selectedCategory || p.category === selectedCategory)
                   .filter(p =>
@@ -874,9 +875,10 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                     return (
                       <div
                         key={product.id}
-                        className={`bg-white rounded-[2rem] p-5 flex gap-5 shadow-lg shadow-gray-100 border border-gray-50 hover:shadow-xl transition-all ${isUnavailable ? 'opacity-60' : ''}`}
+                        className={`flex items-center gap-4 py-4 ${isUnavailable ? 'opacity-60' : ''}`}
                       >
-                        <div className="w-24 h-24 bg-gray-100 rounded-2xl overflow-hidden shrink-0 relative">
+                        {/* Imagem quadrada à esquerda */}
+                        <div className="w-20 h-20 bg-gray-100 rounded-xl overflow-hidden shrink-0 relative">
                           <img
                             src={
                               product.image ||
@@ -885,36 +887,43 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                             className={`w-full h-full object-cover ${isUnavailable ? 'grayscale' : ''}`}
                           />
                           {isUnavailable && (
-                            <div className="absolute inset-0 bg-gray-900/30 flex items-center justify-center">
-                              <span className="bg-red-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wide">
+                            <div className="absolute inset-0 bg-gray-900/20 flex items-center justify-center">
+                              <span className="bg-red-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wide">
                                 Esgotado
                               </span>
                             </div>
                           )}
                         </div>
-                        <div className="flex-1">
-                          <h4 className="font-black text-gray-900 text-sm mb-1 leading-tight">
+                        {/* Nome, desc e preço à direita */}
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-bold text-gray-900 text-sm leading-snug mb-0.5">
                             {product.name}
                           </h4>
-                          <p className="font-black text-gray-900 mb-3 text-base">
+                          {product.category && (
+                            <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">{product.category}</p>
+                          )}
+                          <p className="font-black text-orange-600 text-base">
                             {product.price.toLocaleString('pt-BR', {
                               style: 'currency',
                               currency: 'BRL',
                             })}
                           </p>
+                        </div>
+                        {/* Controles de quantidade ou botão adicionar */}
+                        <div className="shrink-0">
                           {isUnavailable ? (
-                            <span className="inline-block bg-red-50 text-red-400 px-3 py-1.5 rounded-xl font-black text-[9px] uppercase tracking-widest border border-red-100">
+                            <span className="text-[9px] font-bold text-red-400 uppercase tracking-wide">
                               Indisponível
                             </span>
                           ) : cartItem ? (
-                            <div className="flex items-center gap-3 bg-gray-50 p-1.5 rounded-xl w-fit border border-gray-100">
+                            <div className="flex items-center gap-2 bg-gray-50 px-2 py-1.5 rounded-xl border border-gray-100">
                               <button
                                 onClick={() =>
                                   updateCartQuantity(product.id, cartItem.quantity - 1)
                                 }
-                                className="p-1.5 bg-white text-gray-500 rounded-lg shadow-sm"
+                                className="p-1 text-gray-500 hover:text-gray-900 transition-all"
                               >
-                                <Minus size={14} />
+                                <Minus size={13} />
                               </button>
                               <span className="font-black text-gray-900 text-xs w-4 text-center">
                                 {cartItem.quantity}
@@ -923,17 +932,17 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                                 onClick={() =>
                                   updateCartQuantity(product.id, cartItem.quantity + 1)
                                 }
-                                className="p-1.5 bg-white text-gray-500 rounded-lg shadow-sm"
+                                className="p-1 text-gray-500 hover:text-gray-900 transition-all"
                               >
-                                <Plus size={14} />
+                                <Plus size={13} />
                               </button>
                             </div>
                           ) : (
                             <button
                               onClick={() => handleAddToCart(product)}
-                              className="bg-orange-600 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-orange-100 active:scale-95"
+                              className="bg-orange-600 text-white px-4 py-2 rounded-xl font-bold text-xs tracking-wide active:scale-95 transition-all"
                             >
-                              {currentUserProfile ? 'Adicionar' : '🔒 Entrar'}
+                              {currentUserProfile ? 'Adicionar' : 'Entrar'}
                             </button>
                           )}
                         </div>
@@ -946,8 +955,8 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
 
           {activeTab === 'orders' && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <h1 className="text-4xl font-black tracking-tighter text-gray-900 mb-8">Meus Pedidos</h1>
-              <div className="space-y-4 max-w-2xl">
+              <h1 className="text-3xl font-black tracking-tight text-gray-900 mb-6">Meus Pedidos</h1>
+              <div className="space-y-3 max-w-2xl">
                 {orders.filter(o => o.customerId === currentUserProfile?.id).length > 0 ? (
                   orders
                     .filter(o => o.customerId === currentUserProfile?.id)
@@ -955,106 +964,118 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                     .map(order => {
                       const statusInfo = traduzirStatus(order.status);
                       const isActive = !['DELIVERED', 'CANCELLED', 'RETURNED'].includes(order.status);
+                      const progressSteps = ['PENDING', 'PENDING_PAYMENT', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'];
+                      const stepLabels = ['Recebido', 'Pgto', 'Preparo', 'Pronto', 'Entrega'];
+                      const currentStepIdx = progressSteps.indexOf(order.status);
                       return (
                         <div
                           key={order.id}
-                          className={`bg-white p-6 rounded-[2.5rem] border shadow-xl transition-all ${
-                            isActive
-                              ? 'border-orange-100 shadow-orange-50 ring-1 ring-orange-100'
-                              : 'border-gray-50 shadow-gray-100'
+                          className={`bg-white rounded-2xl border transition-all ${
+                            isActive ? 'border-orange-100' : 'border-gray-100'
                           }`}
                         >
-                          <div className="flex items-center gap-4 mb-4">
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
-                              isActive ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-400'
-                            }`}>
-                              <UtensilsCrossed size={22} />
+                          <div className="p-5">
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-black text-gray-900 text-base leading-tight truncate">
+                                  {order.restaurantName}
+                                </h3>
+                                <p className="text-[10px] text-gray-400 mt-0.5">
+                                  #{order.id.slice(-6)} · {new Date(order.timestamp).toLocaleString('pt-BR', {
+                                    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+                                  })}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 ml-3 shrink-0">
+                                <span className="font-black text-lg text-gray-900">
+                                  R$ {order.total.toFixed(2)}
+                                </span>
+                                {order.status === OrderStatus.DELIVERED && (
+                                  <button
+                                    onClick={() => setReceiptOrder(order)}
+                                    className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-all active:scale-95"
+                                    title="Ver comprovante"
+                                  >
+                                    <Receipt size={15} />
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-black text-gray-900 leading-tight truncate">
-                                {order.restaurantName}
-                              </h3>
-                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                                Pedido #{order.id.slice(-6)} · {new Date(order.timestamp).toLocaleString('pt-BR', {
-                                  day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
-                                })}
-                              </p>
+
+                            {/* Itens do pedido — lista simples */}
+                            <div className="mb-3 space-y-0.5">
+                              {order.items.slice(0, 3).map((item, i) => (
+                                <p key={i} className="text-xs text-gray-500">
+                                  {item.quantity}× {item.product.name}
+                                </p>
+                              ))}
+                              {order.items.length > 3 && (
+                                <p className="text-xs text-gray-400">+{order.items.length - 3} item(s)</p>
+                              )}
                             </div>
-                          </div>
 
-                          {/* Itens do pedido */}
-                          <div className="bg-gray-50 rounded-2xl p-4 mb-4 space-y-1">
-                            {order.items.slice(0, 3).map((item, i) => (
-                              <p key={i} className="text-xs font-bold text-gray-600">
-                                {item.quantity}x {item.product.name}
-                              </p>
-                            ))}
-                            {order.items.length > 3 && (
-                              <p className="text-xs text-gray-400">+{order.items.length - 3} item(s)...</p>
-                            )}
-                          </div>
-
-                          <div className="flex items-center justify-between">
                             <span
-                              className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${statusInfo.color}`}
+                              className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold ${statusInfo.color}`}
                             >
                               {statusInfo.label}
                             </span>
-                            <div className="flex items-center gap-2">
-                              <span className="font-black text-lg text-gray-900">
-                                R$ {order.total.toFixed(2)}
-                              </span>
-                              {order.status === OrderStatus.DELIVERED && (
-                                <button
-                                  onClick={() => setReceiptOrder(order)}
-                                  className="p-2 bg-gray-50 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all active:scale-95"
-                                  title="Ver comprovante"
-                                >
-                                  <Receipt size={16} />
-                                </button>
-                              )}
-                            </div>
+
+                            {/* Cancel button for recent pending orders */}
+                            {[OrderStatus.PENDING, OrderStatus.PENDING_PAYMENT].includes(order.status as OrderStatus) &&
+                              Date.now() - order.timestamp <= 3 * 60 * 1000 && (
+                              <button
+                                onClick={async () => {
+                                  if (!window.confirm('Tem certeza que deseja cancelar este pedido?')) return;
+                                  setCancellingOrderId(order.id);
+                                  try {
+                                    await cancelOrder?.(order.id);
+                                  } catch (e: any) {
+                                    alert(e.message || 'Erro ao cancelar pedido');
+                                  } finally {
+                                    setCancellingOrderId(null);
+                                  }
+                                }}
+                                disabled={cancellingOrderId === order.id}
+                                className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 bg-red-50 text-red-600 rounded-xl font-bold text-xs border border-red-100 active:scale-95 transition-all disabled:opacity-50"
+                              >
+                                {cancellingOrderId === order.id ? (
+                                  <Loader size={13} className="animate-spin" />
+                                ) : (
+                                  <Ban size={13} />
+                                )}
+                                Cancelar Pedido (dentro de 3 min)
+                              </button>
+                            )}
                           </div>
 
-                          {/* Cancel button for recent pending orders */}
-                          {[OrderStatus.PENDING, OrderStatus.PENDING_PAYMENT].includes(order.status as OrderStatus) &&
-                            Date.now() - order.timestamp <= 3 * 60 * 1000 && (
-                            <button
-                              onClick={async () => {
-                                if (!window.confirm('Tem certeza que deseja cancelar este pedido?')) return;
-                                setCancellingOrderId(order.id);
-                                try {
-                                  await cancelOrder?.(order.id);
-                                } catch (e: any) {
-                                  alert(e.message || 'Erro ao cancelar pedido');
-                                } finally {
-                                  setCancellingOrderId(null);
-                                }
-                              }}
-                              disabled={cancellingOrderId === order.id}
-                              className="mt-3 w-full flex items-center justify-center gap-2 py-3 bg-red-50 text-red-600 rounded-2xl font-black text-xs uppercase tracking-widest border border-red-100 active:scale-95 transition-all disabled:opacity-50"
-                            >
-                              {cancellingOrderId === order.id ? (
-                                <Loader size={14} className="animate-spin" />
-                              ) : (
-                                <Ban size={14} />
-                              )}
-                              Cancelar Pedido (dentro de 3 min)
-                            </button>
-                          )}
-
-                          {/* Progress bar para pedidos ativos */}
+                          {/* Progress indicator visual limpo para pedidos ativos */}
                           {isActive && (
-                            <div className="mt-4">
-                              <div className="flex justify-between mb-1">
-                                {['PENDING','PREPARING','READY','OUT_FOR_DELIVERY'].map((s, idx) => {
-                                  const steps = ['PENDING','PREPARING','READY','OUT_FOR_DELIVERY'];
-                                  const currentIdx = steps.indexOf(order.status);
-                                  const done = idx <= currentIdx;
+                            <div className="px-5 pb-5">
+                              <div className="flex items-center gap-0">
+                                {progressSteps.map((s, idx) => {
+                                  const done = idx <= currentStepIdx;
+                                  const current = idx === currentStepIdx;
+                                  const isLast = idx === progressSteps.length - 1;
                                   return (
-                                    <div key={s} className={`h-1.5 flex-1 rounded-full mx-0.5 transition-all duration-500 ${
-                                      done ? 'bg-orange-500' : 'bg-gray-200'
-                                    }`} />
+                                    <React.Fragment key={s}>
+                                      <div className="flex flex-col items-center gap-1">
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${
+                                          done
+                                            ? 'bg-orange-500 border-orange-500'
+                                            : 'bg-white border-gray-200'
+                                        } ${current ? 'ring-2 ring-orange-200' : ''}`}>
+                                          {done && <Check size={10} className="text-white" strokeWidth={3} />}
+                                        </div>
+                                        <span className={`text-[8px] font-bold uppercase tracking-wide ${done ? 'text-orange-600' : 'text-gray-300'}`}>
+                                          {stepLabels[idx]}
+                                        </span>
+                                      </div>
+                                      {!isLast && (
+                                        <div className={`flex-1 h-0.5 mb-4 transition-all duration-500 ${
+                                          idx < currentStepIdx ? 'bg-orange-400' : 'bg-gray-100'
+                                        }`} />
+                                      )}
+                                    </React.Fragment>
                                   );
                                 })}
                               </div>
@@ -1072,16 +1093,16 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                             const etaMins = distMeters !== null ? Math.max(1, Math.round(distMeters / 350)) : null; // ~21km/h moto urbana
 
                             return (
-                              <div className="mt-4 bg-purple-50 border border-purple-100 rounded-2xl p-4 animate-in fade-in duration-500">
+                              <div className="mx-5 mb-5 bg-purple-50 border border-purple-100 rounded-xl p-4 animate-in fade-in duration-500">
                                 <div className="flex items-center gap-3 mb-3">
-                                  <div className="bg-purple-600 p-2 rounded-xl shrink-0">
-                                    <Bike size={18} className="text-white" />
+                                  <div className="bg-purple-600 p-2 rounded-lg shrink-0">
+                                    <Bike size={16} className="text-white" />
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-black text-purple-900 truncate">
+                                    <p className="text-xs font-bold text-purple-900 truncate">
                                       {driver?.name || 'Entregador'} está a caminho
                                     </p>
-                                    <p className="text-[10px] text-purple-500 font-bold uppercase tracking-widest">
+                                    <p className="text-[10px] text-purple-500 font-medium">
                                       {driver?.vehicleType || 'Veículo'} {driver?.licensePlate ? `· ${driver.licensePlate}` : ''}
                                     </p>
                                   </div>
@@ -1090,7 +1111,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                                       href={`https://wa.me/55${driver.phoneNumber.replace(/\D/g, '')}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="bg-green-100 text-green-700 p-2 rounded-xl hover:bg-green-200 transition shrink-0"
+                                      className="bg-green-100 text-green-700 p-2 rounded-lg hover:bg-green-200 transition shrink-0"
                                       onClick={e => e.stopPropagation()}
                                     >
                                       <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" xmlns="http://www.w3.org/2000/svg">
@@ -1108,15 +1129,15 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                                     />
                                     {/* Distância e ETA abaixo do mapa */}
                                     {distMeters !== null && (
-                                      <div className="flex items-center gap-3 bg-white rounded-xl p-3 mt-2">
+                                      <div className="flex items-center gap-3 bg-white rounded-lg p-3 mt-2">
                                         <MapPin size={14} className="text-purple-500 shrink-0" />
                                         <div>
-                                          <p className="text-xs font-black text-gray-800">
+                                          <p className="text-xs font-bold text-gray-800">
                                             {distMeters < 1000
                                               ? `${Math.round(distMeters)}m de você`
                                               : `${(distMeters / 1000).toFixed(1)}km de você`}
                                           </p>
-                                          <p className="text-[10px] text-gray-400 font-bold">
+                                          <p className="text-[10px] text-gray-400">
                                             Previsão: ~{etaMins} min
                                           </p>
                                         </div>
@@ -1124,7 +1145,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                                     )}
                                   </>
                                 ) : (
-                                  <div className="flex items-center gap-2 text-[10px] text-purple-400 font-bold">
+                                  <div className="flex items-center gap-2 text-[10px] text-purple-400 font-medium">
                                     <Loader size={12} className="animate-spin" />
                                     Aguardando localização do entregador...
                                   </div>
@@ -1136,12 +1157,12 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                       );
                     })
                 ) : (
-                  <div className="text-center py-20 bg-white rounded-[3rem] shadow-xl border-2 border-dashed border-gray-100">
-                    <UtensilsCrossed size={40} className="mx-auto mb-4 text-gray-200" />
-                    <p className="text-gray-400 font-bold mb-6">Nenhum pedido realizado ainda.</p>
+                  <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-gray-200">
+                    <UtensilsCrossed size={36} className="mx-auto mb-3 text-gray-200" />
+                    <p className="text-gray-400 text-sm mb-5">Nenhum pedido realizado ainda.</p>
                     <button
                       onClick={() => setActiveTab('home')}
-                      className="bg-gray-950 text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest active:scale-95 shadow-xl"
+                      className="bg-gray-900 text-white px-6 py-3 rounded-xl font-bold text-xs tracking-wide active:scale-95 transition-all"
                     >
                       Explorar Restaurantes
                     </button>
@@ -1153,9 +1174,9 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
         </div>
       </main>
 
-      {/* CARRINHO FLUTUANTE AJUSTADO (Z-INDEX 40 E MAIS ALTO PARA NÃO BATER NO MENU) */}
+      {/* CARRINHO FLUTUANTE */}
       {cart.length > 0 && !isCheckoutOpen && (
-        <div className="fixed bottom-32 left-6 right-6 md:left-auto md:right-12 z-40 animate-in slide-in-from-bottom fade-in duration-500">
+        <div className="fixed bottom-28 left-4 right-4 md:left-auto md:right-10 z-40 animate-in slide-in-from-bottom fade-in duration-500">
           <button
             onClick={() => {
               // 🔒 SEGURANÇA: Exige login antes de abrir checkout
@@ -1165,22 +1186,22 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
               }
               setIsCheckoutOpen(true);
             }}
-            className="w-full md:w-auto bg-orange-600 text-white font-black p-5 md:px-8 md:py-6 rounded-[2.5rem] shadow-2xl shadow-orange-300 flex items-center justify-between md:justify-center gap-5 hover:bg-orange-700 transition-all hover:-translate-y-1 active:scale-90 group"
+            className="w-full md:w-auto bg-orange-600 text-white font-bold py-4 px-5 md:px-7 rounded-xl flex items-center justify-between md:justify-center gap-4 hover:bg-orange-700 transition-all active:scale-[0.97] shadow-lg shadow-orange-200"
           >
-            <div className="flex items-center gap-4">
-              <div className="bg-white/20 p-2.5 rounded-xl group-hover:scale-110 transition-transform">
-                <ShoppingCart size={22} />
+            <div className="flex items-center gap-3">
+              <div className="bg-white/20 p-2 rounded-lg">
+                <ShoppingCart size={18} />
               </div>
               <div className="flex flex-col items-start leading-none">
                 <span className="text-[9px] uppercase tracking-widest opacity-80 mb-0.5">
                   {cart.reduce((acc, item) => acc + item.quantity, 0)} Itens
                 </span>
-                <span className="text-lg tracking-tighter">
+                <span className="text-base font-black">
                   {cartTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl text-[10px] uppercase tracking-widest">
+            <div className="flex items-center gap-1 text-xs font-bold opacity-90">
               Ver Sacola <ChevronRight size={14} />
             </div>
           </button>
