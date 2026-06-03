@@ -1011,11 +1011,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteAccount = async () => {
     if (!session?.user.id) return;
-    if (window.confirm('Deseja excluir permanentemente sua conta?')) {
-      const { error } = await supabase.from('profiles').delete().eq('id', session.user.id);
-      if (error) throw error;
-      await signOut();
-    }
+    const { error } = await supabase.from('profiles').delete().eq('id', session.user.id);
+    if (error) throw error;
+    // Remove o usuário do auth via Edge Function (service role)
+    await supabase.functions.invoke('delete-auth-user', { body: { userId: session.user.id } }).catch(() => {});
+    await signOut();
   };
 
   const addAddress = async (addrData: Omit<UserAddress, 'id'>) => {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store';
 import { UserRole, UserProfile, UserAddress } from '../types';
+import { DeleteAccountModal } from '../components/DeleteAccountModal';
 
 const resizeImage = (file: File, maxWidth: number, maxHeight: number): Promise<File> => {
   return new Promise((resolve, reject) => {
@@ -163,6 +164,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
   const [mode, setMode] = useState<AuthMode>('HUB');
   const [partnerType, setPartnerType] = useState<UserRole>(UserRole.CLIENT);
   const [loading, setLoading] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // Form fields
   const [email, setEmail] = useState('');
@@ -867,11 +869,12 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
                   Sair da Conta
                 </button>
                 <button
-                  onClick={deleteAccount}
+                  onClick={() => setShowDeleteModal(true)}
                   className="w-full py-2 text-red-300 hover:text-red-500 font-bold text-[9px] uppercase tracking-widest transition-colors"
                 >
                   Excluir minha conta
                 </button>
+                {showDeleteModal && <DeleteAccountModal onClose={() => setShowDeleteModal(false)} />}
               </div>
             </div>
           ) : (
