@@ -120,23 +120,23 @@ const SettingsTab: React.FC = () => {
       </div>
 
       {/* Como funciona o modelo */}
-      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
         <h4 className="font-black text-gray-700 mb-6 flex items-center gap-2">
           <DollarSign size={18} className="text-purple-500" /> Como funcionam as comissões?
         </h4>
-        
+
         <div className="flex flex-col md:flex-row gap-6 mb-6">
-          <div className="flex-1 bg-orange-50 border border-orange-100 rounded-2xl p-5">
+          <div className="flex-1 bg-orange-50 border border-orange-100 rounded-xl p-5">
             <h5 className="font-black text-orange-600 text-sm mb-2 uppercase tracking-widest">🟠 Lojista ({settings.restaurant_fee_pct}%)</h5>
             <p className="text-xs text-orange-800 font-medium">A plataforma retém <strong>{settings.restaurant_fee_pct}%</strong> sobre o subtotal dos produtos (descontando cupons) como comissão.</p>
           </div>
-          <div className="flex-1 bg-green-50 border border-green-100 rounded-2xl p-5">
+          <div className="flex-1 bg-green-50 border border-green-100 rounded-xl p-5">
             <h5 className="font-black text-green-600 text-sm mb-2 uppercase tracking-widest">🟢 Entregador ({settings.driver_fee_pct}%)</h5>
             <p className="text-xs text-green-800 font-medium">A plataforma retém <strong>{settings.driver_fee_pct}%</strong> sobre o valor da taxa de entrega como comissão.</p>
           </div>
         </div>
 
-        <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4 text-sm font-bold text-purple-700 flex items-start gap-3">
+        <div className="bg-purple-50 border border-purple-100 rounded-xl p-4 text-sm font-bold text-purple-700 flex items-start gap-3">
           <span className="text-xl">💡</span>
           <p>
             A receita total da plataforma por pedido é a <strong>soma</strong> dessas duas comissões. <br />
@@ -146,7 +146,7 @@ const SettingsTab: React.FC = () => {
       </div>
 
       {/* Campos de configuração */}
-      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 space-y-6">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 space-y-6">
         <h4 className="font-black text-gray-700 mb-2">Comissões da Plataforma (%)</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {[
@@ -160,7 +160,7 @@ const SettingsTab: React.FC = () => {
                   type="number" min="0" step="0.01"
                   value={(settings as any)[field.key]}
                   onChange={e => setSettings(s => ({ ...s, [field.key]: parseFloat(e.target.value) || 0 }))}
-                  className="w-full p-4 pr-10 bg-gray-50 rounded-2xl font-black text-xl outline-none border-2 border-transparent focus:border-purple-300 transition-all"
+                  className="w-full p-4 pr-10 bg-gray-50 rounded-xl font-black text-xl outline-none border border-gray-200 focus:border-purple-300 transition-all"
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-black">%</span>
               </div>
@@ -183,7 +183,7 @@ const SettingsTab: React.FC = () => {
                   type="number" min="0" step="0.5"
                   value={(settings as any)[field.key]}
                   onChange={e => setSettings(s => ({ ...s, [field.key]: parseFloat(e.target.value) || 0 }))}
-                  className="w-full p-4 pl-10 bg-gray-50 rounded-2xl font-black outline-none border-2 border-transparent focus:border-purple-300 transition-all"
+                  className="w-full p-4 pl-10 bg-gray-50 rounded-xl font-black outline-none border border-gray-200 focus:border-purple-300 transition-all"
                 />
               </div>
               <p className="text-[10px] text-gray-400 mt-1 ml-1">{field.help}</p>
@@ -193,7 +193,7 @@ const SettingsTab: React.FC = () => {
       </div>
 
       {/* WhatsApp de suporte */}
-      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 space-y-4">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 space-y-4">
         <h4 className="font-black text-gray-700 flex items-center gap-2">
           <span className="text-green-600">📱</span> Contato de Suporte
         </h4>
@@ -203,7 +203,7 @@ const SettingsTab: React.FC = () => {
           value={settings.support_whatsapp}
           onChange={e => setSettings(s => ({ ...s, support_whatsapp: e.target.value.replace(/\D/g, '') }))}
           placeholder="66999990000"
-          className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none border-2 border-transparent focus:border-green-400 transition-all"
+          className="w-full p-4 bg-gray-50 rounded-xl font-black outline-none border border-gray-200 focus:border-green-400 transition-all"
         />
         {settings.support_whatsapp && (
           <a
@@ -218,7 +218,7 @@ const SettingsTab: React.FC = () => {
       </div>
 
       {/* CEP da cidade */}
-      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 space-y-4">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 space-y-4">
         <h4 className="font-black text-gray-700 flex items-center gap-2">
           <span className="text-blue-600">📍</span> CEP da Cidade
         </h4>
@@ -237,12 +237,12 @@ const SettingsTab: React.FC = () => {
             setSettings(s => ({ ...s, city_cep: f }));
           }}
           placeholder="78595-000"
-          className="w-full p-4 bg-gray-50 rounded-2xl font-black outline-none border-2 border-transparent focus:border-blue-400 transition-all"
+          className="w-full p-4 bg-gray-50 rounded-xl font-black outline-none border border-gray-200 focus:border-blue-400 transition-all"
         />
       </div>
 
       {settingsMsg && (
-        <div className={`p-4 rounded-2xl text-sm font-bold text-center ${
+        <div className={`p-4 rounded-xl text-sm font-bold text-center ${
           settingsMsg.startsWith('✅') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
         }`}>{settingsMsg}</div>
       )}
@@ -250,7 +250,7 @@ const SettingsTab: React.FC = () => {
       <button
         onClick={handleSaveSettings}
         disabled={settingsSaving}
-        className="w-full py-5 bg-gray-950 text-white rounded-[2rem] font-black uppercase text-sm tracking-widest flex items-center justify-center gap-3 hover:bg-purple-700 transition-all disabled:opacity-50"
+        className="w-full py-4 bg-purple-600 text-white rounded-xl font-black uppercase text-sm tracking-widest flex items-center justify-center gap-3 hover:bg-purple-700 transition-all disabled:opacity-50"
       >
         {settingsSaving
           ? <><div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Salvando...</>
@@ -268,11 +268,11 @@ const AdminSidebar: React.FC<{
   onSignOut: () => void;
   profiles: UserProfile[];
 }> = ({ activeTab, onTabClick, onSignOut, profiles }) => (
-  <aside className="bg-gray-900 flex flex-col h-full border-r border-gray-800">
-    <div className="p-8 flex items-center justify-center">
-      <img src={Logo} alt="Logo" className="h-16 md:h-20 w-auto object-contain" />
+  <aside className="bg-white flex flex-col h-full border-r border-gray-100">
+    <div className="p-6 flex items-center justify-center border-b border-gray-100">
+      <img src={Logo} alt="Logo" className="h-12 md:h-14 w-auto object-contain" />
     </div>
-    <nav className="flex-1 px-4 space-y-2">
+    <nav className="flex-1 py-4 space-y-1">
       {[
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { id: 'users', label: 'Usuários', icon: Users },
@@ -292,10 +292,14 @@ const AdminSidebar: React.FC<{
         <button
           key={item.id}
           onClick={() => onTabClick(item.id as any)}
-          className={`w-full flex items-center justify-between px-4 py-4 rounded-2xl text-sm font-bold transition-all ${activeTab === item.id ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/40' : 'text-gray-400 hover:bg-white/5'}`}
+          className={`w-full flex items-center justify-between px-4 py-3 border-l-4 text-sm transition-all ${
+            activeTab === item.id
+              ? 'border-purple-600 bg-purple-50 text-purple-700 font-black'
+              : 'border-transparent text-gray-500 hover:bg-gray-50 font-medium'
+          }`}
         >
-          <div className="flex items-center gap-4">
-            <item.icon size={20} /> {item.label}
+          <div className="flex items-center gap-3">
+            <item.icon size={18} /> {item.label}
           </div>
           {(item.badge ?? 0) > 0 && (
             <span className="bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-full">
@@ -305,12 +309,12 @@ const AdminSidebar: React.FC<{
         </button>
       ))}
     </nav>
-    <div className="p-6 border-t border-gray-800">
+    <div className="p-4 border-t border-gray-100">
       <button
         onClick={onSignOut}
-        className="w-full flex items-center gap-4 text-gray-500 font-black text-sm p-4 hover:text-red-400 transition-colors"
+        className="w-full flex items-center gap-3 text-gray-400 font-medium text-sm px-4 py-3 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
       >
-        <LogOut size={20} /> Sair
+        <LogOut size={18} /> Sair
       </button>
     </div>
   </aside>
@@ -425,8 +429,8 @@ export const AdminView: React.FC = () => {
   }, [profiles, userSearch]);
 
   return (
-    <div className="h-screen bg-[#F4F6F9] flex font-sans overflow-hidden">
-      <div className="w-72 hidden md:block h-screen sticky top-0">
+    <div className="h-screen bg-gray-50 flex font-sans overflow-hidden">
+      <div className="w-64 hidden md:block h-screen sticky top-0">
         <AdminSidebar
           activeTab={activeTab}
           onTabClick={t => setActiveTab(t)}
@@ -441,7 +445,7 @@ export const AdminView: React.FC = () => {
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setIsMenuOpen(false)}
           ></div>
-          <div className="relative w-72 h-full bg-gray-900 shadow-xl animate-in slide-in-from-left duration-300">
+          <div className="relative w-64 h-full bg-white shadow-xl animate-in slide-in-from-left duration-300">
             <AdminSidebar
               activeTab={activeTab}
               onTabClick={t => {
@@ -456,10 +460,10 @@ export const AdminView: React.FC = () => {
       )}
 
       <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        <header className="h-20 bg-white border-b flex items-center justify-between px-6 md:px-10">
+        <header className="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-6 md:px-8">
           <div className="flex items-center gap-4">
             <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-2 text-gray-500">
-              <Menu size={24} />
+              <Menu size={22} />
             </button>
             <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
               {activeTab}
@@ -467,9 +471,9 @@ export const AdminView: React.FC = () => {
           </div>
           <button
             onClick={() => refreshData()}
-            className="p-3 text-gray-400 hover:text-purple-600 bg-gray-50 rounded-xl transition-all"
+            className="p-2.5 text-gray-400 hover:text-purple-600 bg-gray-50 rounded-xl transition-all border border-gray-100"
           >
-            <RefreshCw size={18} />
+            <RefreshCw size={16} />
           </button>
         </header>
 
@@ -492,7 +496,7 @@ export const AdminView: React.FC = () => {
                   {pendingApprovals > 0 && (
                     <button
                       onClick={() => setActiveTab('users')}
-                      className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest animate-pulse"
+                      className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest animate-pulse"
                     >
                       <span className="w-2 h-2 bg-amber-500 rounded-full" />
                       {pendingApprovals} aprovação{pendingApprovals > 1 ? 'ões' : ''} pendente{pendingApprovals > 1 ? 's' : ''}
@@ -501,76 +505,66 @@ export const AdminView: React.FC = () => {
                 </div>
 
                 {/* KPIs - Linha 1: Contadores */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
-                    <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mb-4">
-                      <Users size={22} />
-                    </div>
-                    <p className="text-3xl font-black text-gray-900">{profiles.length}</p>
-                    <p className="text-xs font-bold text-gray-400 mt-1">Usuários Cadastrados</p>
-                  </div>
-                  <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
-                    <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center mb-4">
-                      <Store size={22} />
-                    </div>
-                    <p className="text-3xl font-black text-gray-900">{restaurants.length}</p>
-                    <p className="text-xs font-bold text-gray-400 mt-1">Lojas Ativas</p>
-                  </div>
-                  <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
-                    <div className="w-12 h-12 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center mb-4">
-                      <Bike size={22} />
-                    </div>
-                    <p className="text-3xl font-black text-gray-900">{profiles.filter(p => p.role === 'DRIVER').length}</p>
-                    <p className="text-xs font-bold text-gray-400 mt-1">Entregadores</p>
-                  </div>
-                  <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
-                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
-                      <LayoutDashboard size={22} />
-                    </div>
-                    <p className="text-3xl font-black text-gray-900">{todayOrders.length}</p>
-                    <p className="text-xs font-bold text-gray-400 mt-1">Pedidos Hoje</p>
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-gray-100">
+                    {[
+                      { icon: Users, color: 'text-purple-600', bg: 'bg-purple-50', value: profiles.length, label: 'Usuários Cadastrados' },
+                      { icon: Store, color: 'text-orange-600', bg: 'bg-orange-50', value: restaurants.length, label: 'Lojas Ativas' },
+                      { icon: Bike, color: 'text-green-600', bg: 'bg-green-50', value: profiles.filter(p => p.role === 'DRIVER').length, label: 'Entregadores' },
+                      { icon: LayoutDashboard, color: 'text-blue-600', bg: 'bg-blue-50', value: todayOrders.length, label: 'Pedidos Hoje' },
+                    ].map((kpi, i) => (
+                      <div key={i} className="p-6">
+                        <div className={`w-10 h-10 rounded-xl ${kpi.bg} ${kpi.color} flex items-center justify-center mb-3`}>
+                          <kpi.icon size={20} />
+                        </div>
+                        <p className="text-3xl font-black text-gray-900">{kpi.value}</p>
+                        <p className="text-xs font-bold text-gray-400 mt-1">{kpi.label}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
                 {/* KPIs - Linha 2: Financeiro */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-gradient-to-br from-green-500 to-emerald-600 p-8 rounded-[2.5rem] text-white shadow-xl shadow-green-100">
-                    <p className="text-xs font-black uppercase tracking-widest text-green-100 mb-3">GMV Total (Volume)</p>
-                    <p className="text-4xl font-black">{fmt(totalRevenue)}</p>
-                    <p className="text-green-100 text-xs font-bold mt-2">{deliveredOrders.length} pedidos entregues</p>
-                  </div>
-                  <div className="bg-gradient-to-br from-violet-500 to-purple-600 p-8 rounded-[2.5rem] text-white shadow-xl shadow-purple-100">
-                    <p className="text-xs font-black uppercase tracking-widest text-purple-100 mb-3">Receita Plataforma</p>
-                    <p className="text-4xl font-black">{fmt(platformRevenue)}</p>
-                    <p className="text-purple-100 text-xs font-bold mt-2">Taxa de 15% sobre subtotal</p>
-                  </div>
-                  <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <p className="text-xs font-black uppercase tracking-widest text-gray-400 mb-1">Ticket Médio</p>
-                        <p className="text-3xl font-black text-gray-900">{fmt(avgTicket)}</p>
-                      </div>
-                      <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                        <TrendingUp size={20} />
-                      </div>
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-100">
+                    <div className="p-8">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">GMV Total (Volume)</p>
+                      <p className="text-4xl font-black text-green-600">{fmt(totalRevenue)}</p>
+                      <p className="text-gray-400 text-xs font-bold mt-2">{deliveredOrders.length} pedidos entregues</p>
                     </div>
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                      <span className="text-xs font-bold text-gray-400">Taxa de conclusão</span>
-                      <span className={`text-sm font-black ${completionRate >= 80 ? 'text-green-600' : completionRate >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
-                        {completionRate}%
-                      </span>
+                    <div className="p-8">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Receita Plataforma</p>
+                      <p className="text-4xl font-black text-purple-600">{fmt(platformRevenue)}</p>
+                      <p className="text-gray-400 text-xs font-bold mt-2">Taxa de 15% sobre subtotal</p>
                     </div>
-                    <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${completionRate}%` }} />
+                    <div className="p-8">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Ticket Médio</p>
+                          <p className="text-4xl font-black text-gray-900">{fmt(avgTicket)}</p>
+                        </div>
+                        <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                          <TrendingUp size={18} />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                        <span className="text-xs font-bold text-gray-400">Taxa de conclusão</span>
+                        <span className={`text-sm font-black ${completionRate >= 80 ? 'text-green-600' : completionRate >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
+                          {completionRate}%
+                        </span>
+                      </div>
+                      <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${completionRate}%` }} />
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Pedidos recentes */}
-                <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
-                  <div className="p-8 pb-4 flex items-center justify-between">
-                    <h4 className="text-lg font-black text-gray-900">Pedidos Recentes</h4>
-                    <button onClick={() => setActiveTab('orders')} className="text-xs font-black text-orange-600 uppercase tracking-widest hover:underline">
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                    <h4 className="text-base font-black text-gray-900">Pedidos Recentes</h4>
+                    <button onClick={() => setActiveTab('orders')} className="text-xs font-black text-purple-600 uppercase tracking-widest hover:underline">
                       Ver todos →
                     </button>
                   </div>
@@ -589,20 +583,20 @@ export const AdminView: React.FC = () => {
                       };
                       const s = statusMap[o.status] || {label: o.status, color:'text-gray-500 bg-gray-100'};
                       return (
-                        <div key={o.id} className="px-8 py-4 flex items-center justify-between hover:bg-gray-50/50 transition-colors">
+                        <div key={o.id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50/50 transition-colors">
                           <div>
                             <p className="font-black text-gray-900 text-sm">{o.restaurantName}</p>
                             <p className="text-gray-400 text-xs">{o.customerName} • #{o.id.slice(-6)}</p>
                           </div>
                           <div className="flex items-center gap-4">
-                            <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-full ${s.color}`}>{s.label}</span>
+                            <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg ${s.color}`}>{s.label}</span>
                             <span className="font-black text-gray-900 text-sm">{fmt(o.total)}</span>
                           </div>
                         </div>
                       );
                     })}
                     {orders.length === 0 && (
-                      <p className="px-8 py-8 text-gray-400 text-sm font-bold text-center">Nenhum pedido ainda.</p>
+                      <p className="px-6 py-8 text-gray-400 text-sm font-bold text-center">Nenhum pedido ainda.</p>
                     )}
                   </div>
                 </div>
@@ -618,36 +612,36 @@ export const AdminView: React.FC = () => {
                 </h3>
                 <div className="relative w-full md:max-w-md">
                   <Search
-                    className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400"
-                    size={18}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                    size={16}
                   />
                   <input
                     value={userSearch}
                     onChange={e => setUserSearch(e.target.value)}
                     placeholder="Pesquisar..."
-                    className="w-full p-5 pl-14 bg-white border border-gray-100 rounded-2xl font-bold shadow-sm outline-none"
+                    className="w-full p-3 pl-11 bg-white border border-gray-200 rounded-xl font-medium shadow-sm outline-none focus:border-purple-300 transition-all"
                   />
                 </div>
               </div>
-              <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-x-auto shadow-sm">
+              <div className="bg-white rounded-2xl border border-gray-100 overflow-x-auto shadow-sm">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-gray-50/70 border-b border-gray-100">
+                  <thead className="bg-gray-50 border-b border-gray-100">
                     <tr>
-                      <th className="px-8 py-5 font-black text-gray-400 text-xs uppercase tracking-widest">
+                      <th className="px-6 py-4 font-black text-gray-400 text-[10px] uppercase tracking-widest">
                         Usuário / Negócio
                       </th>
-                      <th className="px-8 py-5 font-black text-gray-400 text-xs uppercase tracking-widest">
+                      <th className="px-6 py-4 font-black text-gray-400 text-[10px] uppercase tracking-widest">
                         Papel
                       </th>
-                      <th className="px-8 py-5 font-black text-gray-400 text-xs uppercase tracking-widest">
+                      <th className="px-6 py-4 font-black text-gray-400 text-[10px] uppercase tracking-widest">
                         Status
                       </th>
-                      <th className="px-8 py-5 font-black text-gray-400 text-xs uppercase tracking-widest text-center">
+                      <th className="px-6 py-4 font-black text-gray-400 text-[10px] uppercase tracking-widest text-center">
                         Ações
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody>
                     {filteredProfiles
                       .filter(p =>
                         activeTab === 'users'
@@ -655,43 +649,43 @@ export const AdminView: React.FC = () => {
                           : p.role !== UserRole.CLIENT
                       )
                       .map(p => (
-                        <tr key={p.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-8 py-6">
+                        <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                          <td className="px-6 py-5">
                             <div className="font-black text-gray-900">
                               {p.businessName || p.name}
                             </div>
                             <div className="text-[10px] text-gray-500 font-bold">{p.email}</div>
                           </td>
-                          <td className="px-8 py-6">
+                          <td className="px-6 py-5">
                             <span
-                              className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${p.role === UserRole.RESTAURANT ? 'bg-orange-50 text-orange-600' : p.role === UserRole.DRIVER ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600'}`}
+                              className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${p.role === UserRole.RESTAURANT ? 'bg-orange-50 text-orange-600' : p.role === UserRole.DRIVER ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600'}`}
                             >
                               {p.role}
                             </span>
                           </td>
-                          <td className="px-8 py-6">
+                          <td className="px-6 py-5">
                             <span
                               className={`font-bold text-[10px] ${p.status === 'APPROVED' ? 'text-green-600' : 'text-orange-500'}`}
                             >
                               {p.status}
                             </span>
                           </td>
-                          <td className="px-8 py-6">
-                            <div className="flex justify-center gap-3">
+                          <td className="px-6 py-5">
+                            <div className="flex justify-center gap-2">
                               <button
                                 onClick={() => setViewingUser(p)}
-                                className="p-3 text-gray-400 bg-gray-100 rounded-xl hover:text-purple-600 transition-all shadow-sm"
+                                className="p-2.5 text-gray-400 bg-gray-100 rounded-xl hover:text-purple-600 hover:bg-purple-50 transition-all"
                               >
-                                <Eye size={18} />
+                                <Eye size={16} />
                               </button>
                               <button
                                 onClick={() => {
                                   if (window.confirm('Apagar usuário?')) deleteUserProfile(p.id);
                                 }}
                                 disabled={p.role === UserRole.ADMIN}
-                                className="p-3 text-red-400 bg-red-50 rounded-xl hover:bg-red-600 hover:text-white transition-all disabled:opacity-20 shadow-sm"
+                                className="p-2.5 text-red-400 bg-red-50 border border-red-100 rounded-xl hover:bg-red-600 hover:text-white transition-all disabled:opacity-20"
                               >
-                                <Trash2 size={18} />
+                                <Trash2 size={16} />
                               </button>
                             </div>
                           </td>
@@ -709,14 +703,14 @@ export const AdminView: React.FC = () => {
                 <h3 className="text-2xl font-black text-gray-900 tracking-tighter">
                   Fila de Aprovação
                 </h3>
-                <div className="flex items-center gap-2 text-[10px] font-black text-green-600 uppercase tracking-widest bg-green-50 px-4 py-2 rounded-full">
+                <div className="flex items-center gap-2 text-[10px] font-black text-green-600 uppercase tracking-widest bg-green-50 border border-green-100 px-4 py-2 rounded-xl">
                   <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse inline-block"></span>
                   Tempo Real
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {profiles.filter(p => p.status === 'PENDING').length === 0 ? (
-                  <div className="col-span-full py-20 text-center bg-white rounded-[2.5rem] border-2 border-dashed border-gray-100 text-gray-300 font-black uppercase tracking-widest text-xs">
+                  <div className="col-span-full py-20 text-center bg-white rounded-2xl border-2 border-dashed border-gray-100 text-gray-300 font-black uppercase tracking-widest text-xs">
                     Nenhuma solicitação pendente
                   </div>
                 ) : (
@@ -755,25 +749,25 @@ export const AdminView: React.FC = () => {
                       return (
                         <div
                           key={p.id}
-                          className="bg-white p-8 rounded-[2.5rem] border border-orange-100 shadow-sm animate-in zoom-in-95 relative overflow-hidden"
+                          className="bg-white p-6 rounded-2xl border border-orange-100 shadow-sm animate-in zoom-in-95 relative overflow-hidden"
                         >
                           {/* Badge NOVO piscando */}
-                          <span className="absolute top-5 right-5 bg-orange-500 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest animate-pulse">
+                          <span className="absolute top-4 right-4 bg-orange-500 text-white text-[9px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest animate-pulse">
                             Novo
                           </span>
 
                           <div className="flex items-center gap-4 mb-6">
                             <div
-                              className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${p.role === UserRole.RESTAURANT ? 'bg-orange-50 text-orange-600' : 'bg-green-50 text-green-600'}`}
+                              className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${p.role === UserRole.RESTAURANT ? 'bg-orange-50 text-orange-600' : 'bg-green-50 text-green-600'}`}
                             >
                               {p.role === UserRole.RESTAURANT ? (
-                                <Store size={24} />
+                                <Store size={22} />
                               ) : (
-                                <Bike size={24} />
+                                <Bike size={22} />
                               )}
                             </div>
                             <div className="min-w-0">
-                              <h4 className="font-black text-gray-900 text-lg truncate">
+                              <h4 className="font-black text-gray-900 text-base truncate">
                                 {p.businessName || p.name}
                               </h4>
                               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
@@ -782,20 +776,20 @@ export const AdminView: React.FC = () => {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-3 mb-6">
-                            <div className="bg-gray-50 p-4 rounded-2xl">
+                          <div className="grid grid-cols-2 gap-2 mb-6">
+                            <div className="p-3 border-b border-gray-100">
                               <p className="text-[8px] font-black text-gray-400 uppercase mb-1">
                                 Nome
                               </p>
                               <p className="font-black text-xs truncate">{p.name || '---'}</p>
                             </div>
-                            <div className="bg-gray-50 p-4 rounded-2xl">
+                            <div className="p-3 border-b border-gray-100">
                               <p className="text-[8px] font-black text-gray-400 uppercase mb-1">
                                 WhatsApp
                               </p>
                               <p className="font-black text-xs">{p.phoneNumber || '---'}</p>
                             </div>
-                            <div className="bg-gray-50 p-4 rounded-2xl">
+                            <div className="p-3">
                               <p className="text-[8px] font-black text-gray-400 uppercase mb-1">
                                 Documento
                               </p>
@@ -803,7 +797,7 @@ export const AdminView: React.FC = () => {
                                 {p.cpf || p.cnpj || '---'}
                               </p>
                             </div>
-                            <div className="bg-gray-50 p-4 rounded-2xl">
+                            <div className="p-3">
                               <p className="text-[8px] font-black text-gray-400 uppercase mb-1">
                                 {p.role === UserRole.DRIVER ? 'Placa' : 'E-mail'}
                               </p>
@@ -817,7 +811,7 @@ export const AdminView: React.FC = () => {
                             <button
                               onClick={() => handleApproval('APPROVED')}
                               disabled={isProcessing}
-                              className="flex-1 bg-green-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+                              className="flex-1 bg-purple-600 text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
                             >
                               {approvalLoading[p.id] === 'approving' ? (
                                 <Loader size={14} className="animate-spin" />
@@ -827,12 +821,12 @@ export const AdminView: React.FC = () => {
                             <button
                               onClick={() => handleApproval('BLOCKED')}
                               disabled={isProcessing}
-                              className="px-6 bg-red-50 text-red-600 rounded-2xl font-black text-xs uppercase transition-all shadow-sm active:scale-95 disabled:opacity-60 flex items-center justify-center"
+                              className="px-5 bg-red-50 text-red-600 border border-red-100 rounded-xl font-black text-xs uppercase transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center"
                             >
                               {approvalLoading[p.id] === 'blocking' ? (
                                 <Loader size={14} className="animate-spin" />
                               ) : (
-                                <X size={18} />
+                                <X size={16} />
                               )}
                             </button>
                           </div>
@@ -870,10 +864,10 @@ export const AdminView: React.FC = () => {
             };
 
             const roleColors: Record<string, string> = {
-              RESTAURANT: 'bg-orange-100 text-orange-600',
-              DRIVER: 'bg-green-100 text-green-600',
-              CLIENT: 'bg-blue-100 text-blue-600',
-              ADMIN: 'bg-purple-100 text-purple-600',
+              RESTAURANT: 'bg-orange-50 text-orange-600',
+              DRIVER: 'bg-green-50 text-green-600',
+              CLIENT: 'bg-blue-50 text-blue-600',
+              ADMIN: 'bg-purple-50 text-purple-600',
             };
 
             return (
@@ -885,8 +879,8 @@ export const AdminView: React.FC = () => {
                       {openCount} aberto{openCount !== 1 ? 's' : ''} · {supportTickets.length} total
                     </p>
                   </div>
-                  <button onClick={fetchSupportTickets} className="p-3 bg-gray-100 rounded-2xl hover:bg-gray-200 transition">
-                    <RefreshCw size={16} className={supportLoading ? 'animate-spin' : ''} />
+                  <button onClick={fetchSupportTickets} className="p-2.5 bg-gray-100 rounded-xl hover:bg-gray-200 transition border border-gray-100">
+                    <RefreshCw size={15} className={supportLoading ? 'animate-spin' : ''} />
                   </button>
                 </div>
 
@@ -896,7 +890,7 @@ export const AdminView: React.FC = () => {
                     {(['ALL', 'OPEN', 'RESOLVED'] as const).map(f => (
                       <button key={f} onClick={() => setSupportFilter(f)}
                         className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                          supportFilter === f ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                          supportFilter === f ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
                         }`}>
                         {f === 'ALL' ? 'Todos' : f === 'OPEN' ? 'Abertos' : 'Resolvidos'}
                       </button>
@@ -906,7 +900,7 @@ export const AdminView: React.FC = () => {
                     {(['ALL', 'RESTAURANT', 'DRIVER', 'CLIENT'] as const).map(r => (
                       <button key={r} onClick={() => setSupportRoleFilter(r)}
                         className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                          supportRoleFilter === r ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                          supportRoleFilter === r ? 'bg-purple-600 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
                         }`}>
                         {r === 'ALL' ? 'Todos os papéis' : r === 'RESTAURANT' ? '🏪 Lojista' : r === 'DRIVER' ? '🏍️ Entregador' : '👤 Cliente'}
                       </button>
@@ -918,26 +912,26 @@ export const AdminView: React.FC = () => {
                 {supportLoading ? (
                   <div className="flex justify-center py-16"><Loader className="animate-spin text-purple-500" size={32} /></div>
                 ) : filtered.length === 0 ? (
-                  <div className="text-center py-20 bg-white rounded-[3rem] border border-gray-100">
-                    <MessageSquare size={48} className="mx-auto mb-4 text-gray-200" />
+                  <div className="text-center py-20 bg-white rounded-2xl border border-gray-100">
+                    <MessageSquare size={40} className="mx-auto mb-4 text-gray-200" />
                     <p className="font-black text-gray-400">Nenhum ticket encontrado</p>
                     <p className="text-gray-300 text-sm mt-1">Tudo resolvido por aqui 🎉</p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    {filtered.map(ticket => (
-                      <div key={ticket.id} className={`bg-white p-6 rounded-[2rem] border shadow-sm transition-all ${
-                        ticket.status === 'OPEN' ? 'border-orange-200 shadow-orange-50' : 'border-gray-100'
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    {filtered.map((ticket, idx) => (
+                      <div key={ticket.id} className={`p-5 border-b border-gray-100 transition-all ${idx === filtered.length - 1 ? 'border-b-0' : ''} ${
+                        ticket.status === 'OPEN' ? 'bg-white' : 'bg-gray-50/50'
                       }`}>
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="flex items-center gap-3">
-                            <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-widest ${
                               roleColors[ticket.user_role] || 'bg-gray-100 text-gray-500'
                             }`}>
                               {ticket.user_role}
                             </span>
-                            <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase ${
-                              ticket.status === 'OPEN' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'
+                            <span className={`text-[10px] font-black px-2.5 py-1 rounded-md uppercase ${
+                              ticket.status === 'OPEN' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'
                             }`}>
                               {ticket.status === 'OPEN' ? '● Aberto' : '✓ Resolvido'}
                             </span>
@@ -952,40 +946,40 @@ export const AdminView: React.FC = () => {
                           {ticket.user_email && <p className="text-xs text-gray-400">{ticket.user_email}</p>}
                         </div>
 
-                        <p className="text-sm text-gray-700 font-medium bg-gray-50 p-4 rounded-2xl leading-relaxed">
+                        <p className="text-sm text-gray-700 font-medium leading-relaxed mb-3">
                           {ticket.message}
                         </p>
 
                         {ticket.admin_note && (
-                          <div className="mt-3 bg-purple-50 border border-purple-100 p-4 rounded-2xl">
+                          <div className="mt-2 mb-3 bg-purple-50 border border-purple-100 p-3 rounded-xl">
                             <p className="text-[10px] font-black text-purple-500 uppercase tracking-widest mb-1">Nota interna</p>
                             <p className="text-sm text-purple-800 font-medium">{ticket.admin_note}</p>
                           </div>
                         )}
 
                         {replyingTo === ticket.id && (
-                          <div className="mt-3">
+                          <div className="mt-2 mb-3">
                             <textarea
                               value={replyNote}
                               onChange={e => setReplyNote(e.target.value)}
                               rows={3}
-                              className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-medium outline-none border-2 border-purple-200 focus:border-purple-400 resize-none"
+                              className="w-full p-3 bg-gray-50 rounded-xl text-sm font-medium outline-none border border-purple-200 focus:border-purple-400 resize-none"
                               placeholder="Nota interna ou observação sobre a resolução..."
                             />
                           </div>
                         )}
 
-                        <div className="mt-4 flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           {ticket.status === 'OPEN' && (
                             replyingTo === ticket.id ? (
                               <>
                                 <button
                                   onClick={() => resolveTicket(ticket.id)}
-                                  className="px-4 py-2 bg-green-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-green-500 transition"
+                                  className="px-4 py-2 bg-purple-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-purple-500 transition"
                                 >✓ Confirmar Resolução</button>
                                 <button
                                   onClick={() => { setReplyingTo(null); setReplyNote(''); }}
-                                  className="px-4 py-2 bg-gray-100 text-gray-500 rounded-xl text-xs font-black uppercase"
+                                  className="px-4 py-2 border border-gray-200 text-gray-500 rounded-xl text-xs font-black uppercase"
                                 >Cancelar</button>
                               </>
                             ) : (
@@ -998,7 +992,7 @@ export const AdminView: React.FC = () => {
                           <button
                             onClick={() => deleteTicket(ticket.id)}
                             className="ml-auto p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition"
-                          ><Trash2 size={16} /></button>
+                          ><Trash2 size={15} /></button>
                         </div>
                       </div>
                     ))}
@@ -1033,29 +1027,32 @@ export const AdminView: React.FC = () => {
                 </div>
 
                 {/* KPIs globais */}
-                <div className="grid grid-cols-3 gap-4">
-                  {[
-                    { label: 'Média Geral', value: globalAvg.toFixed(1) + ' ⭐', color: 'text-amber-500' },
-                    { label: 'Total de Avaliações', value: ratedOrders.length, color: 'text-purple-600' },
-                    { label: 'Restaurantes Avaliados', value: byRestaurant.length, color: 'text-blue-600' },
-                  ].map(k => (
-                    <div key={k.label} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm text-center">
-                      <p className={`text-2xl font-black ${k.color}`}>{k.value}</p>
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">{k.label}</p>
-                    </div>
-                  ))}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="grid grid-cols-3 divide-x divide-gray-100">
+                    {[
+                      { label: 'Média Geral', value: globalAvg.toFixed(1) + ' ⭐', color: 'text-amber-500' },
+                      { label: 'Total de Avaliações', value: ratedOrders.length, color: 'text-purple-600' },
+                      { label: 'Restaurantes Avaliados', value: byRestaurant.length, color: 'text-blue-600' },
+                    ].map(k => (
+                      <div key={k.label} className="p-6 text-center">
+                        <p className={`text-3xl font-black ${k.color}`}>{k.value}</p>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">{k.label}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Ranking por restaurante */}
                 {byRestaurant.length > 0 && (
-                  <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
-                    <h4 className="font-black text-sm uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
-                      <Award size={16} /> Ranking de Restaurantes
-                    </h4>
-                    <div className="space-y-3">
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="px-6 py-5 border-b border-gray-100 flex items-center gap-2">
+                      <Award size={15} className="text-gray-400" />
+                      <h4 className="font-black text-sm uppercase tracking-widest text-gray-400">Ranking de Restaurantes</h4>
+                    </div>
+                    <div className="divide-y divide-gray-100">
                       {byRestaurant.map(({ restaurant: r, orders: ro, avg }, idx) => (
-                        <div key={r.id} className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50">
-                          <span className="text-lg font-black text-gray-300 w-6 text-center">{idx + 1}</span>
+                        <div key={r.id} className="flex items-center gap-4 px-6 py-4 hover:bg-gray-50/50 transition-colors">
+                          <span className="text-base font-black text-gray-300 w-6 text-center">{idx + 1}</span>
                           <div className="flex-1 min-w-0">
                             <p className="font-black text-gray-800 text-sm truncate">{r.name}</p>
                             <p className="text-xs text-gray-400 font-medium">{ro.length} avaliações</p>
@@ -1073,20 +1070,21 @@ export const AdminView: React.FC = () => {
                 )}
 
                 {/* Feed de todas as avaliações */}
-                <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
-                  <h4 className="font-black text-sm uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
-                    <MessageSquare size={16} /> Todas as Avaliações
-                  </h4>
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="px-6 py-5 border-b border-gray-100 flex items-center gap-2">
+                    <MessageSquare size={15} className="text-gray-400" />
+                    <h4 className="font-black text-sm uppercase tracking-widest text-gray-400">Todas as Avaliações</h4>
+                  </div>
                   {ratedOrders.length === 0 ? (
                     <p className="text-gray-400 text-sm font-medium text-center py-8">Nenhuma avaliação ainda.</p>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="divide-y divide-gray-100">
                       {ratedOrders.map(order => {
                         const r = order.rating as any;
                         const storeStars: number = r?.storeStars ?? 0;
                         const driverStars: number = r?.driverStars ?? 0;
                         return (
-                          <div key={order.id} className="p-5 rounded-2xl border border-gray-100 bg-gray-50">
+                          <div key={order.id} className="px-6 py-4 hover:bg-gray-50/50 transition-colors">
                             <div className="flex items-start justify-between gap-4 mb-3">
                               <div className="min-w-0">
                                 <p className="font-black text-gray-800 text-sm truncate">{order.customerName}</p>
@@ -1097,7 +1095,7 @@ export const AdminView: React.FC = () => {
                               </span>
                             </div>
 
-                            <div className="flex flex-wrap gap-3 mb-3">
+                            <div className="flex flex-wrap gap-3 mb-2">
                               {/* Estrelas restaurante */}
                               <div className="flex items-center gap-1">
                                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1">Loja</span>
@@ -1117,11 +1115,11 @@ export const AdminView: React.FC = () => {
                             </div>
 
                             {/* Badges produto/embalagem */}
-                            <div className="flex gap-2 mb-3">
-                              <span className={`text-[10px] font-black px-2 py-1 rounded-full ${r?.productOk ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                            <div className="flex gap-2 mb-2">
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${r?.productOk ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
                                 {r?.productOk ? '✓ Produto OK' : '✗ Produto com problema'}
                               </span>
-                              <span className={`text-[10px] font-black px-2 py-1 rounded-full ${r?.packagingOk ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${r?.packagingOk ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
                                 {r?.packagingOk ? '✓ Embalagem OK' : '✗ Embalagem com problema'}
                               </span>
                             </div>
@@ -1147,7 +1145,7 @@ export const AdminView: React.FC = () => {
                 Integridade do Sistema
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+                <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
                   <h4 className="font-black text-sm uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
                     <Terminal size={16} /> Status de Conexão
                   </h4>
@@ -1160,7 +1158,7 @@ export const AdminView: React.FC = () => {
                     </span>
                   </div>
                 </div>
-                <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+                <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
                   <h4 className="font-black text-sm uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
                     <AlertTriangle size={16} /> Alertas Críticos
                   </h4>
@@ -1176,46 +1174,46 @@ export const AdminView: React.FC = () => {
 
       {viewingUser && (
         <div className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white w-full max-w-2xl rounded-[3rem] p-8 md:p-12 shadow-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col relative">
-            <div className="flex justify-between items-center mb-8 shrink-0">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col relative overflow-hidden">
+            <div className="flex justify-between items-center px-8 py-5 border-b border-gray-100 shrink-0">
               <div>
-                <h3 className="text-2xl font-black text-gray-900 tracking-tighter">
+                <h3 className="text-xl font-black text-gray-900 tracking-tighter">
                   Dossiê do Usuário
                 </h3>
-                <p className="text-sm text-gray-500">{viewingUser.email}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{viewingUser.email}</p>
               </div>
               <button
                 onClick={() => setViewingUser(null)}
-                className="p-3 bg-gray-100 rounded-full hover:bg-gray-200 transition"
+                className="p-2.5 bg-gray-100 rounded-xl hover:bg-gray-200 transition"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
             <form
               id="user-dossier-form"
               onSubmit={handleUpdateDossier}
-              className="flex-1 overflow-y-auto no-scrollbar space-y-6 pr-2 pb-10"
+              className="flex-1 overflow-y-auto no-scrollbar space-y-5 px-8 py-6 pb-10"
             >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <label className="text-[10px] font-bold text-gray-500 uppercase ml-2">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase ml-1 tracking-widest">
                     Nome Completo
                   </label>
                   <input
                     name="name"
                     defaultValue={viewingUser.name}
-                    className="w-full mt-1 p-4 bg-gray-50 rounded-xl font-bold border-2 border-transparent focus:border-purple-500 outline-none"
+                    className="w-full mt-1.5 p-3.5 bg-white rounded-xl font-bold border border-gray-200 focus:border-purple-400 outline-none transition-all"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-gray-500 uppercase ml-2">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase ml-1 tracking-widest">
                     Status da Conta
                   </label>
                   <select
                     name="status"
                     defaultValue={viewingUser.status}
-                    className="w-full mt-1 p-4 bg-gray-50 rounded-xl font-bold outline-none border-2 border-transparent focus:border-purple-500 appearance-none"
+                    className="w-full mt-1.5 p-3.5 bg-white rounded-xl font-bold border border-gray-200 focus:border-purple-400 outline-none appearance-none transition-all"
                   >
                     <option value="PENDING">PENDING</option>
                     <option value="APPROVED">APPROVED</option>
@@ -1224,91 +1222,91 @@ export const AdminView: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <label className="text-[10px] font-bold text-gray-500 uppercase ml-2 flex items-center gap-2">
-                    <DollarSign size={12} /> ID Subconta Asaas
+                  <label className="text-[10px] font-bold text-gray-500 uppercase ml-1 tracking-widest flex items-center gap-2">
+                    <DollarSign size={11} /> ID Subconta Asaas
                   </label>
                   <input
                     name="asaasAccountId"
                     defaultValue={viewingUser.asaasAccountId || ''}
-                    className="w-full mt-1 p-4 bg-gray-50 rounded-xl font-bold outline-none border-2 border-transparent focus:border-purple-500"
+                    className="w-full mt-1.5 p-3.5 bg-white rounded-xl font-bold border border-gray-200 outline-none transition-all"
                     readOnly
                     placeholder="Gerado automaticamente"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-gray-500 uppercase ml-2 flex items-center gap-2">
-                    <Wallet size={12} /> Chave PIX
+                  <label className="text-[10px] font-bold text-gray-500 uppercase ml-1 tracking-widest flex items-center gap-2">
+                    <Wallet size={11} /> Chave PIX
                   </label>
                   <input
                     name="pixKey"
                     defaultValue={viewingUser.pixKey || ''}
-                    className="w-full mt-1 p-4 bg-gray-50 rounded-xl font-bold outline-none border-2 border-transparent focus:border-purple-500"
+                    className="w-full mt-1.5 p-3.5 bg-white rounded-xl font-bold border border-gray-200 focus:border-purple-400 outline-none transition-all"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <label className="text-[10px] font-bold text-gray-500 uppercase ml-2">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase ml-1 tracking-widest">
                     CPF / CNPJ
                   </label>
                   <input
                     name="cpf"
                     defaultValue={viewingUser.cpf || viewingUser.cnpj || ''}
-                    className="w-full mt-1 p-4 bg-gray-50 rounded-xl font-bold outline-none border-2 border-transparent focus:border-purple-500"
+                    className="w-full mt-1.5 p-3.5 bg-white rounded-xl font-bold border border-gray-200 focus:border-purple-400 outline-none transition-all"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-gray-500 uppercase ml-2">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase ml-1 tracking-widest">
                     WhatsApp
                   </label>
                   <input
                     name="phone"
                     defaultValue={viewingUser.phoneNumber || ''}
-                    className="w-full mt-1 p-4 bg-gray-50 rounded-xl font-bold outline-none border-2 border-transparent focus:border-purple-500"
+                    className="w-full mt-1.5 p-3.5 bg-white rounded-xl font-bold border border-gray-200 focus:border-purple-400 outline-none transition-all"
                   />
                 </div>
               </div>
 
               {viewingUser.role === UserRole.RESTAURANT && (
-                <div className="space-y-6 pt-4 border-t border-gray-100">
+                <div className="space-y-5 pt-4 border-t border-gray-100">
                   <div>
-                    <label className="text-[10px] font-bold text-gray-500 uppercase ml-2">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase ml-1 tracking-widest">
                       Nome da Loja
                     </label>
                     <input
                       name="businessName"
                       defaultValue={viewingUser.businessName || ''}
-                      className="w-full mt-1 p-4 bg-orange-50 rounded-xl font-black outline-none border-2 border-transparent focus:border-purple-500"
+                      className="w-full mt-1.5 p-3.5 bg-orange-50 rounded-xl font-black border border-orange-100 focus:border-purple-400 outline-none transition-all"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-gray-500 uppercase ml-2">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase ml-1 tracking-widest">
                       Horário de Funcionamento
                     </label>
                     <input
                       name="workingHours"
                       defaultValue={viewingUser.workingHours || ''}
-                      className="w-full mt-1 p-4 bg-orange-50 rounded-xl font-black outline-none border-2 border-transparent focus:border-purple-500"
+                      className="w-full mt-1.5 p-3.5 bg-orange-50 rounded-xl font-black border border-orange-100 focus:border-purple-400 outline-none transition-all"
                     />
                   </div>
                    <div>
-                    <label className="text-[10px] font-bold text-gray-500 uppercase ml-2">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase ml-1 tracking-widest">
                       Descrição
                     </label>
                     <textarea
                       name="description"
                       defaultValue={viewingUser.description || ''}
-                      className="w-full mt-1 p-4 bg-orange-50 rounded-xl font-black outline-none border-2 border-transparent focus:border-purple-500 h-24 resize-none"
+                      className="w-full mt-1.5 p-3.5 bg-orange-50 rounded-xl font-black border border-orange-100 focus:border-purple-400 outline-none h-24 resize-none transition-all"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-orange-600 uppercase ml-2 flex items-center gap-2">
-                      <DollarSign size={12} /> Taxa Personalizada do Lojista (%)
+                    <label className="text-[10px] font-bold text-orange-600 uppercase ml-1 tracking-widest flex items-center gap-2">
+                      <DollarSign size={11} /> Taxa Personalizada do Lojista (%)
                     </label>
-                    <div className="relative mt-1">
+                    <div className="relative mt-1.5">
                       <input
                         name="customFeePct"
                         type="number"
@@ -1316,32 +1314,32 @@ export const AdminView: React.FC = () => {
                         step="0.01"
                         defaultValue={(viewingUser as any).customFeePct ?? ''}
                         placeholder="Deixe vazio para usar a taxa global"
-                        className="w-full p-4 pr-10 bg-orange-50 rounded-xl font-black outline-none border-2 border-transparent focus:border-orange-400"
+                        className="w-full p-3.5 pr-10 bg-orange-50 rounded-xl font-black border border-orange-100 focus:border-orange-400 outline-none transition-all"
                       />
                       <span className="absolute right-4 top-1/2 -translate-y-1/2 text-orange-500 font-black">%</span>
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-1 ml-2">Se preenchido, sobrescreve a taxa global de lojistas para esta loja específica</p>
+                    <p className="text-[10px] text-gray-400 mt-1 ml-1">Se preenchido, sobrescreve a taxa global de lojistas para esta loja específica</p>
                   </div>
                 </div>
               )}
 
               {viewingUser.role === UserRole.DRIVER && (
-                <div className="space-y-6 pt-4 border-t border-gray-100">
+                <div className="space-y-5 pt-4 border-t border-gray-100">
                   <div>
-                    <label className="text-[10px] font-bold text-gray-500 uppercase ml-2">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase ml-1 tracking-widest">
                       Placa do Veículo
                     </label>
                     <input
                       name="licensePlate"
                       defaultValue={viewingUser.licensePlate || ''}
-                      className="w-full mt-1 p-4 bg-green-50 rounded-xl font-black outline-none border-2 border-transparent focus:border-purple-500 uppercase"
+                      className="w-full mt-1.5 p-3.5 bg-green-50 rounded-xl font-black border border-green-100 focus:border-purple-400 outline-none uppercase transition-all"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-green-600 uppercase ml-2 flex items-center gap-2">
-                      <DollarSign size={12} /> Taxa Personalizada do Entregador (%)
+                    <label className="text-[10px] font-bold text-green-600 uppercase ml-1 tracking-widest flex items-center gap-2">
+                      <DollarSign size={11} /> Taxa Personalizada do Entregador (%)
                     </label>
-                    <div className="relative mt-1">
+                    <div className="relative mt-1.5">
                       <input
                         name="customFeePct"
                         type="number"
@@ -1349,25 +1347,25 @@ export const AdminView: React.FC = () => {
                         step="0.01"
                         defaultValue={viewingUser.customFeePct ?? ''}
                         placeholder="Deixe vazio para usar a taxa global"
-                        className="w-full p-4 pr-10 bg-green-50 rounded-xl font-black outline-none border-2 border-transparent focus:border-green-400"
+                        className="w-full p-3.5 pr-10 bg-green-50 rounded-xl font-black border border-green-100 focus:border-green-400 outline-none transition-all"
                       />
                       <span className="absolute right-4 top-1/2 -translate-y-1/2 text-green-500 font-black">%</span>
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-1 ml-2">Se preenchido, sobrescreve a taxa global de entregadores para este parceiro</p>
+                    <p className="text-[10px] text-gray-400 mt-1 ml-1">Se preenchido, sobrescreve a taxa global de entregadores para este parceiro</p>
                   </div>
                 </div>
               )}
             </form>
 
-            <div className="mt-auto pt-6 border-t border-gray-100 shrink-0 space-y-3">
+            <div className="px-8 py-5 border-t border-gray-100 shrink-0 space-y-3">
               <button
                 type="button"
                 onClick={handleResetPassword}
                 disabled={resetPasswordLoading}
-                className="w-full bg-orange-50 text-orange-600 py-4 rounded-2xl font-bold flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50"
+                className="w-full bg-red-50 text-red-600 border border-red-100 py-3 rounded-xl font-bold flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50"
               >
                 {resetPasswordLoading ? (
-                  <Loader className="animate-spin" size={18} />
+                  <Loader className="animate-spin" size={16} />
                 ) : (
                   <span>🔒</span>
                 )}
@@ -1377,9 +1375,9 @@ export const AdminView: React.FC = () => {
                 form="user-dossier-form"
                 type="submit"
                 disabled={isSaving}
-                className="w-full bg-gray-950 text-white py-5 rounded-2xl font-bold flex items-center justify-center gap-3 active:scale-95 transition-all shadow-lg disabled:opacity-50"
+                className="w-full bg-purple-600 text-white py-4 rounded-xl font-black text-sm flex items-center justify-center gap-3 active:scale-95 transition-all shadow-sm disabled:opacity-50"
               >
-                {isSaving ? <Loader className="animate-spin" size={18} /> : <Save size={18} />}
+                {isSaving ? <Loader className="animate-spin" size={16} /> : <Save size={16} />}
                 <span>Salvar Alterações</span>
               </button>
             </div>
