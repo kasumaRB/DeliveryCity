@@ -63,6 +63,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     createOrder,
     recalculateDistances,
     calculateDistance,
+    realDistances,
     submitRating,
     addAddress,
     updateAddress,
@@ -733,6 +734,12 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                   const estFee = estimatedDeliveryFee(restaurant);
                   const isClosed = restaurant.isOpen === false;
                   const isFav = currentUserProfile?.favoriteRestaurantIds?.includes(restaurant.id) ?? false;
+                  const travelMins = realDistances?.[restaurant.id]
+                    ? parseInt(realDistances[restaurant.id].durationText) || 0
+                    : 0;
+                  const prepMins = restaurant.prepTime ?? 30;
+                  const totalMins = travelMins > 0 ? prepMins + travelMins : prepMins;
+                  const timeLabel = travelMins > 0 ? `~${totalMins} min` : `~${prepMins} min preparo`;
                   return (
                     <div
                       key={restaurant.id}
@@ -788,7 +795,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                           {isClosed
                             ? 'Estabelecimento fechado'
                             : estFee !== null
-                              ? `${estFee === 0 ? 'Entrega grátis' : `Entrega R$ ${estFee.toFixed(2)}`} · ${restaurant.deliveryTime ?? '30-45 min'}`
+                              ? `${estFee === 0 ? 'Entrega grátis' : `Entrega R$ ${estFee.toFixed(2)}`} · ${timeLabel}`
                               : 'Defina seu endereço para ver o frete'}
                         </p>
                       </div>
@@ -809,7 +816,12 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                     {selectedRestaurant.name}
                   </h1>
                   <p className="text-white/70 text-xs font-medium">
-                    {selectedRestaurant.category} · {selectedRestaurant.deliveryTime ?? '30-45 min'}
+                    {selectedRestaurant.category} · {(() => {
+                      const t = realDistances?.[selectedRestaurant.id];
+                      const travel = t ? (parseInt(t.durationText) || 0) : 0;
+                      const prep = selectedRestaurant.prepTime ?? 30;
+                      return travel > 0 ? `~${prep + travel} min` : `~${prep} min preparo`;
+                    })()}
                   </p>
                 </div>
               </div>
