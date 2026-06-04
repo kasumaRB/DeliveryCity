@@ -314,6 +314,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           coords: r.coords ?? { lat: -9.5422, lng: -57.4486 },
           isOpen: r.is_open !== false,
           openingHours: Array.isArray(r.opening_hours) ? r.opening_hours : [],
+          deliveryTime: r.delivery_time ?? '30-45 min',
         }));
         setRestaurants(mapped);
         localStorage.setItem(STORAGE_KEY_RESTAURANTS, JSON.stringify(mapped));
@@ -697,6 +698,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           asaasAccountId: r.asaas_account_id,
           isOpen: r.is_open !== false,
           openingHours: Array.isArray(r.opening_hours) ? r.opening_hours : [],
+          deliveryTime: r.delivery_time ?? '30-45 min',
         });
         if (payload.eventType === 'INSERT') {
           const novo = mapRest(payload.new);
@@ -1432,6 +1434,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if ('openingHours' in d) { dbData.opening_hours = (d as any).openingHours; delete dbData.openingHours; }
           if ('ownerId' in d) { dbData.owner_id = (d as any).ownerId; delete dbData.ownerId; }
           if ('asaasAccountId' in d) { dbData.asaas_account_id = (d as any).asaasAccountId; delete dbData.asaasAccountId; }
+          if ('deliveryTime' in d) { dbData.delivery_time = (d as any).deliveryTime; delete dbData.deliveryTime; }
           const { error } = await supabase.from('restaurants').update(dbData).eq('id', id);
           if (error) {
             console.error('Error updating restaurant:', error);

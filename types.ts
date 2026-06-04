@@ -131,6 +131,7 @@ export interface Restaurant {
   minOrder?: number;
   isOpen?: boolean;
   openingHours?: DaySchedule[];
+  deliveryTime?: string;
   promotions?: Promotion[];
 }
 

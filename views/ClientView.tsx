@@ -788,7 +788,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                           {isClosed
                             ? 'Estabelecimento fechado'
                             : estFee !== null
-                              ? `${estFee === 0 ? 'Entrega grátis' : `Entrega R$ ${estFee.toFixed(2)}`} · 30-45 min`
+                              ? `${estFee === 0 ? 'Entrega grátis' : `Entrega R$ ${estFee.toFixed(2)}`} · ${restaurant.deliveryTime ?? '30-45 min'}`
                               : 'Defina seu endereço para ver o frete'}
                         </p>
                       </div>
@@ -809,7 +809,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                     {selectedRestaurant.name}
                   </h1>
                   <p className="text-white/70 text-xs font-medium">
-                    {selectedRestaurant.category} · 30-45 min
+                    {selectedRestaurant.category} · {selectedRestaurant.deliveryTime ?? '30-45 min'}
                   </p>
                 </div>
               </div>

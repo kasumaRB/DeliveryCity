@@ -143,6 +143,7 @@ export const RestaurantView: React.FC = () => {
   );
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [storeDescription, setStoreDescription] = useState(currentUserProfile?.description || '');
+  const [storeDeliveryTime, setStoreDeliveryTime] = useState(myRestaurant?.deliveryTime || '30-45 min');
   const [storeWorkingHours, setStoreWorkingHours] = useState(
     currentUserProfile?.workingHours || ''
   );
@@ -351,6 +352,7 @@ export const RestaurantView: React.FC = () => {
           name: storeName,
           address: storeAddress,
           openingHours: scheduleHours,
+          deliveryTime: storeDeliveryTime || '30-45 min',
           ...(storeCoords ? { coords: storeCoords } : {}),
         }),
         updateUserProfile(currentUserProfile.id, {
@@ -1847,6 +1849,17 @@ export const RestaurantView: React.FC = () => {
                   placeholder="Descrição da Loja"
                   className="w-full p-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-orange-100 h-24 resize-none"
                 />
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">
+                    Tempo estimado de entrega
+                  </label>
+                  <input
+                    value={storeDeliveryTime}
+                    onChange={e => setStoreDeliveryTime(e.target.value)}
+                    placeholder="ex: 30-45 min"
+                    className="w-full p-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-orange-100"
+                  />
+                </div>
               </div>
 
               <div className="space-y-4">
