@@ -1129,18 +1129,14 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
 
                           {/* Contador regressivo de entrega */}
                           {showCountdown && (
-                            <div className={`mx-5 mb-4 rounded-xl p-4 flex items-center gap-3 ${
-                              isOverdue
-                                ? 'bg-red-50 border border-red-100'
-                                : 'bg-orange-50 border border-orange-100'
-                            }`}>
+                            <div className="mx-5 mb-4 rounded-xl p-4 flex items-center gap-3 bg-orange-50 border border-orange-100">
                               {isOverdue ? (
                                 <>
-                                  <span className="text-2xl">⚠️</span>
+                                  <span className="text-xl">🕐</span>
                                   <div>
-                                    <p className="text-xs font-black text-red-600">Está demorando mais que o esperado</p>
-                                    <p className="text-[11px] text-red-400 font-medium mt-0.5">
-                                      Já passou {Math.abs(remainingMins!)} min do tempo estimado. Estamos verificando o que aconteceu.
+                                    <p className="text-xs font-black text-orange-700">Aguarde, seu pedido está a caminho</p>
+                                    <p className="text-[11px] text-orange-500 font-medium mt-0.5">
+                                      Está demorando um pouquinho mais que o previsto. Já já chega!
                                     </p>
                                   </div>
                                 </>
