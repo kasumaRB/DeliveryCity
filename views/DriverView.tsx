@@ -56,6 +56,8 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [plate, setPlate] = useState(currentUserProfile?.licensePlate || '');
   const [phone, setPhone] = useState(currentUserProfile?.phoneNumber || '');
   const [pixKey, setPixKey] = useState(currentUserProfile?.pixKey || '');
+  const [cnh, setCnh] = useState(currentUserProfile?.cnh || '');
+  const [cpf, setCpf] = useState(currentUserProfile?.cpf || '');
   const [asaasAccountId] = useState(currentUserProfile?.asaasAccountId || '');
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
@@ -89,6 +91,14 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     [myDeliveries]
   );
 
+  const startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
+  const startOfWeek  = new Date(); startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); startOfWeek.setHours(0,0,0,0);
+  const startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0,0,0,0);
+
+  const todayEarningsProfile  = useMemo(() => myDeliveries.filter(o => o.timestamp >= startOfToday.getTime()).reduce((s,o) => s+(o.driverNetEarnings||0),0), [myDeliveries]);
+  const weekEarnings  = useMemo(() => myDeliveries.filter(o => o.timestamp >= startOfWeek.getTime()).reduce((s,o) => s+(o.driverNetEarnings||0),0), [myDeliveries]);
+  const monthEarnings = useMemo(() => myDeliveries.filter(o => o.timestamp >= startOfMonth.getTime()).reduce((s,o) => s+(o.driverNetEarnings||0),0), [myDeliveries]);
+
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !currentUserProfile) return;
@@ -120,6 +130,8 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         licensePlate: vehicle !== 'Bicicleta' ? plate : '',
         phoneNumber: phone,
         pixKey,
+        cnh: vehicle !== 'Bicicleta' ? cnh : '',
+        cpf,
         savedAddresses: newSavedAddresses,
       });
       alert('Dados atualizados!');
@@ -168,6 +180,7 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
           <div className="flex-1 min-w-0">
             <h1 className="text-2xl font-black text-white truncate">{currentUserProfile?.name || 'Entregador'}</h1>
+            <p className="text-gray-500 text-[11px] font-medium mt-0.5 truncate">{currentUserProfile?.email}</p>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               <span className="text-sm font-bold text-blue-300">
                 {vehicleIcons[vehicle] || '🚗'} {vehicle}
@@ -182,14 +195,27 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-3 mb-3">
           {[
             { label: 'Entregas', value: myDeliveries.length, color: 'text-green-400' },
-            { label: 'Nota Média', value: myRatings.length ? avgRating.toFixed(1) + ' ⭐' : '—', color: 'text-amber-400' },
-            { label: 'Total Ganho', value: `R$${totalEarned.toFixed(0)}`, color: 'text-blue-300' },
+            { label: 'Nota', value: myRatings.length ? avgRating.toFixed(1) + ' ⭐' : '—', color: 'text-amber-400' },
+            { label: 'Pontuação', value: `${currentUserProfile?.driverScore ?? 100}pts`, color: currentUserProfile?.driverScore !== undefined && currentUserProfile.driverScore < 70 ? 'text-red-400' : 'text-blue-300' },
           ].map(s => (
             <div key={s.label} className="bg-white/5 backdrop-blur rounded-2xl p-3 text-center border border-white/10">
               <p className={`text-lg font-black ${s.color}`}>{s.value}</p>
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mt-0.5">{s.label}</p>
+            </div>
+          ))}
+        </div>
+        {/* Ganhos por período */}
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: 'Hoje', value: `R$${todayEarningsProfile.toFixed(0)}`, color: 'text-green-300' },
+            { label: 'Semana', value: `R$${weekEarnings.toFixed(0)}`, color: 'text-green-300' },
+            { label: 'Mês', value: `R$${monthEarnings.toFixed(0)}`, color: 'text-green-300' },
+          ].map(s => (
+            <div key={s.label} className="bg-white/5 backdrop-blur rounded-2xl p-3 text-center border border-white/10">
+              <p className={`text-base font-black ${s.color}`}>{s.value}</p>
               <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mt-0.5">{s.label}</p>
             </div>
           ))}
@@ -216,26 +242,45 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             ))}
           </div>
           {vehicle !== 'Bicicleta' && (
-            <input
-              value={plate}
-              onChange={e => setPlate(e.target.value.toUpperCase())}
-              className="w-full p-4 bg-gray-700/50 rounded-2xl font-black border-2 border-transparent outline-none text-white focus:border-blue-500 transition-all tracking-widest text-center text-lg"
-              placeholder="ABC-1234"
-              maxLength={8}
-            />
+            <>
+              <input
+                value={plate}
+                onChange={e => setPlate(e.target.value.toUpperCase())}
+                className="w-full p-4 bg-gray-700/50 rounded-2xl font-black border-2 border-transparent outline-none text-white focus:border-blue-500 transition-all tracking-widest text-center text-lg"
+                placeholder="ABC-1234"
+                maxLength={8}
+              />
+              <input
+                value={cnh}
+                onChange={e => setCnh(e.target.value.replace(/\D/g, ''))}
+                className="w-full p-4 bg-gray-700/50 rounded-2xl font-bold border-2 border-transparent outline-none text-white focus:border-blue-500 transition-all mt-3"
+                placeholder="CNH (11 dígitos)"
+                maxLength={11}
+                inputMode="numeric"
+              />
+              <p className="text-[10px] text-gray-600 font-medium ml-1 mt-1">Número da CNH</p>
+            </>
           )}
         </div>
 
         {/* Contato */}
         <div className="bg-gray-800/60 backdrop-blur p-6 rounded-[2rem] border border-gray-700/50">
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <Phone size={14} className="text-green-400" /> Contato
+            <Phone size={14} className="text-green-400" /> Contato e Documentos
           </p>
           <input
             value={phone}
             onChange={e => setPhone(e.target.value)}
-            className="w-full p-4 bg-gray-700/50 rounded-2xl font-bold border-2 border-transparent outline-none text-white focus:border-blue-500 transition-all"
+            className="w-full p-4 bg-gray-700/50 rounded-2xl font-bold border-2 border-transparent outline-none text-white focus:border-blue-500 transition-all mb-3"
             placeholder="(00) 00000-0000"
+          />
+          <input
+            value={cpf}
+            onChange={e => setCpf(e.target.value.replace(/\D/g, '').slice(0, 11))}
+            className="w-full p-4 bg-gray-700/50 rounded-2xl font-bold border-2 border-transparent outline-none text-white focus:border-blue-500 transition-all"
+            placeholder="CPF (apenas números)"
+            inputMode="numeric"
+            maxLength={11}
           />
         </div>
 
@@ -369,6 +414,19 @@ export const DriverView: React.FC = () => {
   const [inputCode, setInputCode] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null);
+
+  // Driver availability (persisted to profiles.is_online)
+  const [isAvailable, setIsAvailable] = useState(currentUserProfile?.isOnline ?? false);
+  useEffect(() => {
+    setIsAvailable(currentUserProfile?.isOnline ?? false);
+  }, [currentUserProfile?.id]);
+
+  const toggleAvailability = async () => {
+    const next = !isAvailable;
+    setIsAvailable(next);
+    try { await updateUserProfile(currentUserProfile!.id, { isOnline: next }); }
+    catch { setIsAvailable(!next); }
+  };
 
   // Fluxo de falha de entrega
   const [showFailedModal, setShowFailedModal] = useState(false);
@@ -648,6 +706,24 @@ export const DriverView: React.FC = () => {
         {/* HOME TAB */}
         {activeTab === 'home' && (
           <div className="px-4 pt-4">
+
+            {/* Availability toggle */}
+            <div className="flex items-center justify-between mb-4 p-4 bg-gray-800/50 rounded-2xl border border-gray-700/40">
+              <div>
+                <p className={`font-black text-sm ${isAvailable ? 'text-green-400' : 'text-gray-400'}`}>
+                  {isAvailable ? 'Disponível' : 'Indisponível'}
+                </p>
+                <p className="text-gray-600 text-xs mt-0.5">
+                  {isAvailable ? 'Recebendo pedidos' : 'Não recebendo pedidos'}
+                </p>
+              </div>
+              <button
+                onClick={toggleAvailability}
+                className={`relative w-14 h-7 rounded-full transition-all duration-300 ${isAvailable ? 'bg-green-500' : 'bg-gray-600'}`}
+              >
+                <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 ${isAvailable ? 'left-8' : 'left-1'}`} />
+              </button>
+            </div>
 
             {/* Quick stats — linha discreta no topo quando sem pedido ativo */}
             {!activeOrder && (

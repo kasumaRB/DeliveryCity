@@ -168,6 +168,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     favoriteRestaurantIds: Array.isArray(p.favorite_restaurant_ids) ? p.favorite_restaurant_ids : [],
     driverTutorialSeen: p.driver_tutorial_seen === true,
     clientTutorialSeen: p.client_tutorial_seen === true,
+    driverScore: p.driver_score !== undefined ? Number(p.driver_score) : 100,
+    cnh: p.cnh || '',
+    isOnline: p.is_online ?? false,
   });
 
   const mapOrder = (o: any): Order => ({
@@ -188,6 +191,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     customerId: o.customer_id,
     timestamp: o.timestamp ? new Date(o.timestamp).getTime() : Date.now(),
     cancelledAt: o.cancelled_at ? new Date(o.cancelled_at).getTime() : undefined,
+    confirmedAt: o.confirmed_at ? new Date(o.confirmed_at).getTime() : undefined,
     driverId: o.driver_id,
     pickupCode: o.pickup_code,
     deliveryCode: o.delivery_code,
@@ -201,6 +205,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     customerPhone: o.customer_phone ?? undefined,
     customerAvatarUrl: o.customer_avatar_url ?? undefined,
     failureReason: o.failure_reason ?? undefined,
+    returnCode: o.return_code ?? undefined,
     driverName: o.driver_name ?? undefined,
   });
 
@@ -274,6 +279,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           coords: r.coords ?? { lat: -9.5422, lng: -57.4486 },
           isOpen: r.is_open !== false,
           openingHours: Array.isArray(r.opening_hours) ? r.opening_hours : [],
+          prepTime: typeof r.prep_time === 'number' ? r.prep_time : 30,
+          cnpj: r.cnpj || '',
+          phoneNumber: r.phone_number || '',
         }));
         setRestaurants(mapped);
         localStorage.setItem(STORAGE_KEY_RESTAURANTS, JSON.stringify(mapped));
@@ -624,6 +632,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           asaasAccountId: r.asaas_account_id,
           isOpen: r.is_open !== false,
           openingHours: Array.isArray(r.opening_hours) ? r.opening_hours : [],
+          prepTime: typeof r.prep_time === 'number' ? r.prep_time : 30,
+          cnpj: r.cnpj || '',
+          phoneNumber: r.phone_number || '',
         });
         if (payload.eventType === 'INSERT') {
           const novo = mapRest(payload.new);
@@ -940,6 +951,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (data.favoriteRestaurantIds !== undefined) up.favorite_restaurant_ids = data.favoriteRestaurantIds;
     if (data.driverTutorialSeen !== undefined) up.driver_tutorial_seen = data.driverTutorialSeen;
     if (data.clientTutorialSeen !== undefined) up.client_tutorial_seen = data.clientTutorialSeen;
+    if (data.cnh !== undefined) up.cnh = data.cnh;
+    if (data.isOnline !== undefined) up.is_online = data.isOnline;
     if (data.currentLocation !== undefined) up.current_location = data.currentLocation;
 
     // Captura role ANTES do fetchData (closure stale após setState assíncrono)
@@ -1298,6 +1311,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if ('openingHours' in d) { dbData.opening_hours = (d as any).openingHours; delete dbData.openingHours; }
           if ('ownerId' in d) { dbData.owner_id = (d as any).ownerId; delete dbData.ownerId; }
           if ('asaasAccountId' in d) { dbData.asaas_account_id = (d as any).asaasAccountId; delete dbData.asaasAccountId; }
+          if ('prepTime' in d) { dbData.prep_time = (d as any).prepTime; delete dbData.prepTime; }
+          if ('phoneNumber' in d) { dbData.phone_number = (d as any).phoneNumber; delete dbData.phoneNumber; }
           const { error } = await supabase.from('restaurants').update(dbData).eq('id', id);
           if (error) {
             console.error('Error updating restaurant:', error);

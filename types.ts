@@ -76,6 +76,9 @@ export interface UserProfile {
   favoriteRestaurantIds?: string[];
   driverTutorialSeen?: boolean;
   clientTutorialSeen?: boolean;
+  driverScore?: number;
+  cnh?: string;
+  isOnline?: boolean;
 }
 
 // Horário estruturado por dia da semana
@@ -130,6 +133,8 @@ export interface Restaurant {
   minOrder?: number;
   isOpen?: boolean;
   openingHours?: DaySchedule[];
+  prepTime?: number;
+  cnpj?: string;
   promotions?: Promotion[];
 }
 
@@ -164,6 +169,7 @@ export interface Order {
   coords?: { lat: number; lng: number };
   timestamp: number;
   cancelledAt?: number;
+  confirmedAt?: number;
   driverId?: string;
   pickupCode?: string;
   deliveryCode?: string;
@@ -174,6 +180,7 @@ export interface Order {
   customerPhone?: string;
   customerAvatarUrl?: string;
   failureReason?: string;
+  returnCode?: string;
 }
 
 export interface OrderRating {

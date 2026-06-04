@@ -156,6 +156,12 @@ export const RestaurantView: React.FC = () => {
   const [respPix, setRespPix] = useState(currentUserProfile?.pixKey || '');
   const [respAsaasId, setRespAsaasId] = useState(currentUserProfile?.asaasAccountId || '');
 
+  const [storePrepTime, setStorePrepTime] = useState(String(myRestaurant?.prepTime ?? 30));
+  const [storeCnpj, setStoreCnpj] = useState(myRestaurant?.cnpj || '');
+  const [storePhoneNumber, setStorePhoneNumber] = useState(myRestaurant?.phoneNumber || '');
+  const [storeCategory, setStoreCategory] = useState(myRestaurant?.category || '');
+  const [statsPeriod, setStatsPeriod] = useState<'today' | 'week' | 'month' | 'all'>('all');
+
   // Promotion states
   const [promoCode, setPromoCode] = useState('');
   const [promoDiscountType, setPromoDiscountType] = useState<'PERCENT' | 'FIXED'>('PERCENT');
@@ -191,6 +197,10 @@ export const RestaurantView: React.FC = () => {
       setRespCpf(currentUserProfile.cpf || '');
       setRespPix(currentUserProfile.pixKey || '');
       setRespAsaasId(currentUserProfile.asaasAccountId || '');
+      setStorePrepTime(String(myRestaurant.prepTime ?? 30));
+      setStoreCnpj(myRestaurant.cnpj || '');
+      setStorePhoneNumber(myRestaurant.phoneNumber || '');
+      setStoreCategory(myRestaurant.category || '');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showEditModal]);
@@ -345,6 +355,10 @@ export const RestaurantView: React.FC = () => {
           name: storeName,
           address: storeAddress,
           openingHours: scheduleHours,
+          prepTime: Math.max(1, parseInt(storePrepTime) || 30),
+          cnpj: storeCnpj,
+          phoneNumber: storePhoneNumber,
+          category: storeCategory,
           ...(storeCoords ? { coords: storeCoords } : {}),
         }),
         updateUserProfile(currentUserProfile.id, {
@@ -1187,16 +1201,24 @@ export const RestaurantView: React.FC = () => {
           )}
 
           {activeTab === 'stats' && (() => {
-            const delivered = myOrders.filter(o => o.status === OrderStatus.DELIVERED);
+            const periodStart: Record<string, number> = {
+              today: (() => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); })(),
+              week:  (() => { const d = new Date(); d.setDate(d.getDate() - 7); d.setHours(0,0,0,0); return d.getTime(); })(),
+              month: (() => { const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d.getTime(); })(),
+              all: 0,
+            };
+            const filteredOrders = statsPeriod === 'all' ? myOrders : myOrders.filter(o => o.timestamp >= periodStart[statsPeriod]);
+
+            const delivered = filteredOrders.filter(o => o.status === OrderStatus.DELIVERED);
             const totalRevenue = delivered.reduce((s, o) => s + (o.restaurantNetEarnings || o.total), 0);
-            const totalGMV = myOrders.reduce((s, o) => s + o.total, 0);
+            const totalGMV = filteredOrders.reduce((s, o) => s + o.total, 0);
             const avgTicket = delivered.length > 0 ? totalGMV / delivered.length : 0;
-            const cancelledCount = myOrders.filter(o => o.status === 'CANCELLED').length;
+            const cancelledCount = filteredOrders.filter(o => o.status === 'CANCELLED').length;
             const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
             // Product sales analytics
             const productSales: Record<string, { name: string; qty: number; revenue: number }> = {};
-            myOrders.forEach(o => {
+            filteredOrders.forEach(o => {
               o.items.forEach((item: any) => {
                 const id = item.product?.id || item.id;
                 const name = item.product?.name || item.name || '?';
@@ -1211,7 +1233,7 @@ export const RestaurantView: React.FC = () => {
             const maxQty = topProducts[0]?.qty || 1;
 
             // Ratings
-            const ratedOrders = myOrders.filter(o => o.rating);
+            const ratedOrders = filteredOrders.filter(o => o.rating);
             const avgRestRating = ratedOrders.length > 0
               ? ratedOrders.reduce((s, o) => s + ((o.rating as any)?.restaurantStars || (o.rating as any)?.stars || 0), 0) / ratedOrders.length
               : 0;
@@ -1231,6 +1253,24 @@ export const RestaurantView: React.FC = () => {
                   <h2 className="text-4xl font-black text-gray-900 tracking-tighter mb-1">Painel de Vendas</h2>
                   <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest">Desempenho completo da sua loja</p>
                 </header>
+
+                {/* Period filter */}
+                <div className="flex gap-2 bg-gray-100 p-1 rounded-xl w-fit">
+                  {([
+                    { id: 'today', label: 'Hoje' },
+                    { id: 'week',  label: '7 dias' },
+                    { id: 'month', label: 'Mês' },
+                    { id: 'all',   label: 'Tudo' },
+                  ] as const).map(p => (
+                    <button
+                      key={p.id}
+                      onClick={() => setStatsPeriod(p.id)}
+                      className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${statsPeriod === p.id ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400'}`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
 
                 {/* KPI Cards — 2×2 no mobile, 1×4 no desktop */}
                 <div className="rounded-2xl border border-gray-100 shadow-sm overflow-hidden bg-gray-100">
@@ -1352,9 +1392,9 @@ export const RestaurantView: React.FC = () => {
                 <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
                   <h3 className="font-black text-gray-900 mb-6">Registro de Vendas</h3>
                   <div className="space-y-3">
-                    {myOrders.length === 0 ? (
-                      <p className="text-center py-8 text-gray-400 font-bold">Nenhum pedido ainda.</p>
-                    ) : [...myOrders].sort((a, b) => b.timestamp - a.timestamp).slice(0, 20).map(order => {
+                    {filteredOrders.length === 0 ? (
+                      <p className="text-center py-8 text-gray-400 font-bold">Nenhum pedido neste período.</p>
+                    ) : [...filteredOrders].sort((a, b) => b.timestamp - a.timestamp).slice(0, 20).map(order => {
                       const s = statusMap[order.status] || { label: order.status, color: 'text-gray-500 bg-gray-100' };
                       return (
                         <div key={order.id} className="p-5 bg-gray-50 rounded-2xl border border-gray-100">
@@ -1419,24 +1459,34 @@ export const RestaurantView: React.FC = () => {
                     </button>
                   </div>
                   <div className="text-center md:text-left flex-1">
-                    <h3 className="text-3xl font-black text-gray-900 mb-2">{myRestaurant.name}</h3>
-                    <p className="text-gray-400 font-bold uppercase text-[10px] tracking-[0.2em] mb-6">
-                      {myRestaurant.category} • {currentUserProfile.email}
+                    <h3 className="text-3xl font-black text-gray-900 mb-1">{myRestaurant.name}</h3>
+                    <p className="text-gray-400 font-bold text-[10px] tracking-[0.15em] mb-1">
+                      {myRestaurant.category || 'Categoria não definida'} • {currentUserProfile.email}
                     </p>
-                    <div className="flex gap-3">
+                    {myRestaurant.phoneNumber && (
+                      <p className="text-gray-500 text-xs font-bold mb-1">📞 {myRestaurant.phoneNumber}</p>
+                    )}
+                    {myRestaurant.cnpj && (
+                      <p className="text-gray-400 text-[10px] font-bold mb-3">CNPJ: {myRestaurant.cnpj}</p>
+                    )}
+                    <div className="flex flex-wrap gap-2">
                       <div className="bg-orange-50 px-3 py-2 rounded-xl border border-orange-100">
-                        <p className="text-[9px] font-black text-orange-400 uppercase tracking-wide mb-0.5">
-                          Status
-                        </p>
-                        <p className="font-black text-orange-600 text-xs">
-                          {currentUserProfile.status}
-                        </p>
+                        <p className="text-[9px] font-black text-orange-400 uppercase tracking-wide mb-0.5">Status</p>
+                        <p className="font-black text-orange-600 text-xs">{currentUserProfile.status}</p>
                       </div>
+                      {myRestaurant.rating > 0 && (
+                        <div className="bg-amber-50 px-3 py-2 rounded-xl border border-amber-100">
+                          <p className="text-[9px] font-black text-amber-500 uppercase tracking-wide mb-0.5">Avaliação</p>
+                          <p className="font-black text-amber-600 text-xs">
+                            ★ {myRestaurant.rating.toFixed(1)} ({myRestaurant.ratingsCount || 0})
+                          </p>
+                        </div>
+                      )}
                       <div className="bg-gray-50 px-3 py-2 rounded-xl border border-gray-100">
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-wide mb-0.5">
-                          Repasse
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-wide mb-0.5">Repasse</p>
+                        <p className="font-black text-gray-900 text-xs">
+                          {100 - Math.round((currentUserProfile?.customFeePct ?? (platformSettings?.restaurantFeePct ?? 0.08) * 100))}% Líquido
                         </p>
-                        <p className="font-black text-gray-900 text-xs">85% Livre</p>
                       </div>
                     </div>
                   </div>
@@ -1767,6 +1817,54 @@ export const RestaurantView: React.FC = () => {
                   placeholder="Descrição da Loja"
                   className="w-full p-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-orange-100 h-24 resize-none"
                 />
+                <select
+                  value={storeCategory}
+                  onChange={e => setStoreCategory(e.target.value)}
+                  className="w-full p-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-orange-100"
+                >
+                  <option value="">Categoria da loja</option>
+                  <option value="Lanche">Lanche</option>
+                  <option value="Pizza">Pizza</option>
+                  <option value="Hambúrguer">Hambúrguer</option>
+                  <option value="Açaí">Açaí</option>
+                  <option value="Sorvete">Sorvete</option>
+                  <option value="Japonesa">Japonesa</option>
+                  <option value="Mexicana">Mexicana</option>
+                  <option value="Italiana">Italiana</option>
+                  <option value="Brasileira">Brasileira</option>
+                  <option value="Marmita">Marmita</option>
+                  <option value="Padaria">Padaria</option>
+                  <option value="Outro">Outro</option>
+                </select>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">
+                      Tempo preparo (min)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      step={5}
+                      value={storePrepTime}
+                      onChange={e => setStorePrepTime(e.target.value)}
+                      placeholder="ex: 30"
+                      className="w-full p-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-orange-100"
+                    />
+                  </div>
+                  <input
+                    value={storePhoneNumber}
+                    onChange={e => setStorePhoneNumber(e.target.value)}
+                    placeholder="Tel. da loja"
+                    className="w-full p-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-orange-100 mt-6"
+                  />
+                  <input
+                    value={storeCnpj}
+                    onChange={e => setStoreCnpj(e.target.value.replace(/\D/g, '').slice(0, 14))}
+                    placeholder="CNPJ (números)"
+                    inputMode="numeric"
+                    className="w-full p-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-orange-100 mt-6"
+                  />
+                </div>
               </div>
 
               <div className="space-y-4">
