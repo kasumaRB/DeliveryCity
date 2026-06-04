@@ -209,6 +209,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     customerId: o.customer_id,
     timestamp: o.timestamp ? new Date(o.timestamp).getTime() : Date.now(),
     cancelledAt: o.cancelled_at ? new Date(o.cancelled_at).getTime() : undefined,
+    confirmedAt: o.confirmed_at ? new Date(o.confirmed_at).getTime() : undefined,
     driverId: o.driver_id,
     pickupCode: o.pickup_code,
     deliveryCode: o.delivery_code,
@@ -1322,7 +1323,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         loginAsTestUser,
         createOrder,
         updateOrderStatus: async (id, s) => {
-          await supabase.from('orders').update({ status: s }).eq('id', id);
+          const extraFields: Record<string, any> = {};
+          if (s === OrderStatus.PREPARING) extraFields.confirmed_at = new Date().toISOString();
+          await supabase.from('orders').update({ status: s, ...extraFields }).eq('id', id);
           await fetchData();
 
           // Notificações por status

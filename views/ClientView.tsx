@@ -141,6 +141,14 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
 
   // Tutorial
   const [showTutorial, setShowTutorial] = useState(false);
+
+  // Relógio para o contador regressivo de entrega (tick a cada 30s)
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(t);
+  }, []);
+
   useEffect(() => {
     if (!currentUserProfile || currentUserProfile.role !== UserRole.CLIENT) return;
     if (currentUserProfile.clientTutorialSeen || hasSeen('CLIENT')) {
@@ -986,6 +994,24 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                       const progressSteps = ['PENDING', 'PENDING_PAYMENT', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'];
                       const stepLabels = ['Recebido', 'Pgto', 'Preparo', 'Pronto', 'Entrega'];
                       const currentStepIdx = progressSteps.indexOf(order.status);
+
+                      // Contador regressivo: só existe após restaurante confirmar (PREPARING em diante)
+                      const orderRestaurant = restaurants.find(r => r.id === order.restaurantId);
+                      const prepMins = orderRestaurant?.prepTime ?? 30;
+                      let travelMins = 15;
+                      if (order.coords && orderRestaurant?.coords && calculateDistance) {
+                        const distKm = calculateDistance(
+                          orderRestaurant.coords.lat, orderRestaurant.coords.lng,
+                          (order.coords as any).lat, (order.coords as any).lng
+                        );
+                        travelMins = Math.ceil(distKm * 1.35 * 3 + 5);
+                      }
+                      const totalEstMins = prepMins + travelMins;
+                      const eta = order.confirmedAt ? order.confirmedAt + totalEstMins * 60 * 1000 : null;
+                      const remainingMs = eta ? eta - now : null;
+                      const isOverdue = remainingMs !== null && remainingMs < 0;
+                      const remainingMins = remainingMs !== null ? Math.ceil(remainingMs / 60000) : null;
+                      const showCountdown = isActive && eta !== null && !['PENDING', 'PENDING_PAYMENT'].includes(order.status);
                       return (
                         <div
                           key={order.id}
@@ -1098,6 +1124,41 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                                   );
                                 })}
                               </div>
+                            </div>
+                          )}
+
+                          {/* Contador regressivo de entrega */}
+                          {showCountdown && (
+                            <div className={`mx-5 mb-4 rounded-xl p-4 flex items-center gap-3 ${
+                              isOverdue
+                                ? 'bg-red-50 border border-red-100'
+                                : 'bg-orange-50 border border-orange-100'
+                            }`}>
+                              {isOverdue ? (
+                                <>
+                                  <span className="text-2xl">⚠️</span>
+                                  <div>
+                                    <p className="text-xs font-black text-red-600">Está demorando mais que o esperado</p>
+                                    <p className="text-[11px] text-red-400 font-medium mt-0.5">
+                                      Já passou {Math.abs(remainingMins!)} min do tempo estimado. Estamos verificando o que aconteceu.
+                                    </p>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+                                    <span className="text-base font-black text-orange-600">{remainingMins}</span>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-black text-orange-700">
+                                      {order.status === 'OUT_FOR_DELIVERY' ? 'Chegando em' : 'Previsão de entrega em'}
+                                    </p>
+                                    <p className="text-[11px] text-orange-500 font-medium mt-0.5">
+                                      {remainingMins === 1 ? 'menos de 1 minuto' : `~${remainingMins} minutos`}
+                                    </p>
+                                  </div>
+                                </>
+                              )}
                             </div>
                           )}
 

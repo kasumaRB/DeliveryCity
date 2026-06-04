@@ -166,6 +166,7 @@ export interface Order {
   coords?: { lat: number; lng: number };
   timestamp: number;
   cancelledAt?: number;
+  confirmedAt?: number;
   driverId?: string;
   pickupCode?: string;
   deliveryCode?: string;
