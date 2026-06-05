@@ -445,30 +445,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
       // fetchData() concorrentemente e o app fecha sem currentUserProfile definido.
       await refreshData();
 
-      // ── Criar subconta Asaas para parceiros (best-effort, não bloqueia cadastro) ──
-      if (mode === 'REGISTER_PARTNER') {
-        try {
-          const cpfCnpj = partnerType === UserRole.RESTAURANT
-            ? cnpj.replace(/\D/g, '')
-            : cpf.replace(/\D/g, '');
-
-          await supabase.functions.invoke('create-asaas-account', {
-            body: {
-              profileId: userId,
-              name: partnerType === UserRole.RESTAURANT ? (businessName || name) : name,
-              email: email.toLowerCase(),
-              cpfCnpj,
-              phoneNumber: cleanPhone,
-              birthDate: partnerType === UserRole.DRIVER ? birthDate : undefined,
-              companyType: partnerType === UserRole.RESTAURANT ? 'MEI' : undefined,
-            },
-          });
-        } catch (asaasErr) {
-          // Não impede o cadastro — a subconta pode ser criada manualmente pelo admin depois
-          console.warn('[AuthView] Falha ao criar subconta Asaas (não fatal):', asaasErr);
-        }
-      }
-
       const msg =
         mode === 'REGISTER_PARTNER'
           ? 'Cadastro enviado! Aguarde a aprovação da equipe.'

@@ -1,7 +1,8 @@
 /**
  * Edge Function: release-payment-splits
  *
- * Transfere para restaurante e entregador somente após DELIVERED.
+ * Envia PIX para restaurante e entregador somente após DELIVERED.
+ * Usa a chave PIX cadastrada no perfil de cada um — sem subconta Asaas.
  * Chamada em confirmDelivery() no store.tsx.
  *
  * Body: { orderId: string }
@@ -18,13 +19,30 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-async function asaasPost(path: string, payload: unknown) {
-  const res = await fetch(`${ASAAS_BASE_URL}${path}`, {
+function detectPixKeyType(key: string): 'CPF' | 'CNPJ' | 'EMAIL' | 'PHONE' | 'EVP' {
+  const clean = key.replace(/\D/g, '');
+  if (key.includes('@')) return 'EMAIL';
+  if (clean.length === 14) return 'CNPJ';
+  if (clean.length === 11) return 'CPF';
+  if (clean.length === 10 || clean.length === 11) return 'PHONE';
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(key)) return 'EVP';
+  return 'EVP';
+}
+
+async function sendPix(pixKey: string, value: number, description: string, externalRef: string) {
+  const keyType = detectPixKeyType(pixKey);
+  const res = await fetch(`${ASAAS_BASE_URL}/transfers`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'access_token': ASAAS_API_KEY },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      value: Math.round(value * 100) / 100,
+      pixAddressKey: pixKey,
+      pixAddressKeyType: keyType,
+      description,
+      externalReference: externalRef,
+    }),
   });
-  return { status: res.status, data: await res.json() };
+  return { status: res.status, data: await res.json(), keyType };
 }
 
 serve(async (req) => {
@@ -53,7 +71,7 @@ serve(async (req) => {
       });
     }
 
-    // Buscar pedido + restaurante + entregador
+    // Buscar pedido
     const { data: order } = await supabase
       .from('orders')
       .select('id, status, restaurant_id, driver_id, restaurant_net_earnings, driver_net_earnings')
@@ -72,48 +90,73 @@ serve(async (req) => {
       });
     }
 
-    const [{ data: restaurant }, { data: driver }] = await Promise.all([
-      supabase.from('restaurants').select('asaas_account_id, name').eq('id', order.restaurant_id).single(),
+    // Buscar owner_id do restaurante e pix_key do entregador em paralelo
+    const [{ data: restaurant }, { data: driverProfile }] = await Promise.all([
+      supabase.from('restaurants').select('name, owner_id').eq('id', order.restaurant_id).single(),
       order.driver_id
-        ? supabase.from('profiles').select('asaas_account_id, name').eq('id', order.driver_id).single()
+        ? supabase.from('profiles').select('pix_key, name').eq('id', order.driver_id).single()
         : Promise.resolve({ data: null }),
     ]);
 
+    // Buscar pix_key do dono do restaurante
+    let restaurantPixKey: string | null = null;
+    let restaurantName = restaurant?.name ?? 'Restaurante';
+    if (restaurant?.owner_id) {
+      const { data: owner } = await supabase
+        .from('profiles')
+        .select('pix_key')
+        .eq('id', restaurant.owner_id)
+        .single();
+      restaurantPixKey = owner?.pix_key ?? null;
+    }
+
     const results: string[] = [];
+    const warnings: string[] = [];
 
-    // Transferir para restaurante
-    if (restaurant?.asaas_account_id && Number(order.restaurant_net_earnings) > 0) {
-      const { data: rt, status: rs } = await asaasPost('/transfers', {
-        value: Math.round(Number(order.restaurant_net_earnings) * 100) / 100,
-        walletId: restaurant.asaas_account_id,
-        description: `Repasse restaurante - Pedido #${orderId}`,
-        externalReference: `restaurant-split-${orderId}`,
-      });
-      if (rs >= 200 && rs < 300 && rt?.id) {
-        results.push(`restaurant:${rt.id}`);
-        console.log(`[release-payment-splits] Restaurante ${restaurant.name}: R$${order.restaurant_net_earnings} → ${rt.id}`);
+    // PIX para o restaurante
+    if (restaurantPixKey && Number(order.restaurant_net_earnings) > 0) {
+      const { data, status, keyType } = await sendPix(
+        restaurantPixKey,
+        Number(order.restaurant_net_earnings),
+        `Repasse restaurante - Pedido #${orderId}`,
+        `restaurant-pix-${orderId}`,
+      );
+      if (status >= 200 && status < 300 && data?.id) {
+        results.push(`restaurant:${data.id}`);
+        console.log(`[splits] ${restaurantName} R$${order.restaurant_net_earnings} → PIX(${keyType}) ✓`);
       } else {
-        console.error('[release-payment-splits] Erro transferência restaurante:', JSON.stringify(rt));
+        console.error('[splits] Erro PIX restaurante:', JSON.stringify(data));
+        warnings.push(`restaurant_pix_failed`);
       }
+    } else {
+      const reason = !restaurantPixKey ? 'sem chave PIX cadastrada' : 'valor zero';
+      console.warn(`[splits] Restaurante pulado — ${reason}. Pedido ${orderId}`);
+      warnings.push(`restaurant_skipped:${reason}`);
     }
 
-    // Transferir para entregador
-    if (driver?.asaas_account_id && Number(order.driver_net_earnings) > 0) {
-      const { data: dt, status: ds } = await asaasPost('/transfers', {
-        value: Math.round(Number(order.driver_net_earnings) * 100) / 100,
-        walletId: driver.asaas_account_id,
-        description: `Repasse entrega - Pedido #${orderId}`,
-        externalReference: `driver-split-${orderId}`,
-      });
-      if (ds >= 200 && ds < 300 && dt?.id) {
-        results.push(`driver:${dt.id}`);
-        console.log(`[release-payment-splits] Entregador ${driver.name}: R$${order.driver_net_earnings} → ${dt.id}`);
+    // PIX para o entregador
+    const driverPixKey = driverProfile?.pix_key ?? null;
+    if (driverPixKey && Number(order.driver_net_earnings) > 0) {
+      const { data, status, keyType } = await sendPix(
+        driverPixKey,
+        Number(order.driver_net_earnings),
+        `Repasse entrega - Pedido #${orderId}`,
+        `driver-pix-${orderId}`,
+      );
+      if (status >= 200 && status < 300 && data?.id) {
+        results.push(`driver:${data.id}`);
+        console.log(`[splits] ${driverProfile?.name} R$${order.driver_net_earnings} → PIX(${keyType}) ✓`);
       } else {
-        console.error('[release-payment-splits] Erro transferência entregador:', JSON.stringify(dt));
+        console.error('[splits] Erro PIX entregador:', JSON.stringify(data));
+        warnings.push(`driver_pix_failed`);
       }
+    } else {
+      const reason = !driverPixKey ? 'sem chave PIX cadastrada' : 'valor zero';
+      console.warn(`[splits] Entregador pulado — ${reason}. Pedido ${orderId}`);
+      warnings.push(`driver_skipped:${reason}`);
     }
 
-    return new Response(JSON.stringify({ released: true, transfers: results }), {
+    return new Response(JSON.stringify({ released: true, transfers: results, warnings }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
