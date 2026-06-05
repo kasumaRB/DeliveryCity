@@ -294,9 +294,14 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           <input
             value={pixKey}
             onChange={e => setPixKey(e.target.value)}
-            className="w-full p-4 bg-gray-700/50 rounded-2xl font-bold border-2 border-transparent outline-none text-white focus:border-blue-500 transition-all"
+            className={`w-full p-4 bg-gray-700/50 rounded-2xl font-bold border-2 outline-none text-white focus:border-blue-500 transition-all ${!pixKey ? 'border-red-500/60' : 'border-transparent'}`}
             placeholder="CPF, e-mail ou telefone"
           />
+          {!pixKey && (
+            <p className="mt-2 text-xs font-black text-red-400 flex items-center gap-1.5">
+              ⚠️ Sem chave PIX você não receberá pagamentos pelas entregas. Cadastre agora.
+            </p>
+          )}
         </div>
 
         {/* Região */}
@@ -723,6 +728,17 @@ export const DriverView: React.FC = () => {
         {/* HOME TAB */}
         {activeTab === 'home' && (
           <div className="px-4 pt-4">
+
+            {/* Aviso PIX ausente */}
+            {!currentUserProfile?.pixKey && (
+              <button
+                onClick={() => setActiveTab('profile')}
+                className="w-full mb-3 p-4 rounded-2xl bg-red-500/15 border border-red-500/40 text-left"
+              >
+                <p className="text-red-400 font-black text-sm">⚠️ Chave PIX não cadastrada</p>
+                <p className="text-red-500/70 text-xs mt-0.5">Você não receberá pagamentos. Toque para cadastrar.</p>
+              </button>
+            )}
 
             {/* Availability toggle */}
             <button

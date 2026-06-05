@@ -1621,10 +1621,18 @@ export const RestaurantView: React.FC = () => {
                       </div>
                       <div className="flex items-center gap-3 text-gray-600">
                         <Wallet size={16} />
-                        <span className="text-sm font-bold">
-                          PIX: {currentUserProfile.pixKey || '---'}
+                        <span className={`text-sm font-bold ${!currentUserProfile.pixKey ? 'text-red-500' : ''}`}>
+                          PIX: {currentUserProfile.pixKey || '⚠️ Não cadastrado'}
                         </span>
                       </div>
+                      {!currentUserProfile.pixKey && (
+                        <button
+                          onClick={() => setShowEditModal(true)}
+                          className="mt-2 w-full py-2 bg-red-50 border border-red-200 text-red-600 rounded-xl font-black text-xs"
+                        >
+                          ⚠️ Cadastre sua chave PIX para receber pagamentos
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1970,12 +1978,19 @@ export const RestaurantView: React.FC = () => {
                     className="w-full p-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-orange-100"
                   />
                 </div>
-                <input
-                  value={respPix}
-                  onChange={e => setRespPix(e.target.value)}
-                  placeholder="Chave PIX"
-                  className="w-full p-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-orange-100"
-                />
+                <div>
+                  <input
+                    value={respPix}
+                    onChange={e => setRespPix(e.target.value)}
+                    placeholder="Chave PIX"
+                    className={`w-full p-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 focus:border-orange-100 transition-all ${!respPix ? 'border-red-300' : 'border-transparent'}`}
+                  />
+                  {!respPix && (
+                    <p className="mt-2 text-xs font-black text-red-500 flex items-center gap-1.5 px-1">
+                      ⚠️ Sem chave PIX você não receberá repasses dos pedidos entregues. Cadastre agora.
+                    </p>
+                  )}
+                </div>
                 <input
                   value={respAsaasId}
                   onChange={e => setRespAsaasId(e.target.value)}

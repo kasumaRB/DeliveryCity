@@ -442,6 +442,7 @@ export const AdminView: React.FC = () => {
     orders,
     sendAdminMessage,
     restaurants,
+    confirmReturn,
   } = useAppStore();
 
   const [activeTab, setActiveTab] = useState<
@@ -462,6 +463,7 @@ export const AdminView: React.FC = () => {
   >({});
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
   const [authorizingReturnId, setAuthorizingReturnId] = useState<string | null>(null);
+  const [confirmingReturnId, setConfirmingReturnId] = useState<string | null>(null);
   const [ordersStatusFilter, setOrdersStatusFilter] = useState<string>('ALL');
   const [messagingOrderId, setMessagingOrderId] = useState<string | null>(null);
   const [messageTarget, setMessageTarget] = useState<'client' | 'driver' | 'restaurant' | null>(null);
@@ -1575,7 +1577,7 @@ export const AdminView: React.FC = () => {
                           )}
 
                           {order.status === 'RETURNING' && (
-                            <div className="px-6 pb-5">
+                            <div className="px-6 pb-5 space-y-3">
                               <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-center gap-3">
                                 <RotateCcw size={16} className="text-blue-500 animate-spin" style={{ animationDuration: '3s' }} />
                                 <div>
@@ -1583,6 +1585,26 @@ export const AdminView: React.FC = () => {
                                   <p className="text-xs text-blue-500">O restaurante gerará um código de devolução e o entregador confirmará no app.</p>
                                 </div>
                               </div>
+                              <button
+                                disabled={confirmingReturnId === order.id}
+                                onClick={async () => {
+                                  if (!confirm('Confirmar devolução sem código? Use apenas se o entregador não conseguir digitar o código.')) return;
+                                  setConfirmingReturnId(order.id);
+                                  try {
+                                    await confirmReturn(order.id);
+                                  } catch (e: any) {
+                                    alert(e.message || 'Erro ao confirmar devolução.');
+                                  } finally {
+                                    setConfirmingReturnId(null);
+                                  }
+                                }}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-700 text-white rounded-xl font-black text-xs disabled:opacity-50 active:scale-95 transition-all"
+                              >
+                                {confirmingReturnId === order.id
+                                  ? <><Loader size={13} className="animate-spin" /> Confirmando...</>
+                                  : <><Package size={13} /> Override — Confirmar devolução sem código</>
+                                }
+                              </button>
                             </div>
                           )}
 
