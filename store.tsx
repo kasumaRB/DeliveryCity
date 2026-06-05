@@ -32,6 +32,23 @@ const STORAGE_KEY_RESTAURANTS = 'deliverycity_cache_restaurants';
 const STORAGE_KEY_ORDERS = 'deliverycity_cache_orders';
 const STORAGE_KEY_PROFILES = 'deliverycity_cache_profiles';
 
+// Incrementar aqui a cada deploy que mude o schema do cache local
+const CACHE_VERSION = '4';
+const CACHE_VERSION_KEY = 'deliverycity_cache_version';
+
+// Limpa caches locais se a versão mudou (ex: após deploy com schema novo)
+if (typeof window !== 'undefined') {
+  const storedVersion = localStorage.getItem(CACHE_VERSION_KEY);
+  if (storedVersion !== CACHE_VERSION) {
+    localStorage.removeItem(STORAGE_KEY_RESTAURANTS);
+    localStorage.removeItem(STORAGE_KEY_ORDERS);
+    localStorage.removeItem(STORAGE_KEY_PROFILES);
+    localStorage.setItem(CACHE_VERSION_KEY, CACHE_VERSION);
+  }
+}
+
+const AUTH_ERROR_CODES = new Set(['401', 'PGRST301', 'invalid_jwt', 'JWT expired', 'not_authorized']);
+
 interface AppContextType {
   restaurants: Restaurant[];
   orders: Order[];
@@ -95,6 +112,9 @@ interface AppContextType {
   reportFailedDelivery: (orderId: string, reason: string) => Promise<void>;
   startReturn: (orderId: string) => Promise<void>;
   confirmReturn: (orderId: string) => Promise<void>;
+  generateReturnCode: (orderId: string) => Promise<string>;
+  confirmReturnWithCode: (orderId: string, code: string) => Promise<void>;
+  sendAdminMessage: (toUserId: string, toName: string, toRole: string, message: string, orderId?: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -248,19 +268,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // o que tornava o throttle de 2s inoperante e causava refetch excessivo)
   const lastFetchTimeRef = useRef(0);
   const cachedDataRef = useRef<{ restaurants?: any[]; orders?: any[]; profiles?: any[] }>({});
+  // Guard: impede chamadas concorrentes de fetchData (causa principal do travamento)
+  const fetchInProgressRef = useRef(false);
+  // Guard: impede que INITIAL_SESSION + SIGNED_IN disparem carga dupla simultaneamente
+  const isAuthHandlingRef = useRef(false);
 
   const fetchData = async (force = false, sessionOverride?: Session | null) => {
     const now = Date.now();
     if (!force && now - lastFetchTimeRef.current < 2000) return;
+    // Impede chamadas concorrentes — causa principal do travamento no "Sincronizando..."
+    if (fetchInProgressRef.current) {
+      devLog('[DEV] fetchData ignorado: já em execução');
+      return;
+    }
+    fetchInProgressRef.current = true;
     lastFetchTimeRef.current = now;
     const cachedData = cachedDataRef.current;
 
+    // Timeout de 8s nas queries: se o Supabase demorar (cold start etc.), rejeita e libera o guard
+    const queryTimeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Query timeout após 8s')), 8000)
+    );
+
     try {
-      const [restData, orderData, profileData, settingsData] = await Promise.all([
-        supabase.from('restaurants').select('*').order('rating', { ascending: false }),
-        supabase.from('orders').select('*').order('timestamp', { ascending: false }).limit(100),
-        supabase.from('profiles').select('*'),
-        supabase.from('platform_settings').select('*').maybeSingle(),
+      const [restData, orderData, profileData, settingsData] = await Promise.race([
+        Promise.all([
+          supabase.from('restaurants').select('*').order('rating', { ascending: false }),
+          supabase.from('orders').select('*').order('timestamp', { ascending: false }).limit(100),
+          supabase.from('profiles').select('*'),
+          supabase.from('platform_settings').select('*').maybeSingle(),
+        ]),
+        queryTimeout,
       ]);
 
       devLog('[DEV] Dados carregados:', {
@@ -357,6 +395,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (typeof window !== 'undefined') {
           (window as any).lastSyncError = 'PROFILE ERROR: ' + profileData.error.message;
         }
+        // Se for erro de autenticação, faz logout automático para limpar sessão inválida
+        const errMsg = profileData.error.message || '';
+        const errCode = String(profileData.error.code || '');
+        if (AUTH_ERROR_CODES.has(errCode) || /jwt|expired|unauthorized|invalid.*token/i.test(errMsg)) {
+          console.warn('[AUTH] Sessão inválida detectada — fazendo logout automático');
+          localStorage.removeItem(STORAGE_KEY_RESTAURANTS);
+          localStorage.removeItem(STORAGE_KEY_ORDERS);
+          localStorage.removeItem(STORAGE_KEY_PROFILES);
+          await supabase.auth.signOut();
+          return;
+        }
       }
 
       if (settingsData.data) {
@@ -374,9 +423,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (typeof window !== 'undefined') {
         (window as any).lastSyncError = err?.message || String(err);
       }
+      const errMsg = err?.message || String(err);
+      if (/jwt|expired|unauthorized|invalid.*token|not_authorized/i.test(errMsg)) {
+        console.warn('[AUTH] Erro de autenticação no fetchData — logout automático');
+        localStorage.removeItem(STORAGE_KEY_RESTAURANTS);
+        localStorage.removeItem(STORAGE_KEY_ORDERS);
+        localStorage.removeItem(STORAGE_KEY_PROFILES);
+        await supabase.auth.signOut().catch(() => {});
+        return;
+      }
       setIsSupabaseConnected(false);
     } finally {
       setIsLoading(false);
+      fetchInProgressRef.current = false;
     }
   };
 
@@ -504,6 +563,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       // Quando retorna do redirect OAuth ou recarrega a janela do app
       if (['INITIAL_SESSION', 'SIGNED_IN'].includes(event)) {
+        // Guard: se INITIAL_SESSION e SIGNED_IN dispararem juntos (acontece no Supabase),
+        // o segundo evento atualiza a sessão mas pula o fetchData para evitar chamadas paralelas.
+        if (isAuthHandlingRef.current) {
+          devLog('[DEV] Auth duplicado ignorado:', event);
+          setSession(newSession);
+          return;
+        }
+        isAuthHandlingRef.current = true;
         setIsLoading(true);
         setSession(newSession);
 
@@ -513,10 +580,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (savedCart && savedCart.length > 0) setCart(savedCart);
         }
 
-        // Timeout de segurança: desbloqueia a UI após 8s caso o fetchData trave
+        // Timeout de segurança: desbloqueia a UI caso o fetchData trave além do AbortController
         const loadingTimeout = setTimeout(() => {
           setIsLoading(false);
-        }, 8000);
+        }, 10000);
 
         try {
           // 🔒 FIX SESSÃO: passa newSession diretamente para evitar race condition em getSession()
@@ -557,6 +624,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } finally {
           clearTimeout(loadingTimeout);
           setIsLoading(false);
+          isAuthHandlingRef.current = false;
         }
       } else if (event === 'TOKEN_REFRESHED') {
         setSession(newSession);
@@ -569,6 +637,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clearOfflineCart();
         setSession(null);
         setIsLoading(false);
+        // Reseta os guards para que o próximo SIGNED_IN funcione normalmente
+        isAuthHandlingRef.current = false;
+        fetchInProgressRef.current = false;
       }
     });
     return () => {
@@ -982,11 +1053,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteAccount = async () => {
     if (!session?.user.id) return;
-    if (window.confirm('Deseja excluir permanentemente sua conta?')) {
-      const { error } = await supabase.from('profiles').delete().eq('id', session.user.id);
-      if (error) throw error;
-      await signOut();
-    }
+    const { error } = await supabase.from('profiles').delete().eq('id', session.user.id);
+    if (error) throw error;
+    // Remove o usuário do auth via Edge Function (service role)
+    await supabase.functions.invoke('delete-auth-user', { body: { userId: session.user.id } }).catch(() => {});
+    await signOut();
   };
 
   const addAddress = async (addrData: Omit<UserAddress, 'id'>) => {
@@ -1128,22 +1199,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .select('id').maybeSingle();
     if (error || !updated) throw new Error('Não foi possível registrar a falha de entrega.');
 
-    // Reembolso automático via Asaas (best-effort: não bloqueia o fluxo se falhar)
-    supabase.functions.invoke('refund-asaas-payment', { body: { orderId } }).catch(() => {});
-
     await fetchData();
 
+    // Notifica o cliente que o suporte entrará em contato
     if (order.customerId) {
       supabase.functions.invoke('send-push-notification', {
         body: {
           userId: order.customerId,
           title: '⚠️ Problema na entrega',
-          body: 'Seu entregador não conseguiu concluir a entrega. O reembolso será processado em breve.',
+          body: 'Seu pedido não pôde ser entregue. Nossa equipe de suporte entrará em contato em breve.',
           data: { orderId, type: 'DELIVERY_FAILED' },
         },
       }).catch(() => {});
     }
 
+    // Cria ticket no suporte para o admin ver
     supabase.from('support_tickets').insert({
       user_id: session!.user.id,
       user_name: currentUserProfile?.name,
@@ -1151,6 +1221,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       message: `[AUTO] Entrega não concluída — Pedido #${orderId}. Motivo: ${reason}`,
       status: 'OPEN',
       created_at: new Date().toISOString(),
+      order_id: orderId,
     }).then(null, () => {});
   };
 
@@ -1170,7 +1241,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           body: {
             userId: rest.owner_id,
             title: '🔄 Devolução a caminho',
-            body: `Pedido #${orderId.slice(-4)} não pôde ser entregue. O entregador está retornando com o pedido.`,
+            body: `Pedido #${orderId.slice(-4)} não pôde ser entregue. O entregador está retornando. Prepare o código de devolução.`,
             data: { orderId, type: 'RETURNING' },
           },
         }).catch(() => {});
@@ -1178,12 +1249,69 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Restaurante gera código de 6 dígitos para o entregador confirmar a devolução presencialmente
+  const generateReturnCode = async (orderId: string): Promise<string> => {
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const { error } = await supabase.from('orders')
+      .update({ return_code: code })
+      .eq('id', orderId).eq('status', OrderStatus.RETURNING);
+    if (error) throw new Error(error.message);
+    await fetchData();
+    return code;
+  };
+
+  // Entregador digita o código no app para confirmar que devolveu ao restaurante
+  const confirmReturnWithCode = async (orderId: string, code: string): Promise<void> => {
+    const { data: order, error: fetchErr } = await supabase.from('orders')
+      .select('return_code, customer_id, status')
+      .eq('id', orderId).maybeSingle();
+    if (fetchErr || !order) throw new Error('Pedido não encontrado.');
+    if (order.status !== OrderStatus.RETURNING) throw new Error('Pedido não está em devolução.');
+    if (!order.return_code) throw new Error('O restaurante ainda não gerou o código de devolução.');
+    if (order.return_code.trim() !== code.trim()) throw new Error('Código inválido. Verifique com o restaurante.');
+
+    const { error } = await supabase.from('orders')
+      .update({ status: OrderStatus.RETURNED })
+      .eq('id', orderId).eq('status', OrderStatus.RETURNING);
+    if (error) throw new Error(error.message);
+
+    await fetchData();
+    // Reembolso já foi processado quando o admin autorizou a devolução
+  };
+
+  // Admin força confirmação sem código (override manual)
   const confirmReturn = async (orderId: string) => {
     const { error } = await supabase.from('orders')
       .update({ status: OrderStatus.RETURNED })
       .eq('id', orderId).eq('status', OrderStatus.RETURNING);
     if (error) throw new Error(error.message);
     await fetchData();
+    // Reembolso já processado na autorização
+  };
+
+  // Admin envia mensagem interna para qualquer usuário (cliente, entregador, restaurante)
+  const sendAdminMessage = async (toUserId: string, toName: string, toRole: string, message: string, orderId?: string) => {
+    const { error } = await supabase.from('support_tickets').insert({
+      user_id: toUserId,
+      user_name: toName,
+      user_role: toRole,
+      message,
+      status: 'OPEN',
+      from_admin: true,
+      order_id: orderId || null,
+      created_at: new Date().toISOString(),
+    });
+    if (error) throw new Error(error.message);
+
+    // Push para o destinatário
+    supabase.functions.invoke('send-push-notification', {
+      body: {
+        userId: toUserId,
+        title: '💬 Mensagem do suporte',
+        body: message.length > 80 ? message.slice(0, 77) + '...' : message,
+        data: { type: 'ADMIN_MESSAGE', orderId },
+      },
+    }).catch(() => {});
   };
 
   return (
@@ -1203,7 +1331,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         loginAsTestUser,
         createOrder,
         updateOrderStatus: async (id, s) => {
-          await supabase.from('orders').update({ status: s }).eq('id', id);
+          const extraFields: Record<string, any> = {};
+          if (s === OrderStatus.PREPARING) extraFields.confirmed_at = new Date().toISOString();
+          await supabase.from('orders').update({ status: s, ...extraFields }).eq('id', id);
           await fetchData();
 
           // Notificações por status
@@ -1301,7 +1431,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateUserProfile,
         setupNotifications,
         deleteUserProfile: async id => {
-          await supabase.from('profiles').delete().eq('id', id);
+          // Deleta o perfil (RLS permite para admin)
+          const { error: profileErr } = await supabase.from('profiles').delete().eq('id', id);
+          if (profileErr) throw new Error('Erro ao deletar perfil: ' + profileErr.message);
+          // Deleta o usuário do auth via Edge Function (requer service role)
+          await supabase.functions.invoke('delete-auth-user', { body: { userId: id } }).catch(() => {});
           await fetchData();
         },
         updateRestaurant: async (id, d) => {
@@ -1382,7 +1516,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               .eq('id', currentUserProfile.id);
           await fetchData();
         },
-        refreshData: () => fetchData(true),
+        refreshData: async () => {
+          // Não chama refreshSession() aqui: dispararia TOKEN_REFRESHED → fetchData via
+          // event listener → fetchInProgressRef=true → esta chamada seria ignorada pelo guard.
+          // O Supabase renova o token automaticamente nas queries quando necessário.
+          return fetchData(true);
+        },
         requestPasswordReset: async e => await supabase.auth.resetPasswordForEmail(e),
         toggleFavorite,
         cancelOrder,
@@ -1405,6 +1544,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         reportFailedDelivery,
         startReturn,
         confirmReturn,
+        generateReturnCode,
+        confirmReturnWithCode,
+        sendAdminMessage,
       }}
     >
       {children}

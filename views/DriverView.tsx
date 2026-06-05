@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppStore } from '../store';
 import { supabase } from '../lib/supabase';
+import { DeleteAccountModal } from '../components/DeleteAccountModal';
 import { Order, OrderStatus, UserAddress } from '../types';
 import { AddressModal } from '../components/AddressModal';
 import { TutorialModal, hasSeen, markSeen } from '../components/TutorialModal';
@@ -70,6 +71,7 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   );
   const [baseAddressData, setBaseAddressData] = useState<UserAddress | null>(baseAddr || null);
   const [showBaseModal, setShowBaseModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const myDeliveries = useMemo(() =>
     orders.filter(o => o.driverId === currentUserProfile?.id && o.status === OrderStatus.DELIVERED),
@@ -350,6 +352,13 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         >
           <LogOut size={18} /> Sair da Conta
         </button>
+        <button
+          onClick={() => setShowDeleteModal(true)}
+          className="w-full py-2 text-red-300 hover:text-red-500 font-bold text-[11px] uppercase tracking-widest transition-colors"
+        >
+          Excluir minha conta
+        </button>
+        {showDeleteModal && <DeleteAccountModal onClose={() => setShowDeleteModal(false)} />}
       </div>
 
       {showBaseModal && (
@@ -382,6 +391,7 @@ export const DriverView: React.FC = () => {
     confirmDelivery,
     reportFailedDelivery,
     startReturn,
+    confirmReturnWithCode,
     signOut,
     processSyncQueue,
     calculateDistance,
@@ -433,6 +443,10 @@ export const DriverView: React.FC = () => {
   const [failureReason, setFailureReason] = useState('');
   const [isReportingFailed, setIsReportingFailed] = useState(false);
   const [failedConfirmed, setFailedConfirmed] = useState(false);
+  // Código de devolução
+  const [returnCode, setReturnCode] = useState('');
+  const [isConfirmingReturn, setIsConfirmingReturn] = useState(false);
+  const [returnCodeError, setReturnCodeError] = useState('');
   const [currentPos, setCurrentPos] = useState<{ lat: number; lng: number } | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
@@ -666,8 +680,10 @@ export const DriverView: React.FC = () => {
 
   if (activeTab === 'profile')
     return (
-      <div className="min-h-screen bg-gray-900 text-white overflow-x-hidden safe-area-top">
-        <DriverProfile onBack={() => setActiveTab('home')} />
+      <div className="h-dvh bg-gray-950 flex justify-center items-start overflow-y-auto overflow-x-hidden">
+        <div className="w-full md:max-w-2xl min-h-full bg-gray-900 text-white safe-area-top md:border-x md:border-gray-800/60">
+          <DriverProfile onBack={() => setActiveTab('home')} />
+        </div>
       </div>
     );
 
@@ -687,7 +703,8 @@ export const DriverView: React.FC = () => {
         onClose={() => { markSeen('DRIVER'); updateUserProfile(currentUserProfile!.id, { driverTutorialSeen: true }).catch(() => {}); setShowTutorial(false); }}
       />
     )}
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col h-screen overflow-hidden safe-area-top">
+    <div className="h-dvh bg-gray-950 flex justify-center overflow-hidden">
+    <div className="flex flex-col w-full md:max-w-2xl bg-gray-900 text-white overflow-hidden safe-area-top md:border-x md:border-gray-800/60">
 
       {/* Top Bar — limpo, logo + status */}
       <header className="bg-gray-950 border-b border-gray-800/60 px-5 py-3 flex justify-between items-center shrink-0">
@@ -806,19 +823,56 @@ export const DriverView: React.FC = () => {
                   </div>
                 )}
 
-                {/* RETURNING — Devolvendo */}
+                {/* RETURNING — Devolvendo: entregador digita o código do restaurante */}
                 {activeOrder.status === 'RETURNING' && (
-                  <div className="bg-gray-800/40 rounded-2xl p-5 border-l-2 border-gray-600">
+                  <div className="bg-gray-800/40 rounded-2xl p-5 border-l-2 border-orange-500 space-y-4">
                     <div className="flex items-center gap-3">
                       <RotateCcw size={20} className="text-orange-400 animate-spin" style={{ animationDuration: '3s' }} />
                       <div>
                         <p className="text-white font-black">Devolvendo ao restaurante</p>
-                        <p className="text-gray-500 text-sm">Aguarde a confirmação após entregar o pedido.</p>
+                        <p className="text-gray-400 text-sm">Entregue o pedido e peça o código de devolução.</p>
                       </div>
                     </div>
-                    <span className="mt-3 inline-block text-orange-400 text-[10px] font-black tracking-widest uppercase">
-                      #{activeOrder.id.slice(-4)}
-                    </span>
+
+                    <div className="bg-gray-900/60 rounded-xl p-4">
+                      <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-3">
+                        Código de devolução
+                      </p>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={returnCode}
+                        onChange={e => { setReturnCode(e.target.value.replace(/\D/g, '')); setReturnCodeError(''); }}
+                        placeholder="______"
+                        className="w-full text-center text-3xl font-black tracking-[0.4em] bg-transparent text-white border-b-2 border-orange-500/50 focus:border-orange-400 outline-none py-2 placeholder:text-gray-700"
+                      />
+                      {returnCodeError && (
+                        <p className="text-red-400 text-xs text-center mt-2 font-bold">{returnCodeError}</p>
+                      )}
+                    </div>
+
+                    <button
+                      disabled={returnCode.length < 4 || isConfirmingReturn}
+                      onClick={async () => {
+                        setIsConfirmingReturn(true);
+                        setReturnCodeError('');
+                        try {
+                          await confirmReturnWithCode(activeOrder.id, returnCode);
+                          setReturnCode('');
+                        } catch (e: any) {
+                          setReturnCodeError(e.message || 'Código inválido. Verifique com o restaurante.');
+                        } finally {
+                          setIsConfirmingReturn(false);
+                        }
+                      }}
+                      className="w-full py-4 bg-orange-500 text-white rounded-xl font-black text-sm tracking-wide flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-40"
+                    >
+                      {isConfirmingReturn
+                        ? <><Loader size={16} className="animate-spin" /> Verificando...</>
+                        : <><CheckCircle size={16} /> Confirmar devolução</>
+                      }
+                    </button>
                   </div>
                 )}
               </div>
@@ -1403,6 +1457,7 @@ export const DriverView: React.FC = () => {
           <span className="font-bold text-sm">Sem conexão — modo offline</span>
         </div>
       )}
+    </div>
     </div>
     </>
   );

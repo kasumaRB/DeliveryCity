@@ -18,6 +18,11 @@ class ErrorBoundary extends React.Component<
     this.state = { hasError: false, error: '' };
   }
   static getDerivedStateFromError(error: Error) {
+    const isChunkError = /Loading chunk|Failed to fetch dynamically imported|Importing a module script failed/i.test(error.message);
+    if (isChunkError) {
+      window.location.reload();
+      return { hasError: false, error: '' };
+    }
     return { hasError: true, error: error.message };
   }
   componentDidCatch(error: Error, info: React.ErrorInfo) {
@@ -95,15 +100,52 @@ const AppContent: React.FC = () => {
   const { isLoading, currentUserProfile, signOut, session, refreshData } = useAppStore();
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [stuckTooLong, setStuckTooLong] = useState(false);
+  const hasAutoRetried = React.useRef(false);
+
+  // Ref para acessar o perfil atual dentro de callbacks assíncronos
+  const currentUserProfileRef = React.useRef(currentUserProfile);
+  React.useEffect(() => {
+    currentUserProfileRef.current = currentUserProfile;
+    if (currentUserProfile) {
+      hasAutoRetried.current = false;
+      setLoadFailed(false);
+    }
+  }, [currentUserProfile]);
+
+  // Uma única tentativa automática silenciosa após carregamento inicial falhar
+  React.useEffect(() => {
+    if (!session || isLoading || currentUserProfile || hasAutoRetried.current) return;
+    hasAutoRetried.current = true;
+    const t = setTimeout(async () => {
+      try { await refreshData(); } catch (_) {}
+      // Aguarda React commitar o novo estado antes de decidir
+      setTimeout(() => {
+        if (!currentUserProfileRef.current) setLoadFailed(true);
+      }, 300);
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [session, isLoading, currentUserProfile]);
+
+  // Saída de emergência: se ficar preso na tela "Sincronizando..." por muito tempo
+  // (ex.: isLoading travado em true após deploy), revela o botão de reconectar.
+  const isOnLoadingScreen = isLoading || (!!session && !currentUserProfile && !loadFailed);
+  React.useEffect(() => {
+    if (currentUserProfile) { setStuckTooLong(false); return; }
+    if (!isOnLoadingScreen) { setStuckTooLong(false); return; }
+    // 5s: tempo suficiente para distinguir travamento real de conexão lenta normal.
+    const t = setTimeout(() => setStuckTooLong(true), 5000);
+    return () => clearTimeout(t);
+  }, [isOnLoadingScreen, currentUserProfile]);
 
   useAndroidBack(() => {
     if (showProfileModal) { setShowProfileModal(false); return true; }
     return false; // minimiza app
   });
 
-  // FIX: sessão existe mas perfil não carregou — fetchData falhou (rede/timing)
-  // Mostra retry em vez de cair silenciosamente na ClientView genérica (loop de login)
-  if (session && !isLoading && !currentUserProfile) {
+  // Sessão existe mas perfil não carregou e retry já foi feito — mostra tela de erro
+  if (session && !isLoading && !currentUserProfile && loadFailed) {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#F8F9FC] p-8 text-center animate-in fade-in duration-500">
         <div className="bg-white p-12 rounded-[3.5rem] shadow-2xl shadow-orange-100 flex flex-col items-center max-w-sm w-full">
@@ -117,8 +159,10 @@ const AppContent: React.FC = () => {
           <button
             onClick={async () => {
               setIsRetrying(true);
-              await refreshData();
-              setIsRetrying(false);
+              setLoadFailed(false);
+              hasAutoRetried.current = false;
+              try { await refreshData(); } catch (_) {}
+              finally { setIsRetrying(false); }
             }}
             disabled={isRetrying}
             className="w-full bg-orange-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-orange-700 transition shadow-xl shadow-orange-100 active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70"
@@ -129,16 +173,19 @@ const AppContent: React.FC = () => {
             }
           </button>
           <button
-            onClick={signOut}
+            onClick={async () => {
+              // Limpa todo o cache local e força novo login
+              ['deliverycity_cache_restaurants', 'deliverycity_cache_orders', 'deliverycity_cache_profiles', 'deliverycity_cache_version'].forEach(k => localStorage.removeItem(k));
+              await signOut();
+            }}
             className="mt-3 w-full text-gray-400 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-100 transition active:scale-95 flex items-center justify-center gap-2"
           >
-            <LogOut size={14} /> Sair
+            <LogOut size={14} /> Reconectar (limpar cache)
           </button>
         </div>
       </div>
     );
   }
-
   // Sem sessão e sem loading = não logado
   if (!session && !isLoading) {
     return (
@@ -155,8 +202,8 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // Carregando
-  if (isLoading) {
+  // Carregando (inicial ou aguardando retry silencioso)
+  if (isLoading || (session && !currentUserProfile && !loadFailed)) {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#F8F9FC] animate-in fade-in duration-500">
         <div className="bg-white p-12 rounded-[3.5rem] shadow-2xl shadow-orange-100 flex flex-col items-center">
@@ -168,6 +215,24 @@ const AppContent: React.FC = () => {
           </div>
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] text-center">Sincronizando...</p>
         </div>
+
+        {/* Saída de emergência: aparece se travar carregando por muito tempo */}
+        {stuckTooLong && (
+          <div className="mt-8 flex flex-col items-center gap-3 animate-in fade-in duration-500 max-w-xs w-full px-8">
+            <p className="text-[11px] font-bold text-gray-400 text-center leading-relaxed">
+              Está demorando mais que o normal. Se não carregar, toque abaixo para reconectar.
+            </p>
+            <button
+              onClick={async () => {
+                ['deliverycity_cache_restaurants', 'deliverycity_cache_orders', 'deliverycity_cache_profiles', 'deliverycity_cache_version'].forEach(k => localStorage.removeItem(k));
+                await signOut();
+              }}
+              className="w-full bg-white border-2 border-gray-100 text-gray-500 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-50 transition active:scale-95 flex items-center justify-center gap-2 shadow-sm"
+            >
+              <LogOut size={14} /> Reconectar (limpar cache)
+            </button>
+          </div>
+        )}
       </div>
     );
   }

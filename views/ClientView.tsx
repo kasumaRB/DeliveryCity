@@ -63,6 +63,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     createOrder,
     recalculateDistances,
     calculateDistance,
+    realDistances,
     submitRating,
     addAddress,
     updateAddress,
@@ -140,6 +141,14 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
 
   // Tutorial
   const [showTutorial, setShowTutorial] = useState(false);
+
+  // Relógio para o contador regressivo de entrega (tick a cada 30s)
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(t);
+  }, []);
+
   useEffect(() => {
     if (!currentUserProfile || currentUserProfile.role !== UserRole.CLIENT) return;
     if (currentUserProfile.clientTutorialSeen || hasSeen('CLIENT')) {
@@ -598,9 +607,9 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
         onClose={() => { markSeen('CLIENT'); if (currentUserProfile) updateUserProfile!(currentUserProfile.id, { clientTutorialSeen: true }).catch(() => {}); setShowTutorial(false); }}
       />
     )}
-    <div className="h-screen bg-gray-50 flex flex-col lg:flex-row overflow-hidden relative safe-area-top safe-area-bottom">
+    <div className="h-dvh bg-gray-50 flex flex-col md:flex-row overflow-hidden relative safe-area-top">
       {/* SIDEBAR DESKTOP */}
-      <aside className="hidden lg:flex w-64 bg-white border-r border-gray-100 flex-col p-6 sticky top-0 h-screen z-30">
+      <aside className="hidden md:flex w-64 bg-white border-r border-gray-100 flex-col p-6 sticky top-0 h-dvh z-30">
         <div className="mb-10 flex items-center gap-3 px-2">
           <img src={Logo} alt="Logo" className="h-8 w-auto object-contain" />
           <img src={Nome} alt="DeliveryCity" className="h-4 w-auto object-contain opacity-70" />
@@ -728,11 +737,17 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                   </button>
                 </div>
               )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
                 {filteredStores.map(restaurant => {
                   const estFee = estimatedDeliveryFee(restaurant);
                   const isClosed = restaurant.isOpen === false;
                   const isFav = currentUserProfile?.favoriteRestaurantIds?.includes(restaurant.id) ?? false;
+                  const travelMins = realDistances?.[restaurant.id]
+                    ? parseInt(realDistances[restaurant.id].durationText) || 0
+                    : 0;
+                  const prepMins = restaurant.prepTime ?? 30;
+                  const totalMins = travelMins > 0 ? prepMins + travelMins : prepMins;
+                  const timeLabel = travelMins > 0 ? `~${totalMins} min` : `~${prepMins} min preparo`;
                   return (
                     <div
                       key={restaurant.id}
@@ -788,7 +803,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                           {isClosed
                             ? 'Estabelecimento fechado'
                             : estFee !== null
-                              ? `${estFee === 0 ? 'Entrega grátis' : `Entrega R$ ${estFee.toFixed(2)}`} · 30-45 min`
+                              ? `${estFee === 0 ? 'Entrega grátis' : `Entrega R$ ${estFee.toFixed(2)}`} · ${timeLabel}`
                               : 'Defina seu endereço para ver o frete'}
                         </p>
                       </div>
@@ -809,7 +824,12 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                     {selectedRestaurant.name}
                   </h1>
                   <p className="text-white/70 text-xs font-medium">
-                    {selectedRestaurant.category} · 30-45 min
+                    {selectedRestaurant.category} · {(() => {
+                      const t = realDistances?.[selectedRestaurant.id];
+                      const travel = t ? (parseInt(t.durationText) || 0) : 0;
+                      const prep = selectedRestaurant.prepTime ?? 30;
+                      return travel > 0 ? `~${prep + travel} min` : `~${prep} min preparo`;
+                    })()}
                   </p>
                 </div>
               </div>
@@ -974,6 +994,24 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                       const progressSteps = ['PENDING', 'PENDING_PAYMENT', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'];
                       const stepLabels = ['Recebido', 'Pgto', 'Preparo', 'Pronto', 'Entrega'];
                       const currentStepIdx = progressSteps.indexOf(order.status);
+
+                      // Contador regressivo: só existe após restaurante confirmar (PREPARING em diante)
+                      const orderRestaurant = restaurants.find(r => r.id === order.restaurantId);
+                      const prepMins = orderRestaurant?.prepTime ?? 30;
+                      let travelMins = 15;
+                      if (order.coords && orderRestaurant?.coords && calculateDistance) {
+                        const distKm = calculateDistance(
+                          orderRestaurant.coords.lat, orderRestaurant.coords.lng,
+                          (order.coords as any).lat, (order.coords as any).lng
+                        );
+                        travelMins = Math.ceil(distKm * 1.35 * 3 + 5);
+                      }
+                      const totalEstMins = prepMins + travelMins;
+                      const eta = order.confirmedAt ? order.confirmedAt + totalEstMins * 60 * 1000 : null;
+                      const remainingMs = eta ? eta - now : null;
+                      const isOverdue = remainingMs !== null && remainingMs < 0;
+                      const remainingMins = remainingMs !== null ? Math.ceil(remainingMs / 60000) : null;
+                      const showCountdown = isActive && eta !== null && !['PENDING', 'PENDING_PAYMENT'].includes(order.status);
                       return (
                         <div
                           key={order.id}
@@ -1086,6 +1124,37 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                                   );
                                 })}
                               </div>
+                            </div>
+                          )}
+
+                          {/* Contador regressivo de entrega */}
+                          {showCountdown && (
+                            <div className="mx-5 mb-4 rounded-xl p-4 flex items-center gap-3 bg-orange-50 border border-orange-100">
+                              {isOverdue ? (
+                                <>
+                                  <span className="text-xl">🕐</span>
+                                  <div>
+                                    <p className="text-xs font-black text-orange-700">Aguarde, seu pedido está a caminho</p>
+                                    <p className="text-[11px] text-orange-500 font-medium mt-0.5">
+                                      Está demorando um pouquinho mais que o previsto. Já já chega!
+                                    </p>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+                                    <span className="text-base font-black text-orange-600">{remainingMins}</span>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-black text-orange-700">
+                                      {order.status === 'OUT_FOR_DELIVERY' ? 'Chegando em' : 'Previsão de entrega em'}
+                                    </p>
+                                    <p className="text-[11px] text-orange-500 font-medium mt-0.5">
+                                      {remainingMins === 1 ? 'menos de 1 minuto' : `~${remainingMins} minutos`}
+                                    </p>
+                                  </div>
+                                </>
+                              )}
                             </div>
                           )}
 
@@ -1221,7 +1290,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
           href={`https://wa.me/55${supportWhatsapp}?text=${encodeURIComponent('Olá! Preciso de ajuda com um pedido no DeliveryCity.')}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="fixed bottom-28 left-6 z-40 bg-green-500 text-white p-4 rounded-full shadow-2xl shadow-green-300 flex items-center justify-center active:scale-90 hover:bg-green-400 transition-all lg:hidden"
+          className="fixed bottom-28 left-6 z-40 bg-green-500 text-white p-4 rounded-full shadow-2xl shadow-green-300 flex items-center justify-center active:scale-90 hover:bg-green-400 transition-all md:hidden"
           title="Falar com o suporte"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
@@ -1232,7 +1301,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
 
       {/* NAVEGAÇÃO MOBILE FIXA (Z-INDEX 50 PARA FICAR POR CIMA DE TUDO) */}
       <nav
-        className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-gray-100 px-8 pt-6 flex justify-around items-center z-50 lg:hidden rounded-t-[2.5rem] shadow-[0_-10px_40px_-5px_rgba(0,0,0,0.08)]"
+        className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-gray-100 px-8 pt-6 flex justify-around items-center z-50 md:hidden rounded-t-[2.5rem] shadow-[0_-10px_40px_-5px_rgba(0,0,0,0.08)]"
         style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}
       >
         <button

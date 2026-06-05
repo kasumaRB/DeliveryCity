@@ -3,6 +3,7 @@ import { useAppStore } from '../store';
 import { supabase } from '../lib/supabase';
 import { OrderStatus, Product, UserRole, Promotion, UserAddress, DaySchedule } from '../types';
 import { AddressModal } from '../components/AddressModal';
+import { DeleteAccountModal } from '../components/DeleteAccountModal';
 
 const resizeImage = (file: File, maxWidth: number, maxHeight: number): Promise<File> => {
   return new Promise((resolve, reject) => {
@@ -107,6 +108,8 @@ export const RestaurantView: React.FC = () => {
     updateUserProfile,
     refreshData,
     platformSettings,
+    confirmReturn,
+    generateReturnCode,
   } = useAppStore();
 
   const myRestaurant = restaurants.find(r => r.ownerId === currentUserProfile?.id);
@@ -115,7 +118,9 @@ export const RestaurantView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<
     'orders' | 'menu' | 'promotions' | 'stats' | 'profile' | 'support'
   >('orders');
-  const [mobileKanbanTab, setMobileKanbanTab] = useState<'pending' | 'preparing' | 'ready'>('pending');
+  const [mobileKanbanTab, setMobileKanbanTab] = useState<'pending' | 'preparing' | 'ready' | 'returning'>('pending');
+  const [confirmingReturnId, setConfirmingReturnId] = useState<string | null>(null);
+  const [generatingCodeId, setGeneratingCodeId] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [itemFormName, setItemFormName] = useState('');
   const [itemFormOwnerPrice, setItemFormOwnerPrice] = useState('');
@@ -138,6 +143,7 @@ export const RestaurantView: React.FC = () => {
   );
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [storeDescription, setStoreDescription] = useState(currentUserProfile?.description || '');
+  const [storePrepTime, setStorePrepTime] = useState(String(myRestaurant?.prepTime ?? 30));
   const [storeWorkingHours, setStoreWorkingHours] = useState(
     currentUserProfile?.workingHours || ''
   );
@@ -155,8 +161,6 @@ export const RestaurantView: React.FC = () => {
   const [respCpf, setRespCpf] = useState(currentUserProfile?.cpf || '');
   const [respPix, setRespPix] = useState(currentUserProfile?.pixKey || '');
   const [respAsaasId, setRespAsaasId] = useState(currentUserProfile?.asaasAccountId || '');
-
-  const [storePrepTime, setStorePrepTime] = useState(String(myRestaurant?.prepTime ?? 30));
   const [storeCnpj, setStoreCnpj] = useState(myRestaurant?.cnpj || '');
   const [storePhoneNumber, setStorePhoneNumber] = useState(myRestaurant?.phoneNumber || '');
   const [storeCategory, setStoreCategory] = useState(myRestaurant?.category || '');
@@ -175,6 +179,7 @@ export const RestaurantView: React.FC = () => {
   >('COUPON');
   const [promoProductIds, setPromoProductIds] = useState<string[]>([]);
   const [promoMaxUsage, setPromoMaxUsage] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // Sincroniza os campos do formulário APENAS quando o modal de edição é ABERTO.
   // NÃO depende de myRestaurant/currentUserProfile para evitar que atualizações
@@ -512,13 +517,22 @@ export const RestaurantView: React.FC = () => {
             </button>
           ))}
         </nav>
-        <button
-          onClick={signOut}
-          className="mt-auto flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-red-500 transition-colors font-bold text-sm"
-        >
-          <LogOut size={18} /> Sair
-        </button>
+        <div className="mt-auto flex flex-col gap-1">
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="flex items-center gap-3 px-4 py-2 text-red-300 hover:text-red-500 transition-colors font-bold text-xs uppercase tracking-widest"
+          >
+            Excluir minha conta
+          </button>
+          <button
+            onClick={signOut}
+            className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-red-500 transition-colors font-bold text-sm"
+          >
+            <LogOut size={18} /> Sair
+          </button>
+        </div>
       </aside>
+      {showDeleteModal && <DeleteAccountModal onClose={() => setShowDeleteModal(false)} />}
 
       {/* HEADER MOBILE */}
       <header className="md:hidden bg-white/80 backdrop-blur-md border-b border-gray-100 px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
@@ -530,12 +544,6 @@ export const RestaurantView: React.FC = () => {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => setActiveTab('profile')}
-            className={`p-2.5 rounded-xl border transition-all ${activeTab === 'profile' ? 'bg-orange-50 border-orange-100 text-orange-600' : 'bg-gray-50 border-gray-100 text-gray-400'}`}
-          >
-            <User size={20} />
-          </button>
           <button
             onClick={signOut}
             className="p-2.5 bg-gray-50 border border-gray-100 rounded-xl text-gray-400"
@@ -579,20 +587,21 @@ export const RestaurantView: React.FC = () => {
               </header>
 
               {/* MOBILE: Seletor de coluna */}
-              <div className="flex lg:hidden gap-1 mb-4 bg-gray-100 p-1 rounded-xl">
+              <div className="flex lg:hidden gap-1 mb-4 bg-gray-100 p-1 rounded-xl overflow-x-auto no-scrollbar">
                 {([
                   { id: 'pending', label: 'Pendentes', count: getOrdersByStatus([OrderStatus.PENDING]).length, color: 'bg-orange-500' },
                   { id: 'preparing', label: 'Cozinha', count: getOrdersByStatus([OrderStatus.PREPARING]).length, color: 'bg-blue-500' },
                   { id: 'ready', label: 'Prontos', count: getOrdersByStatus([OrderStatus.READY, OrderStatus.OUT_FOR_DELIVERY]).length, color: 'bg-green-500' },
+                  { id: 'returning', label: 'Devoluções', count: getOrdersByStatus([OrderStatus.RETURNING]).length, color: 'bg-red-500' },
                 ] as const).map(tab => (
                   <button
                     key={tab.id}
                     onClick={() => setMobileKanbanTab(tab.id)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-black transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-black transition-all whitespace-nowrap ${
                       mobileKanbanTab === tab.id ? 'bg-white shadow-sm text-gray-900' : 'text-gray-400'
                     }`}
                   >
-                    <span className={`w-1.5 h-1.5 rounded-full ${tab.color}`} />
+                    <span className={`w-1.5 h-1.5 rounded-full ${tab.color} shrink-0`} />
                     {tab.label}
                     {tab.count > 0 && (
                       <span className={`text-[9px] px-1.5 py-0.5 rounded-full text-white ${tab.color}`}>{tab.count}</span>
@@ -601,7 +610,7 @@ export const RestaurantView: React.FC = () => {
                 ))}
               </div>
 
-              <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-8 min-h-0 pb-4 no-scrollbar">
+              <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-6 min-h-0 pb-4 no-scrollbar">
                 {/* COLUNA: PENDENTES */}
                 <div className={`flex flex-col h-full ${mobileKanbanTab !== 'pending' ? 'hidden lg:flex' : 'flex'}`}>
                   <div className="flex items-center gap-2 mb-4 px-1">
@@ -759,6 +768,76 @@ export const RestaurantView: React.FC = () => {
                         </div>
                       )
                     )}
+                  </div>
+                </div>
+                {/* COLUNA: DEVOLUÇÕES */}
+                <div className={`flex flex-col h-full ${mobileKanbanTab !== 'returning' ? 'hidden lg:flex' : 'flex'}`}>
+                  <div className="flex items-center gap-2 mb-4 px-1">
+                    <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                    <h3 className="text-xs font-black text-gray-500 uppercase tracking-[0.15em]">
+                      Devoluções ({getOrdersByStatus([OrderStatus.RETURNING]).length})
+                    </h3>
+                  </div>
+                  <div className="flex-1 space-y-3 overflow-y-auto no-scrollbar">
+                    {getOrdersByStatus([OrderStatus.RETURNING]).length === 0 ? (
+                      <p className="text-gray-300 text-xs text-center pt-6">Sem devoluções</p>
+                    ) : getOrdersByStatus([OrderStatus.RETURNING]).map(order => (
+                      <div
+                        key={order.id}
+                        className="bg-white rounded-2xl border border-orange-100 shadow-sm p-4 animate-in zoom-in-95"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className="w-7 h-7 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+                                <span className="text-orange-600 font-black text-xs">
+                                  {order.customerName.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                              <span className="font-black text-gray-900 text-sm">{order.customerName}</span>
+                            </div>
+                            {order.failureReason && (
+                              <p className="text-red-400 text-[10px] font-medium mt-0.5">Motivo: {order.failureReason}</p>
+                            )}
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="font-black text-gray-900 text-sm">#{order.id.slice(-4)}</span>
+                            <p className="text-orange-500 text-[9px] font-black animate-pulse mt-0.5">A caminho</p>
+                          </div>
+                        </div>
+                        <div className="border-t border-gray-50 pt-2 space-y-1 mb-3">
+                          {order.items.map((item, idx) => (
+                            <div key={idx} className="flex justify-between text-xs text-gray-600">
+                              <span>{item.quantity}x {item.product.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                        {/* Código de devolução — gerado pelo restaurante, digitado pelo entregador */}
+                        {order.returnCode ? (
+                          <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-4 text-center">
+                            <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-1">Código de devolução</p>
+                            <p className="text-4xl font-black text-orange-700 tracking-[0.3em]">{order.returnCode}</p>
+                            <p className="text-[10px] text-orange-400 mt-2">Mostre ao entregador. Ele digitará no aplicativo.</p>
+                          </div>
+                        ) : (
+                          <button
+                            disabled={generatingCodeId === order.id}
+                            onClick={async () => {
+                              setGeneratingCodeId(order.id);
+                              try { await generateReturnCode(order.id); }
+                              catch (e: any) { alert(e.message || 'Erro ao gerar código.'); }
+                              finally { setGeneratingCodeId(null); }
+                            }}
+                            className="w-full bg-orange-600 text-white py-2.5 rounded-xl font-black text-xs tracking-wide active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                          >
+                            {generatingCodeId === order.id
+                              ? <><Loader size={14} className="animate-spin" /> Gerando...</>
+                              : '🔑 Gerar código de devolução'
+                            }
+                          </button>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -922,7 +1001,7 @@ export const RestaurantView: React.FC = () => {
                   </div>
                   </div>
                 )}
-                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-8">
+                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
                   {myRestaurant.menu.map(item => (
                     <div
                       key={item.id}
@@ -1507,7 +1586,7 @@ export const RestaurantView: React.FC = () => {
                                 if (!s || s.closed) return null;
                                 return <span key={idx} className="block">{label}: {s.open} – {s.close}</span>;
                               })
-                            : (currentUserProfile.workingHours || 'Não definido')
+                            : <span className="text-gray-400 italic">Horário não configurado</span>
                           }
                         </div>
                       </div>
