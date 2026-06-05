@@ -200,6 +200,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     items: o.items || [],
     subtotal: Number(o.subtotal || 0),
     deliveryFee: Number(o.delivery_fee || 0),
+    serviceFee: Number(o.service_fee || 0),
     platformFee: Number(o.platform_fee || 0),
     driverNetEarnings: Number(o.driver_net_earnings || 0),
     restaurantNetEarnings: Number(o.restaurant_net_earnings || 0),
@@ -415,6 +416,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           restaurantFeePct: (settingsData.data.restaurant_fee_pct ?? 8) / 100,
           minDeliveryFee: settingsData.data.min_delivery_fee ?? 5.0,
           minOrderValue: settingsData.data.min_order_value ?? 15.0,
+          serviceFee: settingsData.data.service_fee ?? 4.0,
         });
       }
       setIsSupabaseConnected(true);
@@ -896,11 +898,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let driverFeePct     = 0.08;
       let restaurantFeePct = 0.08;
       let minDeliveryFee   = 5.0;
+      let serviceFee       = 4.0; // taxa de serviço fixa — cobre o custo das transferências PIX
       const maxDeliveryFee = 100.0; // limite máximo razoável para detectar manipulação
 
       const { data: cfg } = await supabase
         .from('platform_settings')
-        .select('platform_fee_pct, driver_fee_pct, restaurant_fee_pct, min_delivery_fee')
+        .select('platform_fee_pct, driver_fee_pct, restaurant_fee_pct, min_delivery_fee, service_fee')
         .maybeSingle();
 
       if (cfg) {
@@ -908,6 +911,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         driverFeePct     = (cfg.driver_fee_pct     ?? 8)  / 100;
         restaurantFeePct = (cfg.restaurant_fee_pct ?? 8)  / 100;
         minDeliveryFee   = cfg.min_delivery_fee     ?? 5.0;
+        serviceFee       = cfg.service_fee          ?? 4.0;
       }
 
       // Taxa personalizada do lojista (buscada do banco via profiles)
@@ -939,8 +943,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const finalProductTotal    = Math.max(0, subtotal - discountAmount);
       const restaurantNetEarnings = finalProductTotal * (1 - restaurantFeePct);
       const driverEarnings       = deliveryFee * (1 - driverFeePct);
-      const platformFee          = (finalProductTotal - restaurantNetEarnings) + (deliveryFee - driverEarnings);
-      const total                = finalProductTotal + deliveryFee;
+      // Taxa de serviço vai 100% para a plataforma — cobre o custo das transferências PIX
+      const platformFee          = (finalProductTotal - restaurantNetEarnings) + (deliveryFee - driverEarnings) + serviceFee;
+      const total                = finalProductTotal + deliveryFee + serviceFee;
 
       const { data: clientProfile } = await supabase
         .from('profiles').select('phone_number, avatar_url').eq('id', session.user.id).maybeSingle();
@@ -962,6 +967,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         items: validatedItems,
         subtotal,
         delivery_fee: deliveryFee,
+        service_fee: serviceFee,
         platform_fee: platformFee,
         driver_net_earnings: driverEarnings,
         restaurant_net_earnings: restaurantNetEarnings,

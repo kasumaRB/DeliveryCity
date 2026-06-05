@@ -152,6 +152,7 @@ export interface Order {
   items: OrderItem[];
   subtotal: number;
   deliveryFee: number;
+  serviceFee?: number;
   platformFee: number;
   driverNetEarnings: number;
   restaurantNetEarnings?: number;
@@ -213,6 +214,7 @@ export interface PlatformSettings {
   restaurantFeePct: number;
   minDeliveryFee: number;
   minOrderValue: number;
+  serviceFee?: number;
 }
 
 // Retorna se um restaurante está aberto agora com base nos horários estruturados

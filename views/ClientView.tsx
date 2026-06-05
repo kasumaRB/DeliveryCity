@@ -393,8 +393,14 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     return 4.00 + (d * 0.50);
   };
 
+  // Taxa de serviço fixa (configurável no admin) — só incide quando há itens no carrinho
+  const serviceFee = useMemo(() => {
+    if (cartSubtotal === 0) return 0;
+    return platformSettings?.serviceFee ?? 4.0;
+  }, [cartSubtotal, platformSettings]);
+
   const discount = appliedCoupon ? (appliedCoupon.discount > 0 ? appliedCoupon.discount : 0) : 0;
-  const cartTotal = Math.max(0, cartSubtotal + deliveryFee - discount);
+  const cartTotal = Math.max(0, cartSubtotal + deliveryFee + serviceFee - discount);
 
   const handleApplyCoupon = async () => {
     if (!selectedRestaurant || !couponCode.trim()) return;
@@ -1491,6 +1497,14 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                     ⚠️ Selecione um endereço com localização no mapa para calcular o frete exato
                   </p>
                 )}
+                {serviceFee > 0 && (
+                  <div className="flex justify-between items-center text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
+                    <span>Taxa de serviço</span>
+                    <span className="text-gray-900">
+                      {serviceFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </span>
+                  </div>
+                )}
                 {discount > 0 && (
                   <div className="flex justify-between items-center text-[10px] font-black text-green-600 uppercase tracking-widest mb-4">
                     <span>Desconto</span>
@@ -1955,6 +1969,12 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                   <span>Entrega</span>
                   <span>{receiptOrder.deliveryFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                 </div>
+                {(receiptOrder.serviceFee ?? 0) > 0 && (
+                  <div className="flex justify-between text-xs font-bold text-gray-500">
+                    <span>Taxa de serviço</span>
+                    <span>{receiptOrder.serviceFee!.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                  </div>
+                )}
                 <div className="h-px bg-gray-200 my-1" />
                 <div className="flex justify-between font-black text-gray-900 text-lg">
                   <span>Total</span>

@@ -48,11 +48,12 @@ const SettingsTab: React.FC = () => {
     restaurant_fee_pct: 10,
     min_delivery_fee: 4.0,
     min_order_value: 15.0,
+    service_fee: 4.0,
     support_whatsapp: '',
     city_cep: '',
   });
-  const [simSubtotal, setSimSubtotal] = useState(50);
-  const [simDelivery, setSimDelivery] = useState(10);
+  const [simSubtotal, setSimSubtotal] = useState(20);
+  const [simDelivery, setSimDelivery] = useState(8);
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsMsg, setSettingsMsg] = useState('');
@@ -67,6 +68,7 @@ const SettingsTab: React.FC = () => {
           restaurant_fee_pct: data.restaurant_fee_pct ?? 10,
           min_delivery_fee: data.min_delivery_fee ?? 4.0,
           min_order_value: data.min_order_value ?? 15.0,
+          service_fee: data.service_fee ?? 4.0,
           support_whatsapp: data.support_whatsapp ?? '',
           city_cep: data.city_cep ?? '',
         });
@@ -119,15 +121,20 @@ const SettingsTab: React.FC = () => {
   }
 
   // Simulador ao vivo
+  const PIX_TRANSFER_COST = 1.99;       // custo Asaas por transferência PIX enviada
+  const NUM_TRANSFERS     = 2;          // restaurante + entregador
   const simRestaurantGets = simSubtotal * (1 - settings.restaurant_fee_pct / 100);
   const simDriverGets     = simDelivery * (1 - settings.driver_fee_pct / 100);
-  const simPlatformGross  = (simSubtotal * settings.restaurant_fee_pct / 100) + (simDelivery * settings.driver_fee_pct / 100);
-  const simTotal          = simSubtotal + simDelivery;
-  const simAsaasPix       = simTotal * 0.01;
-  const simAsaasCard      = simTotal * 0.0299;
+  const simPlatformGross  = (simSubtotal * settings.restaurant_fee_pct / 100)
+                          + (simDelivery * settings.driver_fee_pct / 100)
+                          + settings.service_fee;
+  const simTotal          = simSubtotal + simDelivery + settings.service_fee;
+  const simTransferCost   = PIX_TRANSFER_COST * NUM_TRANSFERS;
+  const simAsaasPix       = simTotal * 0.01 + simTransferCost;
+  const simAsaasCard      = simTotal * 0.0299 + simTransferCost;
   const simNetPix         = simPlatformGross - simAsaasPix;
   const simNetCard        = simPlatformGross - simAsaasCard;
-  const fmt = (v: number) => `R$ ${v.toFixed(2).replace('.', ',')}`;
+  const fmt = (v: number) => `${v < 0 ? '-' : ''}R$ ${Math.abs(v).toFixed(2).replace('.', ',')}`;
 
   return (
     <div className="max-w-3xl mx-auto animate-in fade-in space-y-6">
@@ -226,21 +233,49 @@ const SettingsTab: React.FC = () => {
         </div>
 
         <div className="bg-gray-50 rounded-xl p-4 space-y-1.5">
-          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Após taxa Asaas</p>
+          <div className="flex justify-between text-xs">
+            <span className="text-gray-400 font-medium">Taxa de serviço (vai pra você)</span>
+            <span className="font-bold text-gray-600">+ {fmt(settings.service_fee)}</span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-gray-400 font-medium">2 transferências PIX (Asaas)</span>
+            <span className="font-bold text-red-400">− {fmt(simTransferCost)}</span>
+          </div>
+          <div className="h-px bg-gray-200 my-1.5" />
+          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Seu lucro líquido por pedido</p>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-500 font-medium">PIX (−1%)</span>
-            <span className="font-black text-gray-800">{fmt(simNetPix)} líquido</span>
+            <span className="text-gray-500 font-medium">Se pagar no PIX</span>
+            <span className={`font-black ${simNetPix < 0 ? 'text-red-600' : 'text-green-600'}`}>{fmt(simNetPix)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-500 font-medium">Cartão (−2,99%)</span>
-            <span className="font-black text-gray-800">{fmt(simNetCard)} líquido</span>
+            <span className="text-gray-500 font-medium">Se pagar no cartão</span>
+            <span className={`font-black ${simNetCard < 0 ? 'text-red-600' : 'text-green-600'}`}>{fmt(simNetCard)}</span>
           </div>
+          {simNetPix < 0 && (
+            <p className="text-[10px] text-red-500 font-bold mt-2">⚠️ Prejuízo neste cenário — aumente a taxa de serviço ou o pedido mínimo.</p>
+          )}
         </div>
       </div>
 
-      {/* Limites mínimos */}
+      {/* Taxa de serviço + Limites mínimos */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
-        <h4 className="font-black text-gray-800">Limites Mínimos</h4>
+        <div>
+          <h4 className="font-black text-gray-800 mb-1">Taxa de Serviço</h4>
+          <p className="text-[11px] text-gray-400 font-medium">Cobrada do cliente em todo pedido e repassada 100% para você. Serve para cobrir o custo das transferências PIX (~R$ 4 por pedido).</p>
+        </div>
+        <div className="max-w-[220px]">
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">R$</span>
+            <input
+              type="number" min="0" step="0.5"
+              value={settings.service_fee}
+              onChange={e => setSettings(s => ({ ...s, service_fee: parseFloat(e.target.value) || 0 }))}
+              className="w-full p-4 pl-9 bg-purple-50 rounded-xl font-black text-xl outline-none border border-purple-100 focus:border-purple-400 transition-all text-purple-700"
+            />
+          </div>
+        </div>
+
+        <h4 className="font-black text-gray-800 pt-4 border-t border-gray-100">Limites Mínimos</h4>
         <div className="grid grid-cols-2 gap-4">
           {[
             { key: 'min_delivery_fee', label: 'Taxa de entrega mínima', help: 'Quando não há taxa definida no restaurante' },
