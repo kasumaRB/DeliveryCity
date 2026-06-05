@@ -44,13 +44,15 @@ const SettingsTab: React.FC = () => {
   const { profiles, updateUserProfile } = useAppStore();
   const [settings, setSettings] = useState({
     platform_fee_pct: 15,
-    driver_fee_pct: 8,
-    restaurant_fee_pct: 8,
+    driver_fee_pct: 10,
+    restaurant_fee_pct: 10,
     min_delivery_fee: 4.0,
     min_order_value: 15.0,
     support_whatsapp: '',
     city_cep: '',
   });
+  const [simSubtotal, setSimSubtotal] = useState(50);
+  const [simDelivery, setSimDelivery] = useState(10);
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsMsg, setSettingsMsg] = useState('');
@@ -61,8 +63,8 @@ const SettingsTab: React.FC = () => {
         const { data } = await supabase.from('platform_settings').select('*').maybeSingle();
         if (data) setSettings({
           platform_fee_pct: data.platform_fee_pct ?? 15,
-          driver_fee_pct: data.driver_fee_pct ?? 8,
-          restaurant_fee_pct: data.restaurant_fee_pct ?? 8,
+          driver_fee_pct: data.driver_fee_pct ?? 10,
+          restaurant_fee_pct: data.restaurant_fee_pct ?? 10,
           min_delivery_fee: data.min_delivery_fee ?? 4.0,
           min_order_value: data.min_order_value ?? 15.0,
           support_whatsapp: data.support_whatsapp ?? '',
@@ -116,81 +118,146 @@ const SettingsTab: React.FC = () => {
     return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-purple-100 border-t-purple-600 rounded-full animate-spin" /></div>;
   }
 
+  // Simulador ao vivo
+  const simRestaurantGets = simSubtotal * (1 - settings.restaurant_fee_pct / 100);
+  const simDriverGets     = simDelivery * (1 - settings.driver_fee_pct / 100);
+  const simPlatformGross  = (simSubtotal * settings.restaurant_fee_pct / 100) + (simDelivery * settings.driver_fee_pct / 100);
+  const simTotal          = simSubtotal + simDelivery;
+  const simAsaasPix       = simTotal * 0.01;
+  const simAsaasCard      = simTotal * 0.0299;
+  const simNetPix         = simPlatformGross - simAsaasPix;
+  const simNetCard        = simPlatformGross - simAsaasCard;
+  const fmt = (v: number) => `R$ ${v.toFixed(2).replace('.', ',')}`;
+
   return (
-    <div className="max-w-3xl mx-auto animate-in fade-in space-y-8">
+    <div className="max-w-3xl mx-auto animate-in fade-in space-y-6">
       <div>
-        <h3 className="text-2xl font-black text-gray-900 tracking-tighter mb-1">Configurações Financeiras</h3>
-        <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Taxas de comissionamento da plataforma</p>
+        <h3 className="text-2xl font-black text-gray-900 tracking-tighter mb-1">Configurações da Plataforma</h3>
+        <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Comissões, limites e contato</p>
       </div>
 
-      {/* Como funciona o modelo */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
-        <h4 className="font-black text-gray-700 mb-6 flex items-center gap-2">
-          <DollarSign size={18} className="text-purple-500" /> Como funcionam as comissões?
+      {/* Comissões */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
+        <h4 className="font-black text-gray-800 flex items-center gap-2">
+          <DollarSign size={16} className="text-purple-500" /> Comissões
         </h4>
-
-        <div className="flex flex-col md:flex-row gap-6 mb-6">
-          <div className="flex-1 bg-orange-50 border border-orange-100 rounded-xl p-5">
-            <h5 className="font-black text-orange-600 text-sm mb-2 uppercase tracking-widest">🟠 Lojista ({settings.restaurant_fee_pct}%)</h5>
-            <p className="text-xs text-orange-800 font-medium">A plataforma retém <strong>{settings.restaurant_fee_pct}%</strong> sobre o subtotal dos produtos (descontando cupons) como comissão.</p>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-2 block">
+              Lojista — sobre produtos
+            </label>
+            <div className="relative">
+              <input
+                type="number" min="0" max="100" step="0.5"
+                value={settings.restaurant_fee_pct}
+                onChange={e => setSettings(s => ({ ...s, restaurant_fee_pct: parseFloat(e.target.value) || 0 }))}
+                className="w-full p-4 pr-10 bg-orange-50 rounded-xl font-black text-2xl outline-none border border-orange-100 focus:border-orange-400 transition-all text-orange-700"
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-orange-400 font-black text-lg">%</span>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1">Lojista recebe {(100 - settings.restaurant_fee_pct).toFixed(1)}% do subtotal</p>
           </div>
-          <div className="flex-1 bg-green-50 border border-green-100 rounded-xl p-5">
-            <h5 className="font-black text-green-600 text-sm mb-2 uppercase tracking-widest">🟢 Entregador ({settings.driver_fee_pct}%)</h5>
-            <p className="text-xs text-green-800 font-medium">A plataforma retém <strong>{settings.driver_fee_pct}%</strong> sobre o valor da taxa de entrega como comissão.</p>
+          <div>
+            <label className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-2 block">
+              Entregador — sobre entrega
+            </label>
+            <div className="relative">
+              <input
+                type="number" min="0" max="100" step="0.5"
+                value={settings.driver_fee_pct}
+                onChange={e => setSettings(s => ({ ...s, driver_fee_pct: parseFloat(e.target.value) || 0 }))}
+                className="w-full p-4 pr-10 bg-green-50 rounded-xl font-black text-2xl outline-none border border-green-100 focus:border-green-400 transition-all text-green-700"
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-green-400 font-black text-lg">%</span>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1">Entregador recebe {(100 - settings.driver_fee_pct).toFixed(1)}% da taxa de entrega</p>
+          </div>
+        </div>
+        <p className="text-[10px] text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
+          Taxa individual por lojista pode ser ajustada no perfil de cada um — substitui a geral acima.
+        </p>
+      </div>
+
+      {/* Simulador ao vivo */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+        <h4 className="font-black text-gray-800 flex items-center gap-2">
+          <span className="text-purple-500">🧮</span> Simulador — quanto você recebe por pedido
+        </h4>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Subtotal (produtos)</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">R$</span>
+              <input
+                type="number" min="0" step="5"
+                value={simSubtotal}
+                onChange={e => setSimSubtotal(parseFloat(e.target.value) || 0)}
+                className="w-full p-3 pl-9 bg-gray-50 rounded-xl font-bold outline-none border border-gray-200 focus:border-purple-300 transition-all"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Taxa de entrega</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">R$</span>
+              <input
+                type="number" min="0" step="1"
+                value={simDelivery}
+                onChange={e => setSimDelivery(parseFloat(e.target.value) || 0)}
+                className="w-full p-3 pl-9 bg-gray-50 rounded-xl font-bold outline-none border border-gray-200 focus:border-purple-300 transition-all"
+              />
+            </div>
           </div>
         </div>
 
-        <div className="bg-purple-50 border border-purple-100 rounded-xl p-4 text-sm font-bold text-purple-700 flex items-start gap-3">
-          <span className="text-xl">💡</span>
-          <p>
-            A receita total da plataforma por pedido é a <strong>soma</strong> dessas duas comissões. <br />
-            Lembrando que é possível configurar uma taxa diferenciada para cada lojista diretamente no perfil dele.
-          </p>
+        <div className="grid grid-cols-3 gap-3 pt-1">
+          <div className="bg-orange-50 border border-orange-100 rounded-xl p-3 text-center">
+            <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-1">Lojista recebe</p>
+            <p className="text-lg font-black text-orange-700">{fmt(simRestaurantGets)}</p>
+          </div>
+          <div className="bg-green-50 border border-green-100 rounded-xl p-3 text-center">
+            <p className="text-[10px] font-black text-green-500 uppercase tracking-widest mb-1">Entregador recebe</p>
+            <p className="text-lg font-black text-green-700">{fmt(simDriverGets)}</p>
+          </div>
+          <div className="bg-purple-50 border border-purple-100 rounded-xl p-3 text-center">
+            <p className="text-[10px] font-black text-purple-500 uppercase tracking-widest mb-1">Plataforma (bruto)</p>
+            <p className="text-lg font-black text-purple-700">{fmt(simPlatformGross)}</p>
+          </div>
+        </div>
+
+        <div className="bg-gray-50 rounded-xl p-4 space-y-1.5">
+          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Após taxa Asaas</p>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500 font-medium">PIX (−1%)</span>
+            <span className="font-black text-gray-800">{fmt(simNetPix)} líquido</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500 font-medium">Cartão (−2,99%)</span>
+            <span className="font-black text-gray-800">{fmt(simNetCard)} líquido</span>
+          </div>
         </div>
       </div>
 
-      {/* Campos de configuração */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 space-y-6">
-        <h4 className="font-black text-gray-700 mb-2">Comissões da Plataforma (%)</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Limites mínimos */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
+        <h4 className="font-black text-gray-800">Limites Mínimos</h4>
+        <div className="grid grid-cols-2 gap-4">
           {[
-            { key: 'restaurant_fee_pct', label: 'Comissão sobre Lojista', color: 'orange', help: 'Porcentagem cobrada sobre os produtos' },
-            { key: 'driver_fee_pct', label: 'Comissão sobre Entregador', color: 'green', help: 'Porcentagem cobrada sobre a taxa de entrega' },
-          ].map(field => (
-            <div key={field.key}>
-              <label className={`text-[10px] font-black text-${field.color}-600 uppercase tracking-widest mb-2 block`}>{field.label}</label>
-              <div className="relative">
-                <input
-                  type="number" min="0" step="0.01"
-                  value={(settings as any)[field.key]}
-                  onChange={e => setSettings(s => ({ ...s, [field.key]: parseFloat(e.target.value) || 0 }))}
-                  className="w-full p-4 pr-10 bg-gray-50 rounded-xl font-black text-xl outline-none border border-gray-200 focus:border-purple-300 transition-all"
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-black">%</span>
-              </div>
-              <p className="text-[10px] text-gray-400 mt-1 ml-1">{field.help}</p>
-            </div>
-          ))}
-        </div>
-
-        <h4 className="font-black text-gray-700 pt-4 border-t border-gray-100">Limites Mínimos</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {[
-            { key: 'min_delivery_fee', label: 'Taxa de Entrega Mínima', help: 'Cobrado do cliente quando não há taxa definida' },
-            { key: 'min_order_value', label: 'Pedido Mínimo (R$)', help: 'Valor mínimo para realizar um pedido' },
+            { key: 'min_delivery_fee', label: 'Taxa de entrega mínima', help: 'Quando não há taxa definida no restaurante' },
+            { key: 'min_order_value', label: 'Pedido mínimo', help: 'Valor mínimo para o cliente fazer um pedido' },
           ].map(field => (
             <div key={field.key}>
               <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block">{field.label}</label>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-black text-sm">R$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">R$</span>
                 <input
                   type="number" min="0" step="0.5"
                   value={(settings as any)[field.key]}
                   onChange={e => setSettings(s => ({ ...s, [field.key]: parseFloat(e.target.value) || 0 }))}
-                  className="w-full p-4 pl-10 bg-gray-50 rounded-xl font-black outline-none border border-gray-200 focus:border-purple-300 transition-all"
+                  className="w-full p-4 pl-9 bg-gray-50 rounded-xl font-black outline-none border border-gray-200 focus:border-purple-300 transition-all"
                 />
               </div>
-              <p className="text-[10px] text-gray-400 mt-1 ml-1">{field.help}</p>
+              <p className="text-[10px] text-gray-400 mt-1">{field.help}</p>
             </div>
           ))}
         </div>
