@@ -5,8 +5,7 @@
  * Fluxo:
  *   1. Valida o pedido no banco (segurança: recalcula valores do servidor)
  *   2. Cria/recupera o customer Asaas do cliente
- *   3. Cria a cobrança com split parcial para o restaurante
- *      (taxa de entrega fica retida na conta principal para repasse assíncrono ao entregador)
+ *   3. Cria a cobrança sem split (repasses ocorrem somente após DELIVERED via release-payment-splits)
  *   4. Atualiza o pedido com asaas_payment_id + QR code PIX
  *   5. Retorna { asaasPaymentId, pixQrCode, pixQrCodeImage, status }
  *
