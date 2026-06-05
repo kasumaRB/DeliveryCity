@@ -108,6 +108,9 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
   const [savedCardCvv, setSavedCardCvv] = useState(''); // CVV necessário mesmo para cards salvos (PCI)
   const [showNewCardForm, setShowNewCardForm] = useState(false);
 
+  // Erro de pagamento — exibido no checkout sem fechar
+  const [paymentError, setPaymentError] = useState<{ message: string; isDeclined: boolean } | null>(null);
+
   // PIX modal — exibido após criação da cobrança Asaas
   const [pixModal, setPixModal] = useState<{
     qrCode: string;
@@ -487,6 +490,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     }
 
     setIsProcessing(true);
+    setPaymentError(null);
     try {
       const savedCards = currentUserProfile.savedCards || [];
       const selectedSaved = savedCards.find(c => c.id === selectedSavedCardId);
@@ -517,10 +521,8 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
         // Dados de cartão
         if (selectedPayment === 'CREDIT_CARD') {
           if (selectedSaved?.token) {
-            // Cartão tokenizado (token Asaas salvo no perfil)
             paymentBody.creditCardToken = selectedSaved.token;
           } else {
-            // Cartão novo — dados enviados para tokenização no Asaas
             const [expMonth, expYear] = cardExpiry.split('/');
             if (!cardNumber || !cardHolder || !expMonth || !expYear || !cardCvv) {
               throw new Error('Preencha todos os dados do cartão.');
@@ -547,7 +549,25 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
           body: paymentBody,
         });
 
-        if (pmError) throw pmError;
+        // Erro de rede/timeout na Edge Function
+        if (pmError) {
+          // Cancelar pedido preso em PENDING_PAYMENT
+          supabase.from('orders').update({ status: 'CANCELLED' }).eq('id', newOrderId).catch(() => {});
+          throw pmError;
+        }
+
+        // Pagamento recusado/falhou (servidor retornou errorCode)
+        if (pmData?.errorCode) {
+          const isDeclined = pmData.errorCode === 'CARD_DECLINED';
+          setPaymentError({
+            message: isDeclined
+              ? 'Cartão recusado. Tente outro cartão ou pague via PIX.'
+              : (pmData.error || 'Falha no pagamento. Tente novamente.'),
+            isDeclined,
+          });
+          return; // mantém checkout aberto para o usuário tentar de novo
+        }
+
         if (!pmData?.asaasPaymentId) throw new Error('Falha ao criar cobrança Asaas.');
 
         // ── Salvar token do cartão para uso futuro ──
@@ -591,7 +611,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
       setIsCheckoutOpen(false);
       setShowOrderSuccess(true);
     } catch (error: any) {
-      alert(`Erro: ${error.message}`);
+      setPaymentError({ message: error.message || 'Erro inesperado. Tente novamente.', isDeclined: false });
     } finally {
       setIsProcessing(false);
     }
@@ -1529,7 +1549,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                 ] as { method: PaymentMethod; label: string; icon: React.ReactNode }[]).map(({ method, label, icon }) => (
                   <button
                     key={method}
-                    onClick={() => { setSelectedPayment(method); setSelectedSavedCardId(null); setShowNewCardForm(false); }}
+                    onClick={() => { setSelectedPayment(method); setSelectedSavedCardId(null); setShowNewCardForm(false); setPaymentError(null); }}
                     className={`py-5 flex flex-col items-center justify-center gap-2 rounded-[1.8rem] border-2 transition-all ${selectedPayment === method ? 'border-orange-500 bg-orange-50 text-orange-600 shadow-lg' : 'border-gray-100 bg-white text-gray-400'}`}
                   >
                     <div className={`p-2 rounded-xl ${selectedPayment === method ? 'bg-orange-600 text-white' : 'bg-gray-50'}`}>
@@ -1680,6 +1700,21 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                 </div>
               )}
             </div>
+            {/* Banner de erro de pagamento */}
+            {paymentError && (
+              <div className="mb-3 p-4 bg-red-50 border border-red-200 rounded-2xl animate-in fade-in duration-300">
+                <p className="text-xs font-black text-red-700 mb-1">❌ {paymentError.message}</p>
+                {paymentError.isDeclined && selectedPayment === 'CREDIT_CARD' && (
+                  <button
+                    onClick={() => { setSelectedPayment('PIX'); setPaymentError(null); }}
+                    className="mt-2 w-full py-2 bg-green-600 text-white rounded-xl font-black text-xs"
+                  >
+                    Tentar via PIX
+                  </button>
+                )}
+              </div>
+            )}
+
             <button
               onClick={handleFinalizeOrder}
               disabled={isProcessing}

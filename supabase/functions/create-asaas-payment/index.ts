@@ -249,8 +249,46 @@ serve(async (req) => {
 
     if (pmStatus < 200 || pmStatus >= 300 || !payment?.id) {
       console.error('[create-asaas-payment] Erro criar pagamento:', JSON.stringify(payment));
-      return new Response(JSON.stringify({ error: 'Falha ao criar cobrança Asaas', details: payment }), {
-        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+
+      // Detectar cartão recusado — Asaas retorna erros com code contendo "DECLINED" ou "creditCard"
+      const errs: any[] = payment?.errors ?? [];
+      const isDeclined = billingType === 'CREDIT_CARD' && errs.some((e: any) =>
+        String(e.code ?? '').toLowerCase().includes('declined') ||
+        String(e.code ?? '').toLowerCase().includes('creditcard') ||
+        String(e.description ?? '').toLowerCase().includes('recus') ||
+        String(e.description ?? '').toLowerCase().includes('declined')
+      );
+
+      // Cancelar pedido para não ficar travado em PENDING_PAYMENT
+      await supabase.from('orders')
+        .update({ status: 'CANCELLED' })
+        .eq('id', orderId)
+        .catch(() => {});
+
+      const errorMsg = isDeclined
+        ? 'Cartão recusado pela operadora.'
+        : 'Falha ao processar pagamento. Tente novamente.';
+
+      return new Response(JSON.stringify({
+        error: errorMsg,
+        errorCode: isDeclined ? 'CARD_DECLINED' : 'PAYMENT_FAILED',
+      }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Pagamento aceito mas status DECLINED (Asaas retornou 200 porém status = DECLINED)
+    if (payment.status === 'DECLINED') {
+      await supabase.from('orders')
+        .update({ status: 'CANCELLED' })
+        .eq('id', orderId)
+        .catch(() => {});
+
+      return new Response(JSON.stringify({
+        error: 'Cartão recusado pela operadora.',
+        errorCode: 'CARD_DECLINED',
+      }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
