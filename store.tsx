@@ -942,9 +942,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // ═══════════════════════════════════════════════════════
       const finalProductTotal    = Math.max(0, subtotal - discountAmount);
       const restaurantNetEarnings = finalProductTotal * (1 - restaurantFeePct);
-      const driverEarnings       = deliveryFee * (1 - driverFeePct);
+      // Entregador: sempre recebe o valor base (minDeliveryFee) +
+      // 60% do excesso por km — driverFeePct é a % do excesso que vai para a plataforma
+      const kmExcess             = Math.max(0, deliveryFee - minDeliveryFee);
+      const platformKmShare      = driverFeePct; // ex: 0.40 = plataforma leva 40% do excesso
+      const driverEarnings       = minDeliveryFee + kmExcess * (1 - platformKmShare);
+      const platformFromDelivery = kmExcess * platformKmShare;
       // Taxa de serviço vai 100% para a plataforma — cobre o custo das transferências PIX
-      const platformFee          = (finalProductTotal - restaurantNetEarnings) + (deliveryFee - driverEarnings) + serviceFee;
+      const platformFee          = (finalProductTotal - restaurantNetEarnings) + platformFromDelivery + serviceFee;
       const total                = finalProductTotal + deliveryFee + serviceFee;
 
       const { data: clientProfile } = await supabase

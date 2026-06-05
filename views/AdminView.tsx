@@ -44,7 +44,7 @@ const SettingsTab: React.FC = () => {
   const { profiles, updateUserProfile } = useAppStore();
   const [settings, setSettings] = useState({
     platform_fee_pct: 15,
-    driver_fee_pct: 0,
+    driver_fee_pct: 40,
     restaurant_fee_pct: 10,
     min_delivery_fee: 4.0,
     min_order_value: 15.0,
@@ -64,7 +64,7 @@ const SettingsTab: React.FC = () => {
         const { data } = await supabase.from('platform_settings').select('*').maybeSingle();
         if (data) setSettings({
           platform_fee_pct: data.platform_fee_pct ?? 15,
-          driver_fee_pct: data.driver_fee_pct ?? 0,
+          driver_fee_pct: data.driver_fee_pct ?? 40,
           restaurant_fee_pct: data.restaurant_fee_pct ?? 10,
           min_delivery_fee: data.min_delivery_fee ?? 4.0,
           min_order_value: data.min_order_value ?? 15.0,
@@ -121,15 +121,16 @@ const SettingsTab: React.FC = () => {
   }
 
   // Simulador ao vivo
-  const PIX_TRANSFER_COST = 1.99;       // custo Asaas por transferência PIX enviada
-  const NUM_TRANSFERS     = 2;          // restaurante + entregador
+  const PIX_TRANSFER_COST = 1.99;
+  const simKmExcess       = Math.max(0, simDelivery - settings.min_delivery_fee);
+  const simPlatformKmPct  = settings.driver_fee_pct / 100;
+  const simDriverGets     = settings.min_delivery_fee + simKmExcess * (1 - simPlatformKmPct);
   const simRestaurantGets = simSubtotal * (1 - settings.restaurant_fee_pct / 100);
-  const simDriverGets     = simDelivery * (1 - settings.driver_fee_pct / 100);
   const simPlatformGross  = (simSubtotal * settings.restaurant_fee_pct / 100)
-                          + (simDelivery * settings.driver_fee_pct / 100)
+                          + (simKmExcess * simPlatformKmPct)
                           + settings.service_fee;
   const simTotal          = simSubtotal + simDelivery + settings.service_fee;
-  const simTransferCost   = PIX_TRANSFER_COST * NUM_TRANSFERS;
+  const simTransferCost   = PIX_TRANSFER_COST * 2;
   const simAsaasPix       = simTotal * 0.01 + simTransferCost;
   const simAsaasCard      = simTotal * 0.0299 + simTransferCost;
   const simNetPix         = simPlatformGross - simAsaasPix;
@@ -166,11 +167,11 @@ const SettingsTab: React.FC = () => {
           </div>
           <div>
             <label className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-2 block">
-              Entregador — sobre entrega
+              Sua % do excesso por km
             </label>
             <div className="relative">
               <input
-                type="number" min="0" max="100" step="0.5"
+                type="number" min="0" max="100" step="5"
                 value={settings.driver_fee_pct}
                 onChange={e => setSettings(s => ({ ...s, driver_fee_pct: parseFloat(e.target.value) || 0 }))}
                 className="w-full p-4 pr-10 bg-green-50 rounded-xl font-black text-2xl outline-none border border-green-100 focus:border-green-400 transition-all text-green-700"
@@ -178,9 +179,7 @@ const SettingsTab: React.FC = () => {
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-green-400 font-black text-lg">%</span>
             </div>
             <p className="text-[10px] text-gray-400 mt-1">
-              {settings.driver_fee_pct === 0
-                ? 'Entregador recebe 100% da taxa de entrega'
-                : `Entregador recebe ${(100 - settings.driver_fee_pct).toFixed(1)}% da taxa de entrega`}
+              Entregador: R$ {settings.min_delivery_fee} fixo + {(100 - settings.driver_fee_pct).toFixed(0)}% do km extra
             </p>
           </div>
         </div>
