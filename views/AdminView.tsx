@@ -44,7 +44,7 @@ const SettingsTab: React.FC = () => {
   const { profiles, updateUserProfile } = useAppStore();
   const [settings, setSettings] = useState({
     platform_fee_pct: 15,
-    driver_fee_pct: 10,
+    driver_fee_pct: 0,
     restaurant_fee_pct: 10,
     min_delivery_fee: 4.0,
     min_order_value: 15.0,
@@ -64,7 +64,7 @@ const SettingsTab: React.FC = () => {
         const { data } = await supabase.from('platform_settings').select('*').maybeSingle();
         if (data) setSettings({
           platform_fee_pct: data.platform_fee_pct ?? 15,
-          driver_fee_pct: data.driver_fee_pct ?? 10,
+          driver_fee_pct: data.driver_fee_pct ?? 0,
           restaurant_fee_pct: data.restaurant_fee_pct ?? 10,
           min_delivery_fee: data.min_delivery_fee ?? 4.0,
           min_order_value: data.min_order_value ?? 15.0,
@@ -177,7 +177,11 @@ const SettingsTab: React.FC = () => {
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-green-400 font-black text-lg">%</span>
             </div>
-            <p className="text-[10px] text-gray-400 mt-1">Entregador recebe {(100 - settings.driver_fee_pct).toFixed(1)}% da taxa de entrega</p>
+            <p className="text-[10px] text-gray-400 mt-1">
+              {settings.driver_fee_pct === 0
+                ? 'Entregador recebe 100% da taxa de entrega'
+                : `Entregador recebe ${(100 - settings.driver_fee_pct).toFixed(1)}% da taxa de entrega`}
+            </p>
           </div>
         </div>
         <p className="text-[10px] text-gray-400 bg-gray-50 rounded-lg px-3 py-2">

@@ -908,7 +908,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (cfg) {
         platformFeePct   = (cfg.platform_fee_pct   ?? 15) / 100;
-        driverFeePct     = (cfg.driver_fee_pct     ?? 8)  / 100;
+        driverFeePct     = (cfg.driver_fee_pct     ?? 0)  / 100;
         restaurantFeePct = (cfg.restaurant_fee_pct ?? 8)  / 100;
         minDeliveryFee   = cfg.min_delivery_fee     ?? 5.0;
         serviceFee       = cfg.service_fee          ?? 4.0;
