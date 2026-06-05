@@ -725,22 +725,28 @@ export const DriverView: React.FC = () => {
           <div className="px-4 pt-4">
 
             {/* Availability toggle */}
-            <div className="flex items-center justify-between mb-4 p-4 bg-gray-800/50 rounded-2xl border border-gray-700/40">
-              <div>
-                <p className={`font-black text-sm ${isAvailable ? 'text-green-400' : 'text-gray-400'}`}>
-                  {isAvailable ? 'Disponível' : 'Indisponível'}
-                </p>
-                <p className="text-gray-600 text-xs mt-0.5">
-                  {isAvailable ? 'Recebendo pedidos' : 'Não recebendo pedidos'}
-                </p>
+            <button
+              onClick={toggleAvailability}
+              className={`w-full mb-4 p-5 rounded-2xl border-2 transition-all duration-300 text-left ${
+                isAvailable
+                  ? 'bg-green-500/10 border-green-500/40'
+                  : 'bg-red-500/10 border-red-500/50 animate-pulse'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`font-black text-lg ${isAvailable ? 'text-green-400' : 'text-red-400'}`}>
+                    {isAvailable ? '🟢 Disponível para corridas' : '🔴 Indisponível — toque para ativar'}
+                  </p>
+                  <p className={`text-xs mt-0.5 font-medium ${isAvailable ? 'text-green-600' : 'text-red-500'}`}>
+                    {isAvailable ? 'Você está recebendo pedidos agora' : 'Você NÃO está recebendo pedidos'}
+                  </p>
+                </div>
+                <div className={`relative w-14 h-7 rounded-full transition-all duration-300 shrink-0 ml-4 ${isAvailable ? 'bg-green-500' : 'bg-red-800'}`}>
+                  <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 ${isAvailable ? 'left-8' : 'left-1'}`} />
+                </div>
               </div>
-              <button
-                onClick={toggleAvailability}
-                className={`relative w-14 h-7 rounded-full transition-all duration-300 ${isAvailable ? 'bg-green-500' : 'bg-gray-600'}`}
-              >
-                <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 ${isAvailable ? 'left-8' : 'left-1'}`} />
-              </button>
-            </div>
+            </button>
 
             {/* Quick stats — linha discreta no topo quando sem pedido ativo */}
             {!activeOrder && (
@@ -751,6 +757,15 @@ export const DriverView: React.FC = () => {
                 {' · '}
                 <span className="text-amber-400">{(currentUserProfile?.averageRating || 0).toFixed(1)} ★</span>
               </p>
+            )}
+
+            {/* Mensagem quando desligado */}
+            {!isAvailable && !activeOrder && (
+              <div className="pt-16 pb-16 text-center">
+                <div className="text-5xl mb-4">😴</div>
+                <p className="text-red-400 font-black text-base">Você está inativo</p>
+                <p className="text-gray-600 text-sm mt-1">Toque no botão acima para começar a receber pedidos</p>
+              </div>
             )}
 
             {/* Pedido ativo */}
@@ -878,8 +893,8 @@ export const DriverView: React.FC = () => {
               </div>
             )}
 
-            {/* Pedidos disponíveis — quando não há pedido ativo */}
-            {!activeOrder && (
+            {/* Pedidos disponíveis — só quando disponível e sem pedido ativo */}
+            {!activeOrder && isAvailable && (
               <div className="animate-in fade-in duration-500">
                 {availableOrdersWithScore.length === 0 ? (
                   <div className="pt-12 pb-16 text-center">

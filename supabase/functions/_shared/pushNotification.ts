@@ -151,6 +151,7 @@ export async function sendPushToAllDrivers(
       .select('push_token')
       .eq('role', 'DRIVER')
       .eq('status', 'APPROVED')
+      .eq('is_online', true)
       .not('push_token', 'is', null);
 
     if (!drivers?.length) return;
