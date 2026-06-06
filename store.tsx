@@ -846,12 +846,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // ═══════════════════════════════════════════════════════
       const { data: restaurantData, error: restError } = await supabase
         .from('restaurants')
-        .select('id, name, menu, owner_id')
+        .select('id, name, menu, owner_id, is_open, opening_hours')
         .eq('id', restaurantId)
         .single();
 
       if (restError || !restaurantData) {
         throw new Error('Restaurante não encontrado ou inativo.');
+      }
+
+      if (restaurantData.is_open === false) {
+        throw new Error('Este restaurante está fechado no momento. Tente novamente mais tarde.');
       }
 
       // ═══════════════════════════════════════════════════════
@@ -1210,15 +1214,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .select('id').maybeSingle();
     if (error || !updated) throw new Error('Não foi possível registrar a falha de entrega.');
 
+    // Reembolso automático — nenhum repasse foi feito ainda (só acontece em DELIVERED)
+    supabase.functions.invoke('refund-asaas-payment', { body: { orderId } }).catch(() => {});
+
     await fetchData();
 
-    // Notifica o cliente que o suporte entrará em contato
+    // Notifica o cliente que o reembolso está sendo processado
     if (order.customerId) {
       supabase.functions.invoke('send-push-notification', {
         body: {
           userId: order.customerId,
           title: '⚠️ Problema na entrega',
-          body: 'Seu pedido não pôde ser entregue. Nossa equipe de suporte entrará em contato em breve.',
+          body: 'Seu pedido não pôde ser entregue. O reembolso será processado automaticamente.',
           data: { orderId, type: 'DELIVERY_FAILED' },
         },
       }).catch(() => {});
@@ -1396,7 +1403,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const driver = profiles.find(p => p.id === did);
           const order = orders.find(o => o.id === oid);
 
-          let updatePayload: any = { driver_id: did, status: OrderStatus.READY };
+          let updatePayload: any = { driver_id: did, status: OrderStatus.READY, driver_name: driver?.name ?? null };
 
           if (driver && order && driver.customFeePct !== undefined) {
             const driverFeePct = driver.customFeePct / 100;
