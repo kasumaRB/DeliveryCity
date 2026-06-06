@@ -438,10 +438,13 @@ export const DriverView: React.FC = () => {
 
   const toggleAvailability = async () => {
     const next = !isAvailable;
-    if (next && !baseAddressData?.coords) {
-      alert('Configure sua região de atuação no perfil antes de ficar disponível.');
-      setActiveTab('profile');
-      return;
+    if (next) {
+      const hasBase = currentUserProfile?.savedAddresses?.some(a => a.label === 'Base' && a.coords);
+      if (!hasBase) {
+        alert('Configure sua região de atuação no perfil antes de ficar disponível.');
+        setActiveTab('profile');
+        return;
+      }
     }
     setIsAvailable(next);
     try { await updateUserProfile(currentUserProfile!.id, { isOnline: next }); }

@@ -1281,7 +1281,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Entregador digita o código no app para confirmar que devolveu ao restaurante
   const confirmReturnWithCode = async (orderId: string, code: string): Promise<void> => {
     const { data: order, error: fetchErr } = await supabase.from('orders')
-      .select('return_code, customer_id, status')
+      .select('return_code, customer_id, restaurant_id, status')
       .eq('id', orderId).maybeSingle();
     if (fetchErr || !order) throw new Error('Pedido não encontrado.');
     if (order.status !== OrderStatus.RETURNING) throw new Error('Pedido não está em devolução.');
@@ -1294,17 +1294,71 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (error) throw new Error(error.message);
 
     await fetchData();
-    // Reembolso já foi processado quando o admin autorizou a devolução
+
+    // Notifica cliente que devolução foi concluída
+    if (order.customer_id) {
+      supabase.functions.invoke('send-push-notification', {
+        body: {
+          userId: order.customer_id,
+          title: '📦 Devolução concluída',
+          body: 'Seu pedido foi devolvido ao restaurante. O reembolso já está sendo processado.',
+          data: { orderId, type: 'RETURNED' },
+        },
+      }).catch(() => {});
+    }
+
+    // Notifica restaurante que entregador confirmou a devolução
+    if (order.restaurant_id) {
+      const { data: rest } = await supabase.from('restaurants')
+        .select('owner_id').eq('id', order.restaurant_id).maybeSingle();
+      if (rest?.owner_id) {
+        supabase.functions.invoke('send-push-notification', {
+          body: {
+            userId: rest.owner_id,
+            title: '✅ Devolução confirmada',
+            body: `Pedido #${orderId.slice(-4)} devolvido e confirmado pelo entregador.`,
+            data: { orderId, type: 'RETURNED' },
+          },
+        }).catch(() => {});
+      }
+    }
   };
 
   // Admin força confirmação sem código (override manual)
   const confirmReturn = async (orderId: string) => {
+    const { data: order } = await supabase.from('orders')
+      .select('customer_id, restaurant_id').eq('id', orderId).maybeSingle();
+
     const { error } = await supabase.from('orders')
       .update({ status: OrderStatus.RETURNED })
       .eq('id', orderId).eq('status', OrderStatus.RETURNING);
     if (error) throw new Error(error.message);
     await fetchData();
-    // Reembolso já processado na autorização
+
+    if (order?.customer_id) {
+      supabase.functions.invoke('send-push-notification', {
+        body: {
+          userId: order.customer_id,
+          title: '📦 Devolução concluída',
+          body: 'Seu pedido foi devolvido ao restaurante. O reembolso já está sendo processado.',
+          data: { orderId, type: 'RETURNED' },
+        },
+      }).catch(() => {});
+    }
+    if (order?.restaurant_id) {
+      const { data: rest } = await supabase.from('restaurants')
+        .select('owner_id').eq('id', order.restaurant_id).maybeSingle();
+      if (rest?.owner_id) {
+        supabase.functions.invoke('send-push-notification', {
+          body: {
+            userId: rest.owner_id,
+            title: '✅ Devolução confirmada',
+            body: `Pedido #${orderId.slice(-4)} foi devolvido e confirmado.`,
+            data: { orderId, type: 'RETURNED' },
+          },
+        }).catch(() => {});
+      }
+    }
   };
 
   // Admin envia mensagem interna para qualquer usuário (cliente, entregador, restaurante)
