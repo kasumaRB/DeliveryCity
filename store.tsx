@@ -527,6 +527,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }).catch(() => {});
     }
 
+    // Notifica restaurante que entrega foi confirmada
+    if (order.restaurantId) {
+      const restaurant = restaurants.find(r => r.id === order.restaurantId);
+      if (restaurant?.ownerId) {
+        supabase.functions.invoke('send-push-notification', {
+          body: {
+            userId: restaurant.ownerId,
+            title: '✅ Entrega confirmada',
+            body: `Pedido #${orderId.slice(-4)} entregue ao cliente. Repasse será processado.`,
+            data: { orderId, type: 'DELIVERED' },
+          },
+        }).catch(() => {});
+      }
+    }
+
     return true;
   };
 
@@ -1433,17 +1448,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 data: { orderId: id, type: 'ORDER_READY' },
               },
             }).catch(() => {});
+
+            // Notifica cliente que pedido está pronto e entregador foi acionado
+            if (order.customerId) {
+              supabase.functions.invoke('send-push-notification', {
+                body: {
+                  userId: order.customerId,
+                  title: '✅ Pedido pronto!',
+                  body: `Seu pedido em ${order.restaurantName} ficou pronto. Aguardando entregador.`,
+                  data: { orderId: id, type: 'ORDER_READY' },
+                },
+              }).catch(() => {});
+            }
           }
 
-          if (s === OrderStatus.CANCELLED && order.customerId) {
-            supabase.functions.invoke('send-push-notification', {
-              body: {
-                userId: order.customerId,
-                title: '❌ Pedido cancelado',
-                body: `Seu pedido em ${order.restaurantName} foi cancelado. Dúvidas? Fale com o suporte.`,
-                data: { orderId: id, type: 'ORDER_CANCELLED' },
-              },
-            }).catch(() => {});
+          if (s === OrderStatus.CANCELLED) {
+            // Notifica cliente
+            if (order.customerId) {
+              supabase.functions.invoke('send-push-notification', {
+                body: {
+                  userId: order.customerId,
+                  title: '❌ Pedido cancelado',
+                  body: `Seu pedido em ${order.restaurantName} foi cancelado. Dúvidas? Fale com o suporte.`,
+                  data: { orderId: id, type: 'ORDER_CANCELLED' },
+                },
+              }).catch(() => {});
+            }
+            // Notifica restaurante
+            const restaurant = restaurants.find(r => r.id === order.restaurantId);
+            if (restaurant?.ownerId) {
+              supabase.functions.invoke('send-push-notification', {
+                body: {
+                  userId: restaurant.ownerId,
+                  title: '❌ Pedido cancelado',
+                  body: `Pedido #${id.slice(-4)} foi cancelado.`,
+                  data: { orderId: id, type: 'ORDER_CANCELLED' },
+                },
+              }).catch(() => {});
+            }
+            // Notifica entregador (se já estava atribuído)
+            if (order.driverId) {
+              supabase.functions.invoke('send-push-notification', {
+                body: {
+                  userId: order.driverId,
+                  title: '❌ Pedido cancelado',
+                  body: `O pedido #${id.slice(-4)} que você aceitou foi cancelado. Verifique outros pedidos.`,
+                  data: { orderId: id, type: 'ORDER_CANCELLED' },
+                },
+              }).catch(() => {});
+            }
           }
         },
         confirmPickup,
