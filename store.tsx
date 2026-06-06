@@ -1184,6 +1184,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (error) throw error;
     await fetchData();
 
+    // Se o pagamento já tinha sido confirmado (PENDING), reembolsa automaticamente
+    if (order.status === OrderStatus.PENDING) {
+      supabase.functions.invoke('refund-asaas-payment', { body: { orderId } }).catch(() => {});
+    }
+
     // Notifica o restaurante sobre o cancelamento
     const restaurant = restaurants.find(r => r.id === order.restaurantId);
     if (restaurant?.ownerId) {

@@ -116,7 +116,23 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     qrCode: string;
     qrCodeImage: string | null;
     asaasPaymentId: string;
+    orderId: string;
   } | null>(null);
+
+  // Detecta confirmação do PIX via Realtime (store já atualiza orders em tempo real)
+  useEffect(() => {
+    if (!pixModal?.orderId) return;
+    const order = orders.find(o => o.id === pixModal.orderId);
+    if (!order) return;
+    if (order.status === 'PENDING') {
+      setPixModal(null);
+      setShowOrderSuccess(true);
+      setActiveTab('orders');
+    } else if (order.status === 'CANCELLED') {
+      setPixModal(null);
+      alert('PIX expirado ou cancelado. Tente novamente.');
+    }
+  }, [orders, pixModal?.orderId]);
 
   // Coupon states
   const [couponCode, setCouponCode] = useState('');
@@ -597,6 +613,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
             qrCode: pmData.pixQrCode,
             qrCodeImage: pmData.pixQrCodeImage || null,
             asaasPaymentId: pmData.asaasPaymentId,
+            orderId: newOrderId,
           });
           return; // não mostra "pedido confirmado" ainda — aguarda pagamento via webhook
         }
