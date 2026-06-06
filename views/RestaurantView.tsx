@@ -563,8 +563,9 @@ export const RestaurantView: React.FC = () => {
                     <h2 className="text-4xl font-black text-gray-900 tracking-tighter mb-2">
                       Painel de Pedidos
                     </h2>
-                    <div className="flex items-center gap-2 text-xs font-black text-green-600 uppercase tracking-widest">
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" /> Em operação
+                    <div className={`flex items-center gap-2 text-xs font-black uppercase tracking-widest ${myRestaurant.isOpen !== false ? 'text-green-600' : 'text-red-500'}`}>
+                      <div className={`w-2 h-2 rounded-full ${myRestaurant.isOpen !== false ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                      {myRestaurant.isOpen !== false ? 'Em operação' : 'Loja fechada'}
                     </div>
                   </div>
                   <button
