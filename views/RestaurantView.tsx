@@ -571,6 +571,10 @@ export const RestaurantView: React.FC = () => {
                   <button
                     onClick={async () => {
                       const next = !myRestaurant.isOpen;
+                      if (next && (!myRestaurant.menu || myRestaurant.menu.length === 0)) {
+                        alert('Adicione pelo menos um produto ao cardápio antes de abrir a loja.');
+                        return;
+                      }
                       await updateRestaurant(myRestaurant.id, { isOpen: next });
                     }}
                     className={`flex items-center gap-3 px-5 py-2.5 rounded-xl font-black text-sm uppercase tracking-wide transition-all shrink-0 ${

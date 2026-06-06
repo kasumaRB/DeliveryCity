@@ -1153,6 +1153,37 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                             </div>
                           )}
 
+                          {/* Card de feedback para pedidos encerrados sem entrega */}
+                          {['CANCELLED', 'DELIVERY_FAILED', 'RETURNING', 'RETURNED'].includes(order.status) && (
+                            <div className={`mx-5 mb-4 rounded-xl p-4 border ${
+                              order.status === 'CANCELLED'
+                                ? 'bg-red-50 border-red-100'
+                                : order.status === 'DELIVERY_FAILED'
+                                  ? 'bg-orange-50 border-orange-100'
+                                  : 'bg-gray-50 border-gray-100'
+                            }`}>
+                              <p className={`text-xs font-black mb-0.5 ${
+                                order.status === 'CANCELLED' ? 'text-red-700'
+                                : order.status === 'DELIVERY_FAILED' ? 'text-orange-700'
+                                : 'text-gray-600'
+                              }`}>
+                                {order.status === 'CANCELLED' && '❌ Pedido cancelado'}
+                                {order.status === 'DELIVERY_FAILED' && '⚠️ Não foi possível entregar — reembolso em processamento'}
+                                {order.status === 'RETURNING' && '🔄 Pedido sendo devolvido ao restaurante'}
+                                {order.status === 'RETURNED' && '📦 Pedido devolvido — reembolso processado'}
+                              </p>
+                              {supportWhatsapp && (
+                                <a
+                                  href={`https://wa.me/55${supportWhatsapp.replace(/\D/g,'')}?text=${encodeURIComponent(`Olá, preciso de ajuda com o pedido #${order.id.slice(-6)}`)}`}
+                                  target="_blank" rel="noreferrer"
+                                  className="text-[10px] text-green-600 font-bold underline"
+                                >
+                                  Falar com suporte
+                                </a>
+                              )}
+                            </div>
+                          )}
+
                           {/* Contador regressivo de entrega */}
                           {showCountdown && (
                             <div className="mx-5 mb-4 rounded-xl p-4 flex items-center gap-3 bg-orange-50 border border-orange-100">
@@ -1713,6 +1744,15 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                   </button>
                 )}
               </div>
+            )}
+
+            {(!currentUserProfile?.phoneNumber || !currentUserProfile?.cpf) && (
+              <button
+                onClick={onOpenProfile}
+                className="w-full mb-3 py-3 px-4 bg-yellow-50 border border-yellow-200 rounded-2xl text-xs font-black text-yellow-800 text-left"
+              >
+                ⚠️ Complete seu perfil (WhatsApp e CPF) para finalizar o pedido →
+              </button>
             )}
 
             <button

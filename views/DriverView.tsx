@@ -438,6 +438,11 @@ export const DriverView: React.FC = () => {
 
   const toggleAvailability = async () => {
     const next = !isAvailable;
+    if (next && !baseAddressData?.coords) {
+      alert('Configure sua região de atuação no perfil antes de ficar disponível.');
+      setActiveTab('profile');
+      return;
+    }
     setIsAvailable(next);
     try { await updateUserProfile(currentUserProfile!.id, { isOnline: next }); }
     catch { setIsAvailable(!next); }
@@ -728,6 +733,16 @@ export const DriverView: React.FC = () => {
         {/* HOME TAB */}
         {activeTab === 'home' && (
           <div className="px-4 pt-4">
+
+            {/* Aviso pontuação baixa */}
+            {(currentUserProfile?.driverScore ?? 100) < 70 && (
+              <div className="w-full mb-3 p-4 rounded-2xl bg-red-500/15 border border-red-500/40">
+                <p className="text-red-400 font-black text-sm">🚫 Pontuação baixa — corridas suspensas</p>
+                <p className="text-red-500/70 text-xs mt-0.5">
+                  Sua pontuação está em {currentUserProfile?.driverScore}pts (mínimo 70pts). Entre em contato com o suporte para regularizar.
+                </p>
+              </div>
+            )}
 
             {/* Aviso PIX ausente */}
             {!currentUserProfile?.pixKey && (
