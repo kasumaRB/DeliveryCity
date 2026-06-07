@@ -579,7 +579,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
         // Erro de rede/timeout na Edge Function
         if (pmError) {
           // Cancelar pedido preso em PENDING_PAYMENT
-          supabase.from('orders').update({ status: 'CANCELLED' }).eq('id', newOrderId).catch(() => {});
+          supabase.from('orders').update({ status: 'CANCELLED' }).eq('id', newOrderId).then(undefined, () => {});
           throw pmError;
         }
 

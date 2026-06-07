@@ -294,10 +294,18 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
       mode === 'REGISTER_PARTNER'
     ) {
       if (!name) newErrors.name = 'Nome é obrigatório';
-      if (!phone) newErrors.phone = 'WhatsApp é obrigatório';
+      if (!phone) {
+        newErrors.phone = 'WhatsApp é obrigatório';
+      } else if (phone.replace(/\D/g, '').length < 10) {
+        newErrors.phone = 'WhatsApp inválido (com DDD)';
+      }
 
       if (mode === 'REGISTER_EMAIL' || mode === 'REGISTER_PARTNER') {
-        if (!email) newErrors.email = 'E-mail inválido';
+        if (!email) {
+          newErrors.email = 'E-mail obrigatório';
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+          newErrors.email = 'E-mail inválido';
+        }
         if (!password || password.length < 6) newErrors.password = 'Mínimo 6 caracteres';
         if (password !== confirmPassword) newErrors.confirmPassword = 'As senhas não coincidem';
         if (!acceptedTerms) newErrors.terms = 'Você deve aceitar os termos';
@@ -310,7 +318,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
       const isClientEditing = mode === 'EDIT_PROFILE' && role === UserRole.CLIENT;
 
       if (role === UserRole.RESTAURANT) {
-        if (isCompletingOrEditing && !businessName) {
+        if (!businessName) {
           newErrors.businessName = 'Nome da loja obrigatório';
         }
         const cleanCpf = cpf.replace(/\D/g, '');
@@ -325,8 +333,19 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
       } else if (!isClientEditing) {
         // Valida CPF e data apenas para cadastro ou completion — não em edição simples de cliente
         if (!cpf || cpf.replace(/\D/g, '').length < 11) newErrors.cpf = 'CPF incompleto';
-        if (!birthDate || birthDate.length < 10)
+        if (!birthDate || birthDate.length < 10) {
           newErrors.birthDate = 'Data de nascimento inválida';
+        } else {
+          const [dd, mm, yyyy] = birthDate.split('/').map(Number);
+          const birth = new Date(yyyy, mm - 1, dd);
+          const validDate = birth.getFullYear() === yyyy && birth.getMonth() === mm - 1 && birth.getDate() === dd;
+          if (!validDate) {
+            newErrors.birthDate = 'Data inválida';
+          } else {
+            const age = (Date.now() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+            if (age < 18) newErrors.birthDate = 'Você precisa ter 18 anos ou mais';
+          }
+        }
       } else {
         // Cliente editando: valida CPF só se ele preencheu algo (parcial)
         if (cpf && cpf.replace(/\D/g, '').length > 0 && cpf.replace(/\D/g, '').length < 11) {
@@ -335,7 +354,20 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
       }
 
       if (role === UserRole.DRIVER || role === UserRole.RESTAURANT) {
-        if (!pixKey) newErrors.pixKey = 'Chave PIX obrigatória';
+        if (!pixKey) {
+          newErrors.pixKey = 'Chave PIX obrigatória';
+        } else {
+          // Valida formato: CPF/CNPJ (11/14 dígitos), e-mail, telefone (10-11 dígitos) ou chave aleatória (UUID)
+          const k = pixKey.trim();
+          const digits = k.replace(/\D/g, '');
+          const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(k);
+          const isEvp = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(k);
+          const isCpfCnpj = digits.length === 11 || digits.length === 14;
+          const isPhone = digits.length === 10 || digits.length === 11;
+          if (!isEmail && !isEvp && !isCpfCnpj && !isPhone) {
+            newErrors.pixKey = 'Chave PIX inválida (CPF, CNPJ, e-mail, telefone ou chave aleatória)';
+          }
+        }
       }
 
       if (mode === 'REGISTER_PARTNER' && !regAddress) {
@@ -1236,14 +1268,17 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
                 </h4>
               </div>
               <div className="space-y-4">
-                {isCompletingOrEditing && (
+                <div>
                   <input
                     value={businessName}
                     onChange={e => setBusinessName(e.target.value)}
                     placeholder="Nome Fantasia da Loja"
-                    className="w-full p-5 bg-orange-50/30 rounded-[1.5rem] font-black border-2 border-transparent focus:border-orange-100 focus:bg-white"
+                    className={`w-full p-5 bg-orange-50/30 rounded-[1.5rem] font-black border-2 transition-all ${errors.businessName ? 'border-red-100 bg-red-50/30' : 'border-transparent focus:border-orange-100 focus:bg-white'}`}
                   />
-                )}
+                  {errors.businessName && (
+                    <p className="text-red-500 text-[10px] font-black mt-2 pl-4">{errors.businessName}</p>
+                  )}
+                </div>
                 <input
                   value={cnpj}
                   onChange={e => setCnpj(formatCpfCnpj(e.target.value))}
@@ -1251,33 +1286,29 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
                   className={`w-full p-5 bg-orange-50/30 rounded-[1.5rem] font-bold border-2 transition-all ${errors.cnpj ? 'border-red-100 bg-red-50/30' : 'border-transparent focus:border-orange-100 focus:bg-white'}`}
                 />
 
-                {isCompletingOrEditing && (
-                  <>
-                    <div className="flex gap-3">
-                      <div className="w-full relative">
-                        <input
-                          value={workingHours}
-                          onChange={e => setWorkingHours(e.target.value)}
-                          placeholder="Horário (ex: 08h às 22h)"
-                          className="w-full p-5 bg-orange-50/30 rounded-[1.5rem] font-bold outline-none border-2 border-transparent focus:border-orange-100 focus:bg-white"
-                        />
-                        <Clock
-                          className="absolute right-5 top-1/2 -translate-y-1/2 text-orange-200"
-                          size={18}
-                        />
-                      </div>
-                    </div>
-                    <div className="relative">
-                      <textarea
-                        value={description}
-                        onChange={e => setDescription(e.target.value)}
-                        placeholder="Breve descrição da loja e especialidades..."
-                        className="w-full p-5 bg-orange-50/30 rounded-[1.5rem] font-bold outline-none border-2 border-transparent focus:border-orange-100 focus:bg-white h-28 resize-none shadow-inner"
-                      />
-                      <AlignLeft className="absolute right-5 top-5 text-orange-200" size={18} />
-                    </div>
-                  </>
-                )}
+                <div className="flex gap-3">
+                  <div className="w-full relative">
+                    <input
+                      value={workingHours}
+                      onChange={e => setWorkingHours(e.target.value)}
+                      placeholder="Horário (ex: 08h às 22h)"
+                      className="w-full p-5 bg-orange-50/30 rounded-[1.5rem] font-bold outline-none border-2 border-transparent focus:border-orange-100 focus:bg-white"
+                    />
+                    <Clock
+                      className="absolute right-5 top-1/2 -translate-y-1/2 text-orange-200"
+                      size={18}
+                    />
+                  </div>
+                </div>
+                <div className="relative">
+                  <textarea
+                    value={description}
+                    onChange={e => setDescription(e.target.value)}
+                    placeholder="Breve descrição da loja e especialidades..."
+                    className="w-full p-5 bg-orange-50/30 rounded-[1.5rem] font-bold outline-none border-2 border-transparent focus:border-orange-100 focus:bg-white h-28 resize-none shadow-inner"
+                  />
+                  <AlignLeft className="absolute right-5 top-5 text-orange-200" size={18} />
+                </div>
               </div>
             </div>
           )}
@@ -1321,16 +1352,21 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
                   </div>
                 )}
 
-                <div className="relative">
-                  <input
-                    value={pixKey}
-                    onChange={e => setPixKey(e.target.value)}
-                    placeholder="Chave PIX para Recebimento"
-                    className="w-full p-5 bg-white rounded-2xl font-black border-2 border-purple-100 outline-none focus:ring-4 focus:ring-purple-100"
-                  />
-                  <div className="absolute right-5 top-1/2 -translate-y-1/2 text-purple-200 flex items-center gap-1 font-black text-[8px] uppercase tracking-widest">
-                    Pix
+                <div>
+                  <div className="relative">
+                    <input
+                      value={pixKey}
+                      onChange={e => setPixKey(e.target.value)}
+                      placeholder="Chave PIX para Recebimento"
+                      className={`w-full p-5 bg-white rounded-2xl font-black border-2 outline-none focus:ring-4 focus:ring-purple-100 ${errors.pixKey ? 'border-red-200' : 'border-purple-100'}`}
+                    />
+                    <div className="absolute right-5 top-1/2 -translate-y-1/2 text-purple-200 flex items-center gap-1 font-black text-[8px] uppercase tracking-widest">
+                      Pix
+                    </div>
                   </div>
+                  {errors.pixKey && (
+                    <p className="text-red-500 text-[10px] font-black mt-2 pl-4">{errors.pixKey}</p>
+                  )}
                 </div>
               </div>
             </div>
