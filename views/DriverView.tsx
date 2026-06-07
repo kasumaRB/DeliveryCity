@@ -663,13 +663,17 @@ export const DriverView: React.FC = () => {
       const success = await confirmDelivery(activeOrder.id, inputCode);
       if (success) {
         if (deliveryPhotoFile) {
-          const fileName = `delivery/${activeOrder.id}-${Date.now()}.jpg`;
-          const { data, error: uploadErr } = await supabase.storage
-            .from('avatars')
-            .upload(fileName, deliveryPhotoFile, { upsert: true });
-          if (!uploadErr && data) {
+          try {
+            const fileName = `delivery/${activeOrder.id}-${Date.now()}.jpg`;
+            const { data, error: uploadErr } = await supabase.storage
+              .from('avatars')
+              .upload(fileName, deliveryPhotoFile, { upsert: true });
+            if (uploadErr || !data) throw uploadErr || new Error('upload falhou');
             const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
             await supabase.from('orders').update({ delivery_photo_url: publicUrl }).eq('id', activeOrder.id);
+          } catch {
+            // Entrega já confirmada — foto é opcional, apenas avisa
+            alert('Entrega confirmada! Mas não foi possível salvar a foto (verifique sua conexão).');
           }
         }
         setShowCodeInput(false);
@@ -970,6 +974,11 @@ export const DriverView: React.FC = () => {
                         <button
                           onClick={async () => {
                             if (!isOnline || acceptingOrderId) return;
+                            if (!currentUserProfile?.pixKey) {
+                              alert('Cadastre sua chave PIX no perfil antes de aceitar corridas — sem ela você não recebe o pagamento.');
+                              setActiveTab('profile');
+                              return;
+                            }
                             setAcceptingOrderId(order.id);
                             try {
                               await assignDriver(order.id, currentUserProfile?.id!);

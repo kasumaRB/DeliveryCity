@@ -134,6 +134,17 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     }
   }, [orders, pixModal?.orderId]);
 
+  // Fallback: se Realtime falhar, fecha o modal após 15 min e leva para os pedidos
+  useEffect(() => {
+    if (!pixModal?.orderId) return;
+    const timer = setTimeout(() => {
+      setPixModal(null);
+      setActiveTab('orders');
+      alert('Não recebemos a confirmação do PIX. Verifique em "Meus Pedidos" — se o pagamento foi feito, ele será confirmado em instantes.');
+    }, 15 * 60 * 1000);
+    return () => clearTimeout(timer);
+  }, [pixModal?.orderId]);
+
   // Coupon states
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<{
