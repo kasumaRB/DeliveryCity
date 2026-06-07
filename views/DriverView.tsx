@@ -852,13 +852,16 @@ export const DriverView: React.FC = () => {
                 )}
 
                 {/* DELIVERY_FAILED — Devolução necessária */}
-                {activeOrder.status === 'DELIVERY_FAILED' && (
+                {activeOrder.status === 'DELIVERY_FAILED' && (() => {
+                  const failedRestaurant = restaurants.find(r => r.id === activeOrder.restaurantId);
+                  const mapsQuery = failedRestaurant?.address || activeOrder.restaurantName;
+                  return (
                   <div className="bg-gray-800/40 rounded-2xl p-5 border-l-2 border-orange-500">
                     <p className="text-[10px] font-black text-orange-400 tracking-widest uppercase mb-2">Entrega não concluída</p>
                     <p className="text-white font-bold mb-1">{activeOrder.restaurantName}</p>
                     <p className="text-gray-500 text-sm mb-4">Reembolso em processamento. Devolva o pedido ao restaurante.</p>
                     <a
-                      href={`https://maps.google.com/?q=${encodeURIComponent(activeOrder.restaurantName)}`}
+                      href={`https://maps.google.com/?q=${encodeURIComponent(mapsQuery)}`}
                       target="_blank" rel="noopener noreferrer"
                       className="flex items-center gap-2 text-blue-400 font-bold text-sm mb-4"
                     >
@@ -874,7 +877,8 @@ export const DriverView: React.FC = () => {
                       <RotateCcw size={16} /> Iniciar devolução
                     </button>
                   </div>
-                )}
+                  );
+                })()}
 
                 {/* RETURNING — Devolvendo: entregador digita o código do restaurante */}
                 {activeOrder.status === 'RETURNING' && (

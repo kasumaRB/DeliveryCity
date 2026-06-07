@@ -46,13 +46,21 @@ serve(async (req) => {
 
     const { data: order } = await supabase
       .from('orders')
-      .select('id, asaas_payment_id, total, status')
+      .select('id, asaas_payment_id, total, status, refunded_at')
       .eq('id', orderId)
       .single();
 
     if (!order) {
       return new Response(JSON.stringify({ error: 'Pedido não encontrado' }), {
         status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Idempotência: já foi reembolsado antes
+    if (order.refunded_at) {
+      console.log(`[refund-asaas-payment] Pedido ${orderId} já reembolsado em ${order.refunded_at} — ignorando.`);
+      return new Response(JSON.stringify({ refunded: true, skipped: true }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -77,6 +85,12 @@ serve(async (req) => {
         status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    // Registrar data do reembolso para evitar duplicatas futuras
+    await supabase.from('orders')
+      .update({ refunded_at: new Date().toISOString() })
+      .eq('id', orderId)
+      .catch(e => console.warn('[refund-asaas-payment] Erro ao gravar refunded_at:', e));
 
     console.log(`[refund-asaas-payment] Pedido ${orderId} reembolsado: R$${order.total}`);
 

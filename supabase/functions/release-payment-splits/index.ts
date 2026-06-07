@@ -19,12 +19,26 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function isValidCPF(digits: string): boolean {
+  if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += Number(digits[i]) * (10 - i);
+  let rem = (sum * 10) % 11;
+  if (rem === 10 || rem === 11) rem = 0;
+  if (rem !== Number(digits[9])) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += Number(digits[i]) * (11 - i);
+  rem = (sum * 10) % 11;
+  if (rem === 10 || rem === 11) rem = 0;
+  return rem === Number(digits[10]);
+}
+
 function detectPixKeyType(key: string): 'CPF' | 'CNPJ' | 'EMAIL' | 'PHONE' | 'EVP' {
   const clean = key.replace(/\D/g, '');
   if (key.includes('@')) return 'EMAIL';
   if (clean.length === 14) return 'CNPJ';
-  if (clean.length === 11) return 'CPF';
-  if (clean.length === 10 || clean.length === 11) return 'PHONE';
+  if (clean.length === 11) return isValidCPF(clean) ? 'CPF' : 'PHONE';
+  if (clean.length === 10) return 'PHONE';
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(key)) return 'EVP';
   return 'EVP';
 }
@@ -74,7 +88,7 @@ serve(async (req) => {
     // Buscar pedido
     const { data: order } = await supabase
       .from('orders')
-      .select('id, status, restaurant_id, driver_id, restaurant_net_earnings, driver_net_earnings')
+      .select('id, status, restaurant_id, driver_id, restaurant_net_earnings, driver_net_earnings, driver_split_released')
       .eq('id', orderId)
       .single();
 
@@ -89,6 +103,17 @@ serve(async (req) => {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    // Idempotência: evita repassar duas vezes (ex: retry de rede)
+    if (order.driver_split_released === true) {
+      console.log(`[splits] Pedido ${orderId} já teve repasses liberados — ignorando.`);
+      return new Response(JSON.stringify({ released: true, skipped: true }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Marcar imediatamente para prevenir corrida entre chamadas concorrentes
+    await supabase.from('orders').update({ driver_split_released: true }).eq('id', orderId);
 
     // Buscar owner_id do restaurante e pix_key do entregador em paralelo
     const [{ data: restaurant }, { data: driverProfile }] = await Promise.all([

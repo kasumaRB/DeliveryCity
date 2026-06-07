@@ -16,7 +16,7 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { sendPushToUser, sendPushToAllDrivers } from '../_shared/pushNotification.ts';
+import { sendPushToUser } from '../_shared/pushNotification.ts';
 
 const ASAAS_WEBHOOK_TOKEN = Deno.env.get('ASAAS_WEBHOOK_TOKEN') ?? '';
 
@@ -155,7 +155,8 @@ serve(async (req) => {
         .single();
 
       if (newStatus === 'PENDING' && orderData?.restaurant_id) {
-        // Pagamento confirmado → notifica restaurante
+        // Pagamento confirmado → notifica restaurante para começar a preparar
+        // Entregadores são notificados somente quando o restaurante marcar READY
         const { data: restData } = await supabase
           .from('restaurants')
           .select('owner_id, name')
@@ -168,12 +169,6 @@ serve(async (req) => {
             title: '🛒 Novo Pedido!',
             body: `${orderData.customer_name || 'Cliente'} fez um pedido de R$ ${total}. Confirme agora!`,
             data: { orderId, type: 'NEW_ORDER' },
-          });
-          // Pedido pronto para entregadores buscarem
-          await sendPushToAllDrivers(supabase, {
-            title: '📦 Pedido disponível!',
-            body: `Novo pedido em ${restData.name || 'restaurante'}. Abra o app para aceitar.`,
-            data: { orderId, type: 'ORDER_READY' },
           });
         }
       }
