@@ -215,7 +215,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
 
     setLoading(true);
     try {
-      console.log('Uploading avatar...');
       const resizedFile = await resizeImage(file, 400, 400);
       const fileExt = 'jpg';
       const fileName = `${currentUserProfile.id}-${Date.now()}.${fileExt}`;
@@ -230,7 +229,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
         throw new Error(uploadError.message);
       }
 
-      console.log('Upload success:', data);
       const {
         data: { publicUrl },
       } = supabase.storage.from('avatars').getPublicUrl(filePath);
@@ -833,9 +831,9 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
                   <div className="flex justify-between items-center text-xs font-bold mb-3">
                     <span className="text-gray-400 uppercase text-[9px]">Status da Conta</span>
                     <span
-                      className={`px-3 py-1 rounded-full shadow-sm text-[9px] font-black ${profile.status === 'APPROVED' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}
+                      className={`px-3 py-1 rounded-full shadow-sm text-[9px] font-black ${profile.status === 'APPROVED' ? 'bg-green-100 text-green-600' : profile.status === 'BLOCKED' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}`}
                     >
-                      {profile.status}
+                      {profile.status === 'APPROVED' ? 'Aprovado' : profile.status === 'BLOCKED' ? 'Bloqueado' : 'Pendente'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center text-xs font-bold">

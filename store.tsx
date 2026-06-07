@@ -999,7 +999,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         payment_method: paymentMethod,
         payment_id: paymentId,
         coords: addressCoords,
-        timestamp: new Date().toISOString(),
+        timestamp: Date.now(),
         pickup_code: Math.floor(1000 + Math.random() * 9000).toString(),
         delivery_code: Math.floor(1000 + Math.random() * 9000).toString(),
       };
@@ -1160,13 +1160,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     clearOfflineCart();
   };
 
-  const requestPasswordReset = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
-    });
-    if (error) throw error;
-  };
-
   const cancelOrder = async (orderId: string) => {
     if (!session?.user?.id) throw new Error('Não autenticado.');
     const order = orders.find(o => o.id === orderId);
@@ -1179,7 +1172,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       throw new Error('O prazo de cancelamento (3 minutos) já expirou.');
     const { error } = await supabase
       .from('orders')
-      .update({ status: OrderStatus.CANCELLED, cancelled_at: new Date().toISOString() })
+      .update({ status: OrderStatus.CANCELLED, cancelled_at: Date.now() })
       .eq('id', orderId);
     if (error) throw error;
     await fetchData();
@@ -1652,7 +1645,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           // O Supabase renova o token automaticamente nas queries quando necessário.
           return fetchData(true);
         },
-        requestPasswordReset: async e => await supabase.auth.resetPasswordForEmail(e),
+        requestPasswordReset: async e => await supabase.auth.resetPasswordForEmail(e, { redirectTo: window.location.origin }),
         toggleFavorite,
         cancelOrder,
         realDistances,
