@@ -136,7 +136,14 @@ serve(async (req) => {
       });
     }
 
-    // Idempotência: se já tem payment_id, retorna ele
+    // Verifica que o pedido pertence ao usuário autenticado — ANTES de retornar qualquer dado
+    if (order.customer_id !== user.id) {
+      return new Response(JSON.stringify({ error: 'Acesso negado a este pedido' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Idempotência: se já tem payment_id, retorna ele (só após validar ownership)
     if (order.asaas_payment_id) {
       const { data: existingPayment } = await asaasGet(`/payments/${order.asaas_payment_id}`);
       if (existingPayment?.id) {
@@ -149,13 +156,6 @@ serve(async (req) => {
           status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-    }
-
-    // Verifica que o pedido pertence ao usuário autenticado
-    if (order.customer_id !== user.id) {
-      return new Response(JSON.stringify({ error: 'Acesso negado a este pedido' }), {
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
     }
 
     // Buscar subconta Asaas do restaurante

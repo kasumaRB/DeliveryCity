@@ -191,6 +191,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     driverScore: p.driver_score !== undefined ? Number(p.driver_score) : 100,
     cnh: p.cnh || '',
     isOnline: p.is_online ?? false,
+    avatarUrl: p.avatar_url || undefined,
+    pushToken: p.push_token || undefined,
   });
 
   const mapOrder = (o: any): Order => ({
@@ -842,7 +844,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // ═══════════════════════════════════════════════════════
       // 0. IDEMPOTÊNCIA: Bloqueia pedido duplicado (ex: reconexão após queda)
       // ═══════════════════════════════════════════════════════
-      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+      const twoMinutesAgo = Date.now() - 2 * 60 * 1000;
       const { data: recentOrder } = await supabase
         .from('orders')
         .select('id')
@@ -1171,11 +1173,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const ageMs = Date.now() - order.timestamp;
     if (ageMs > 3 * 60 * 1000)
       throw new Error('O prazo de cancelamento (3 minutos) já expirou.');
-    const { error } = await supabase
+    const { data: cancelled, error } = await supabase
       .from('orders')
       .update({ status: OrderStatus.CANCELLED, cancelled_at: Date.now() })
-      .eq('id', orderId);
+      .eq('id', orderId)
+      .in('status', ['PENDING_PAYMENT', 'PENDING'])
+      .select('id').maybeSingle();
     if (error) throw error;
+    if (!cancelled) throw new Error('Não foi possível cancelar — o pedido já está em preparo.');
     await fetchData();
 
     // Se o pagamento já tinha sido confirmado (PENDING), reembolsa automaticamente

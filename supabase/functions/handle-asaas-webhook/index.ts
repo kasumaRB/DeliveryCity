@@ -32,9 +32,11 @@ serve(async (req) => {
 
   try {
     // ── 1. Validar token do webhook (header asaas-access-token) ───────────────
+    // Fail-closed: se ASAAS_WEBHOOK_TOKEN não estiver configurado, rejeita todas as requisições.
+    // Isso evita que um atacante manipule pedidos em ambiente sem variável configurada.
     const webhookToken = req.headers.get('asaas-access-token') ?? '';
-    if (ASAAS_WEBHOOK_TOKEN && webhookToken !== ASAAS_WEBHOOK_TOKEN) {
-      console.warn('[handle-asaas-webhook] Token inválido recebido.');
+    if (!ASAAS_WEBHOOK_TOKEN || webhookToken !== ASAAS_WEBHOOK_TOKEN) {
+      console.warn('[handle-asaas-webhook] Token inválido ou não configurado.');
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
