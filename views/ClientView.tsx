@@ -437,8 +437,13 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     setCouponError('');
     setIsApplyingCoupon(true);
 
+    const now = Date.now();
     const promo = selectedRestaurant.promotions?.find(
-      p => p.code.toUpperCase() === couponCode.toUpperCase() && p.isActive
+      p =>
+        p.code.toUpperCase() === couponCode.toUpperCase() &&
+        p.isActive &&
+        now >= p.validFrom &&
+        now <= p.validUntil
     );
 
     if (!promo) {
@@ -454,7 +459,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     }
 
     if (promo.type === 'FREE_DELIVERY' && cartSubtotal < 30) {
-      setCouponError('Frete grátis válido only para pedidos acima de R$ 30,00');
+      setCouponError('Frete grátis válido apenas para pedidos acima de R$ 30,00');
       setIsApplyingCoupon(false);
       return;
     }
@@ -554,11 +559,13 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
             if (!cardNumber || !cardHolder || !expMonth || !expYear || !cardCvv) {
               throw new Error('Preencha todos os dados do cartão.');
             }
+            const rawYear = expYear.trim();
+            const fullYear = rawYear.length === 2 ? `20${rawYear}` : rawYear;
             paymentBody.creditCard = {
               holderName: cardHolder,
               number: cardNumber.replace(/\s/g, ''),
               expiryMonth: expMonth.trim(),
-              expiryYear: `20${expYear.trim()}`,
+              expiryYear: fullYear,
               ccv: cardCvv,
             };
             paymentBody.creditCardHolderInfo = {

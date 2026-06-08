@@ -248,7 +248,6 @@ export const RestaurantView: React.FC = () => {
     }
     setIsSaving(true);
     try {
-      console.log('Uploading restaurant image...');
       const resizedFile = await resizeImage(file, 600, 600);
       const fileExt = 'jpg';
       const fileName = `restaurants/${myRestaurant.id}-${Date.now()}.${fileExt}`;
@@ -259,7 +258,6 @@ export const RestaurantView: React.FC = () => {
         console.error('Upload error:', uploadError);
         throw new Error(uploadError.message);
       }
-      console.log('Upload success:', data);
       const {
         data: { publicUrl },
       } = supabase.storage.from('avatars').getPublicUrl(fileName);
@@ -285,13 +283,11 @@ export const RestaurantView: React.FC = () => {
     }
     setIsSaving(true);
     try {
-      console.log('Starting image upload...');
       const resizedFile = await resizeImage(file, 400, 400);
-      console.log('Image resized, uploading...');
       const fileExt = 'jpg';
       const fileName = `products/${currentUserProfile?.id}-${Date.now()}.${fileExt}`;
 
-      const { data, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(fileName, resizedFile);
 
@@ -300,7 +296,6 @@ export const RestaurantView: React.FC = () => {
         throw new Error(uploadError.message);
       }
 
-      console.log('Upload successful:', data);
       const {
         data: { publicUrl },
       } = supabase.storage.from('avatars').getPublicUrl(fileName);

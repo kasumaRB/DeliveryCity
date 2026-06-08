@@ -959,7 +959,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // ═══════════════════════════════════════════════════════
       // 5. CALCULAR VALORES FINANCEIROS — todos no servidor
       // ═══════════════════════════════════════════════════════
-      const finalProductTotal    = Math.max(0, subtotal - discountAmount);
+      const safeDiscount         = Math.max(0, Math.min(discountAmount, subtotal));
+      const finalProductTotal    = subtotal - safeDiscount;
       const restaurantNetEarnings = finalProductTotal * (1 - restaurantFeePct);
       // Entregador: sempre recebe o valor base (minDeliveryFee) +
       // 60% do excesso por km — driverFeePct é a % do excesso que vai para a plataforma
