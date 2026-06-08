@@ -1258,13 +1258,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const startReturn = async (orderId: string) => {
+    const order = orders.find(o => o.id === orderId);
     const { error } = await supabase.from('orders')
       .update({ status: OrderStatus.RETURNING })
       .eq('id', orderId).eq('status', OrderStatus.DELIVERY_FAILED);
     if (error) throw new Error(error.message);
     await fetchData();
 
-    const order = orders.find(o => o.id === orderId);
     if (order?.restaurantId) {
       const { data: rest } = await supabase.from('restaurants')
         .select('owner_id').eq('id', order.restaurantId).single();

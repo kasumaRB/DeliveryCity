@@ -133,14 +133,24 @@ export interface OfflineConfirmation {
   timestamp: number;
 }
 
+const SYNC_QUEUE_TTL = 4 * 60 * 60 * 1000; // 4 horas
+
 /**
  * Busca a fila de confirmações pendentes de sincronização.
+ * Itens com mais de 4 horas são descartados automaticamente.
  * @returns Um array de confirmações pendentes.
  */
 export const getSyncQueue = (): OfflineConfirmation[] => {
   try {
     const queueJson = localStorage.getItem(SYNC_QUEUE_KEY);
-    return queueJson ? JSON.parse(queueJson) : [];
+    if (!queueJson) return [];
+    const all: OfflineConfirmation[] = JSON.parse(queueJson);
+    const cutoff = Date.now() - SYNC_QUEUE_TTL;
+    const fresh = all.filter(item => item.timestamp > cutoff);
+    if (fresh.length !== all.length) {
+      localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(fresh));
+    }
+    return fresh;
   } catch (error) {
     console.error("Falha ao buscar fila de sincronização:", error);
     return [];

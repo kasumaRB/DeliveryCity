@@ -10,9 +10,18 @@ export interface PushPayload {
   data?: Record<string, string>;
 }
 
+// ── Cache de access token (evita chamada ao Google a cada notificação) ────
+const tokenCache = new Map<string, { token: string; expiresAt: number }>();
+
 // ── Gera access token OAuth2 a partir da service account ──────────────────
 async function getAccessToken(clientEmail: string, privateKey: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
+
+  const cached = tokenCache.get(clientEmail);
+  if (cached && now < cached.expiresAt - 60) {
+    return cached.token;
+  }
+
 
   function base64url(input: ArrayBuffer | string): string {
     const str =
@@ -67,6 +76,12 @@ async function getAccessToken(clientEmail: string, privateKey: string): Promise<
   if (!tokenData.access_token) {
     throw new Error(`Falha ao obter access token: ${JSON.stringify(tokenData)}`);
   }
+
+  tokenCache.set(clientEmail, {
+    token: tokenData.access_token,
+    expiresAt: now + (tokenData.expires_in ?? 3600),
+  });
+
   return tokenData.access_token;
 }
 
@@ -115,8 +130,6 @@ export async function sendFCMNotification(
   if (!res.ok) {
     const err = await res.text();
     console.error('[push] Erro FCM:', err);
-  } else {
-    console.log('[push] Notificação enviada para token:', fcmToken.slice(0, 20) + '...');
   }
 }
 

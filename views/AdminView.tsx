@@ -555,7 +555,7 @@ export const AdminView: React.FC = () => {
           onTabClick={t => setActiveTab(t)}
           onSignOut={signOut}
           profiles={profiles}
-          failureCount={orders.filter(o => o.status === 'DELIVERY_FAILED').length}
+          failureCount={orders.filter(o => ['DELIVERY_FAILED', 'RETURNING'].includes(o.status)).length}
         />
       </div>
 
@@ -574,7 +574,7 @@ export const AdminView: React.FC = () => {
               }}
               onSignOut={signOut}
               profiles={profiles}
-              failureCount={orders.filter(o => o.status === 'DELIVERY_FAILED').length}
+              failureCount={orders.filter(o => ['DELIVERY_FAILED', 'RETURNING'].includes(o.status)).length}
             />
           </div>
         </div>
@@ -656,7 +656,7 @@ export const AdminView: React.FC = () => {
                     <div className="p-8">
                       <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Receita Plataforma</p>
                       <p className="text-4xl font-black text-purple-600">{fmt(platformRevenue)}</p>
-                      <p className="text-gray-400 text-xs font-bold mt-2">Taxa de 15% sobre subtotal</p>
+                      <p className="text-gray-400 text-xs font-bold mt-2">{deliveredOrders.length} pedidos entregues</p>
                     </div>
                     <div className="p-8">
                       <div className="flex justify-between items-start mb-4">
@@ -1339,7 +1339,9 @@ export const AdminView: React.FC = () => {
                             </div>
                             <div className="text-right shrink-0">
                               <p className="font-black text-gray-900 text-lg">R$ {order.total.toFixed(2)}</p>
-                              <p className="text-gray-400 text-xs">a reembolsar</p>
+                              <p className="text-gray-400 text-xs">
+                                {order.status === 'RETURNED' ? 'reembolso processado' : 'a reembolsar'}
+                              </p>
                             </div>
                           </div>
 

@@ -1261,7 +1261,7 @@ export const DriverView: React.FC = () => {
           <div className="bg-gray-900 rounded-t-[3rem] w-full max-w-lg p-6 pb-10 animate-in slide-in-from-bottom-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-black text-white">Problema na entrega</h3>
-              <button onClick={() => setShowFailedModal(false)} className="p-2 text-gray-400 hover:text-white">
+              <button onClick={() => { setShowFailedModal(false); setFailedConfirmed(false); setFailureReason(''); }} className="p-2 text-gray-400 hover:text-white">
                 <X size={22} />
               </button>
             </div>
@@ -1362,7 +1362,7 @@ export const DriverView: React.FC = () => {
                 <h4 className="text-white font-black text-lg mb-2">Reembolso solicitado</h4>
                 <p className="text-gray-400 text-sm mb-6">Agora você precisa devolver o pedido ao restaurante <strong className="text-white">{activeOrder.restaurantName}</strong>.</p>
                 <a
-                  href={`https://maps.google.com/?q=${encodeURIComponent(activeOrder.restaurantName)}`}
+                  href={`https://maps.google.com/?q=${encodeURIComponent(restaurants.find(r => r.id === activeOrder.restaurantId)?.address || activeOrder.restaurantName)}`}
                   target="_blank" rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 text-blue-400 font-bold text-sm mb-6 underline"
                 >
