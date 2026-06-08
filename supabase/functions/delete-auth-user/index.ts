@@ -10,7 +10,6 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    // Verifica que o chamador é ADMIN
     const authHeader = req.headers.get('Authorization') ?? '';
     const callerClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -20,16 +19,19 @@ serve(async (req) => {
     const { data: { user: caller } } = await callerClient.auth.getUser();
     if (!caller) return new Response(JSON.stringify({ error: 'Não autenticado' }), { status: 401, headers: corsHeaders });
 
-    const { data: callerProfile } = await callerClient
-      .from('profiles').select('role').eq('id', caller.id).single();
-    if (callerProfile?.role !== 'ADMIN') {
-      return new Response(JSON.stringify({ error: 'Acesso negado' }), { status: 403, headers: corsHeaders });
-    }
-
     const { userId } = await req.json();
     if (!userId) return new Response(JSON.stringify({ error: 'userId obrigatório' }), { status: 400, headers: corsHeaders });
 
-    // Usa service role para deletar o usuário do auth
+    // Permite: deleção da própria conta (self-service) OU ADMIN deletando qualquer conta
+    const isSelf = caller.id === userId;
+    if (!isSelf) {
+      const { data: callerProfile } = await callerClient
+        .from('profiles').select('role').eq('id', caller.id).single();
+      if (callerProfile?.role !== 'ADMIN') {
+        return new Response(JSON.stringify({ error: 'Acesso negado' }), { status: 403, headers: corsHeaders });
+      }
+    }
+
     const adminClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
@@ -43,3 +45,4 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });
+

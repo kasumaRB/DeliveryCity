@@ -532,7 +532,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
         user_role: currentUserProfile.role,
         message: supportMessage,
         status: 'OPEN',
-        created_at: new Date().toISOString(),
       });
       if (error) throw error;
       alert('Mensagem enviada! Retornaremos em breve.');

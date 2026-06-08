@@ -245,7 +245,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
         o =>
           o.customerId === currentUserProfile.id && o.status === OrderStatus.DELIVERED && !o.rating
       );
-      if (pendingRating) setRatingOrder(pendingRating);
+      if (pendingRating && !ratingOrder) setRatingOrder(pendingRating);
 
       if (!selectedAddress && currentUserProfile.savedAddresses?.length > 0) {
         handleSelectAddress(currentUserProfile.savedAddresses[0]);
@@ -1051,9 +1051,9 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                     .sort((a, b) => b.timestamp - a.timestamp)
                     .map(order => {
                       const statusInfo = traduzirStatus(order.status);
-                      const isActive = !['DELIVERED', 'CANCELLED', 'RETURNED'].includes(order.status);
-                      const progressSteps = ['PENDING', 'PENDING_PAYMENT', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'];
-                      const stepLabels = ['Recebido', 'Pgto', 'Preparo', 'Pronto', 'Entrega'];
+                      const isActive = !['DELIVERED', 'CANCELLED', 'RETURNED', 'DELIVERY_FAILED', 'RETURNING'].includes(order.status);
+                      const progressSteps = ['PENDING_PAYMENT', 'PENDING', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'];
+                      const stepLabels = ['Pgto', 'Recebido', 'Preparo', 'Pronto', 'Entrega'];
                       const currentStepIdx = progressSteps.indexOf(order.status);
 
                       // Contador regressivo: só existe após restaurante confirmar (PREPARING em diante)

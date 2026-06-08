@@ -28,7 +28,7 @@ ON CONFLICT (id) DO NOTHING;
 
 -- 3. Adiciona coluna de taxa personalizada por parceiro (se não existir)
 ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS "customFeePct" NUMERIC(6,2) DEFAULT NULL;
+  ADD COLUMN IF NOT EXISTS custom_fee_pct NUMERIC(6,2) DEFAULT NULL;
 
 -- 4. Verificação final
 SELECT
@@ -39,5 +39,5 @@ SELECT
    WHERE table_name='support_tickets' AND column_name='admin_note'
    LIMIT 1)                                               AS admin_note_exists,
   (SELECT column_name FROM information_schema.columns
-   WHERE table_name='profiles' AND column_name='customFeePct'
+   WHERE table_name='profiles' AND column_name='custom_fee_pct'
    LIMIT 1)                                               AS custom_fee_exists;
