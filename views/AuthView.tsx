@@ -88,6 +88,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { AddressModal } from '../components/AddressModal';
+import { TermsView } from './TermsView';
 import Logo from '../assets/Logo.png';
 import Nome from '../assets/Nome.png';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
@@ -698,50 +699,24 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
   if (mode === 'TERMS') {
     return (
       <div className="flex flex-col h-full bg-white animate-in slide-in-from-right duration-300">
-        <div className="p-6 border-b flex items-center gap-4">
+        <div className="flex items-center gap-3 px-5 pt-5 pb-3 border-b border-gray-100 shrink-0">
           <button onClick={() => setMode(previousMode)} className="p-2 bg-gray-50 rounded-xl">
-            <ChevronLeft />
+            <ChevronLeft size={20} />
           </button>
-          <h2 className="text-xl font-black tracking-tighter">Termos & Privacidade</h2>
+          <h2 className="text-lg font-black tracking-tighter">Termos de Uso</h2>
         </div>
-        <div className="flex-1 overflow-y-auto p-8 space-y-6 text-gray-600 text-sm leading-relaxed">
-          <section>
-            <h3 className="font-black text-gray-900 uppercase text-[10px] tracking-widest mb-2">
-              1. Coleta de Dados
-            </h3>
-            <p>
-              Coletamos seu nome, e-mail e localização para processar entregas e garantir a
-              segurança das transações.
-            </p>
-          </section>
-          <section>
-            <h3 className="font-black text-gray-900 uppercase text-[10px] tracking-widest mb-2">
-              2. Repasses Financeiros
-            </h3>
-            <p>
-              Parceiros concordam com as taxas de serviço da plataforma, que são descontadas
-              automaticamente via split de pagamento.
-            </p>
-          </section>
-          <section>
-            <h3 className="font-black text-gray-900 uppercase text-[10px] tracking-widest mb-2">
-              3. Exclusão de Conta
-            </h3>
-            <p>
-              Você pode solicitar a exclusão definitiva de todos os seus dados a qualquer momento
-              através das configurações de perfil.
-            </p>
-          </section>
+        <div className="flex-1 overflow-y-auto">
+          <TermsView />
         </div>
-        <div className="p-8 border-t">
+        <div className="p-5 border-t shrink-0">
           <button
             onClick={() => {
               setAcceptedTerms(true);
               setMode(previousMode);
             }}
-            className="w-full bg-orange-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest"
+            className="w-full bg-orange-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest active:scale-95 transition-all"
           >
-            Aceito os Termos
+            Li e Aceito os Termos
           </button>
         </div>
       </div>
