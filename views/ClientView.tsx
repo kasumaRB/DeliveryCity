@@ -347,6 +347,24 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
       );
   }, [restaurants, searchQuery, showFavoritesOnly, currentUserProfile?.favoriteRestaurantIds]);
 
+  // Produtos em destaque: itens com foto de restaurantes ativos, embaralhados
+  const featuredProducts = useMemo(() => {
+    const items: { product: Product; restaurant: (typeof restaurants)[0] }[] = [];
+    restaurants
+      .filter(r => r.isOpen !== false)
+      .forEach(r => {
+        r.menu
+          .filter(p => p.available !== false && p.image)
+          .forEach(p => items.push({ product: p, restaurant: r }));
+      });
+    // Fisher-Yates shuffle para variar a cada visita
+    for (let i = items.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [items[i], items[j]] = [items[j], items[i]];
+    }
+    return items.slice(0, 12);
+  }, [restaurants]);
+
   const handleAddToCart = (product: Product) => {
     // 🔒 SEGURANÇA: Exige login antes de adicionar ao carrinho
     if (!currentUserProfile) {
@@ -798,6 +816,43 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                   </button>
                 </div>
               )}
+              {/* PRODUTOS EM DESTAQUE — só aparece sem filtro ativo */}
+              {featuredProducts.length > 0 && !searchQuery && !showFavoritesOnly && (
+                <div className="mb-8">
+                  <h3 className="text-lg font-black text-gray-900 mb-4 flex items-center gap-2">
+                    🔥 <span>Em destaque</span>
+                  </h3>
+                  <div className="flex gap-3 overflow-x-auto pb-3 no-scrollbar -mx-1 px-1">
+                    {featuredProducts.map(({ product, restaurant }, i) => (
+                      <button
+                        key={`${restaurant.id}-${product.id}-${i}`}
+                        onClick={() => setSelectedRestaurant(restaurant)}
+                        className="flex-shrink-0 w-36 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden text-left active:scale-95 transition-all hover:shadow-md"
+                      >
+                        <div className="h-24 w-full bg-gray-100 overflow-hidden relative">
+                          <img
+                            src={product.image}
+                            alt={product.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="p-2.5">
+                          <p className="text-xs font-black text-gray-900 leading-tight line-clamp-2 mb-1">
+                            {product.name}
+                          </p>
+                          <p className="text-xs font-black text-orange-600">
+                            {product.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </p>
+                          <p className="text-[9px] text-gray-400 font-bold mt-0.5 truncate">
+                            {restaurant.name}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
                 {filteredStores.map(restaurant => {
                   const estFee = estimatedDeliveryFee(restaurant);
