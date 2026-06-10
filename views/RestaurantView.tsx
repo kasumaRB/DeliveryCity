@@ -1324,7 +1324,7 @@ export const RestaurantView: React.FC = () => {
 
             // Product sales analytics
             const productSales: Record<string, { name: string; qty: number; revenue: number }> = {};
-            filteredOrders.forEach(o => {
+            filteredOrders.filter(o => o.status === OrderStatus.DELIVERED).forEach(o => {
               o.items.forEach((item: any) => {
                 const id = item.product?.id || item.id;
                 const name = item.product?.name || item.name || '?';
