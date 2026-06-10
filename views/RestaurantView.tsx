@@ -153,6 +153,7 @@ export const RestaurantView: React.FC = () => {
   const [itemFormOwnerPrice, setItemFormOwnerPrice] = useState('');
   const [itemFormDesc, setItemFormDesc] = useState('');
   const [itemFormImage, setItemFormImage] = useState('');
+  const [itemFormImageError, setItemFormImageError] = useState(false);
   const [itemFormCategory, setItemFormCategory] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -315,6 +316,7 @@ export const RestaurantView: React.FC = () => {
     setItemFormOwnerPrice('');
     setItemFormDesc('');
     setItemFormImage('');
+    setItemFormImageError(false);
     setItemFormCategory('');
     setShowProductForm(false);
   };
@@ -337,13 +339,19 @@ export const RestaurantView: React.FC = () => {
   };
 
   const handleSaveItem = async () => {
+    if (!itemFormImage) {
+      setItemFormImageError(true);
+      alert('Foto do prato é obrigatória. Adicione uma imagem antes de salvar.');
+      return;
+    }
+    setItemFormImageError(false);
     const price = parseFloat(itemFormOwnerPrice);
-    const feePct = currentUserProfile?.customFeePct !== undefined 
-      ? currentUserProfile.customFeePct / 100 
+    const feePct = currentUserProfile?.customFeePct !== undefined
+      ? currentUserProfile.customFeePct / 100
       : (platformSettings?.restaurantFeePct ?? 0.08);
     const ownerPrice = price * (1 - feePct);
     const finalPrice = price;
-    const img = itemFormImage || `https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500`;
+    const img = itemFormImage;
 
     try {
       if (editingProduct)
@@ -951,15 +959,16 @@ export const RestaurantView: React.FC = () => {
                       </select>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">
-                        Foto do Prato
+                      <label className="text-[10px] font-black uppercase tracking-widest ml-4 flex items-center gap-1.5" style={{ color: itemFormImageError ? '#dc2626' : '#9ca3af' }}>
+                        Foto do Prato <span className="text-red-500">*</span>
+                        {itemFormImageError && <span className="text-red-500 normal-case font-bold text-[9px]">— obrigatória</span>}
                       </label>
-                      <div className="flex items-center gap-4">
-                        <div className="w-20 h-20 bg-gray-100 rounded-2xl overflow-hidden flex items-center justify-center">
+                      <div className={`flex items-center gap-4 p-3 rounded-2xl border-2 transition-all ${itemFormImageError ? 'border-red-300 bg-red-50' : 'border-transparent'}`}>
+                        <div className="w-20 h-20 bg-gray-100 rounded-2xl overflow-hidden flex items-center justify-center shrink-0">
                           {itemFormImage ? (
                             <img src={itemFormImage} className="w-full h-full object-cover" />
                           ) : (
-                            <span className="text-gray-400 text-xs">Sem foto</span>
+                            <span className={`text-xs font-bold ${itemFormImageError ? 'text-red-400' : 'text-gray-400'}`}>Sem foto</span>
                           )}
                         </div>
                         <input
@@ -967,15 +976,22 @@ export const RestaurantView: React.FC = () => {
                           ref={productImageInputRef}
                           accept="image/*"
                           className="hidden"
-                          onChange={handleProductImageUpload}
+                          onChange={e => { setItemFormImageError(false); handleProductImageUpload(e); }}
                         />
-                        <button
-                          type="button"
-                          onClick={() => productImageInputRef.current?.click()}
-                          className="px-4 py-3 bg-orange-100 text-orange-600 rounded-xl font-bold text-xs"
-                        >
-                          Escolher Imagem
-                        </button>
+                        <div className="flex flex-col gap-2">
+                          <button
+                            type="button"
+                            onClick={() => productImageInputRef.current?.click()}
+                            className={`px-4 py-3 rounded-xl font-bold text-xs transition-all ${itemFormImageError ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}`}
+                          >
+                            {itemFormImage ? 'Trocar Imagem' : 'Escolher Imagem'}
+                          </button>
+                          {!itemFormImage && (
+                            <p className="text-[9px] text-gray-400 font-bold leading-tight">
+                              Foto é obrigatória para aparecer no destaque
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="space-y-2">
