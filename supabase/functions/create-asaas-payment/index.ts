@@ -192,9 +192,20 @@ serve(async (req) => {
         });
 
         if (csStatus < 200 || csStatus >= 300 || !createdCustomer?.id) {
-          console.error('[create-asaas-payment] Erro criar customer:', createdCustomer);
-          return new Response(JSON.stringify({ error: 'Falha ao criar customer Asaas', details: createdCustomer }), {
-            status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          console.error('[create-asaas-payment] Erro criar customer:', JSON.stringify(createdCustomer));
+          const asaasErr = createdCustomer?.errors?.[0];
+          const isInvalidDoc = asaasErr?.code?.toLowerCase().includes('cpf') ||
+            asaasErr?.code?.toLowerCase().includes('cnpj') ||
+            asaasErr?.description?.toLowerCase().includes('cpf') ||
+            asaasErr?.description?.toLowerCase().includes('cnpj');
+          return new Response(JSON.stringify({
+            error: isInvalidDoc
+              ? 'CPF/CNPJ inválido na sua conta. Acesse Perfil e corrija o documento para pagar.'
+              : 'Não foi possível criar sua conta de pagamento. Tente novamente.',
+            errorCode: 'CUSTOMER_ERROR',
+            details: asaasErr ?? createdCustomer,
+          }), {
+            status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
         foundCustomer = createdCustomer;
@@ -297,9 +308,21 @@ serve(async (req) => {
     let pixQrCodeImage: string | null = null;
 
     if (billingType === 'PIX') {
-      const { data: pixData } = await asaasGet(`/payments/${payment.id}/pixQrCode`);
-      pixQrCode      = pixData?.payload          ?? null;
-      pixQrCodeImage = pixData?.encodedImage     ?? null;
+      const { data: pixData, status: pixStatus } = await asaasGet(`/payments/${payment.id}/pixQrCode`);
+      console.log(`[create-asaas-payment] pixQrCode status=${pixStatus} keys=${Object.keys(pixData ?? {}).join(',')}`);
+      if (pixStatus < 200 || pixStatus >= 300 || !pixData?.payload) {
+        console.error('[create-asaas-payment] pixQrCode indisponível:', JSON.stringify(pixData));
+        // Cancelar o pedido para não ficar travado em PENDING_PAYMENT sem QR code
+        await supabase.from('orders').update({ status: 'CANCELLED' }).eq('id', orderId).catch(() => {});
+        return new Response(JSON.stringify({
+          error: 'PIX gerado mas QR Code indisponível. Verifique se sua conta Asaas tem PIX habilitado e tente novamente.',
+          errorCode: 'PIX_QRCODE_UNAVAILABLE',
+        }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      pixQrCode      = pixData.payload;
+      pixQrCodeImage = pixData.encodedImage ?? null;
     }
 
     // ── 8. Atualizar pedido no banco ──────────────────────────────────────────

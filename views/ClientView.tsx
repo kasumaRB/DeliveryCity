@@ -609,7 +609,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
         }
 
         // Pagamento recusado/falhou (servidor retornou errorCode)
-        if (pmData?.errorCode) {
+        if (pmData?.errorCode || pmData?.error) {
           const isDeclined = pmData.errorCode === 'CARD_DECLINED';
           setPaymentError({
             message: isDeclined
@@ -620,7 +620,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
           return; // mantém checkout aberto para o usuário tentar de novo
         }
 
-        if (!pmData?.asaasPaymentId) throw new Error('Falha ao criar cobrança Asaas.');
+        if (!pmData?.asaasPaymentId) throw new Error('Falha ao criar cobrança. Verifique sua conexão e tente novamente.');
 
         // ── Salvar token do cartão para uso futuro ──
         if (selectedPayment === 'CREDIT_CARD' && saveCardForFuture && !selectedSaved && pmData.creditCardToken) {
@@ -638,7 +638,15 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
         }
 
         // ── Para PIX: exibir modal com QR code ──
-        if (selectedPayment === 'PIX' && pmData.pixQrCode) {
+        if (selectedPayment === 'PIX') {
+          if (!pmData.pixQrCode) {
+            // Pedido foi cancelado no Edge Function, mostrar erro claro
+            setPaymentError({
+              message: 'Não foi possível gerar o QR Code PIX. Verifique se sua conta Asaas tem o PIX habilitado.',
+              isDeclined: false,
+            });
+            return;
+          }
           setCart([]);
           setCardNumber('');
           setCardHolder('');
