@@ -221,8 +221,8 @@ serve(async (req) => {
     }
 
     // ── 5. Montar payload de cobrança ─────────────────────────────────────────
-    const totalCents   = Number(order.total);
-    const restaurantNetEarnings = Number(order.restaurant_net_earnings ?? 0);
+    const totalCents   = parseFloat(Number(order.total).toFixed(2));
+    const restaurantNetEarnings = parseFloat(Number(order.restaurant_net_earnings ?? 0).toFixed(2));
 
     // Vencimento: hoje + 1 dia (PIX expira rápido, cartão é processado imediatamente)
     const dueDate = new Date();

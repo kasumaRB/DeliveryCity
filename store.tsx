@@ -961,18 +961,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // ═══════════════════════════════════════════════════════
       // 5. CALCULAR VALORES FINANCEIROS — todos no servidor
       // ═══════════════════════════════════════════════════════
-      const safeDiscount         = Math.max(0, Math.min(discountAmount, subtotal));
-      const finalProductTotal    = subtotal - safeDiscount;
-      const restaurantNetEarnings = finalProductTotal * (1 - restaurantFeePct);
+      const r2 = (n: number) => parseFloat(n.toFixed(2));
+      const safeDiscount          = r2(Math.max(0, Math.min(discountAmount, subtotal)));
+      const finalProductTotal     = r2(subtotal - safeDiscount);
+      const restaurantNetEarnings = r2(finalProductTotal * (1 - restaurantFeePct));
       // Entregador: sempre recebe o valor base (minDeliveryFee) +
       // 60% do excesso por km — driverFeePct é a % do excesso que vai para a plataforma
-      const kmExcess             = Math.max(0, deliveryFee - minDeliveryFee);
-      const platformKmShare      = driverFeePct; // ex: 0.40 = plataforma leva 40% do excesso
-      const driverEarnings       = minDeliveryFee + kmExcess * (1 - platformKmShare);
-      const platformFromDelivery = kmExcess * platformKmShare;
+      const kmExcess              = r2(Math.max(0, deliveryFee - minDeliveryFee));
+      const platformKmShare       = driverFeePct; // ex: 0.40 = plataforma leva 40% do excesso
+      const driverEarnings        = r2(minDeliveryFee + kmExcess * (1 - platformKmShare));
+      const platformFromDelivery  = r2(kmExcess * platformKmShare);
       // Taxa de serviço vai 100% para a plataforma — cobre o custo das transferências PIX
-      const platformFee          = (finalProductTotal - restaurantNetEarnings) + platformFromDelivery + serviceFee;
-      const total                = finalProductTotal + deliveryFee + serviceFee;
+      const platformFee           = r2((finalProductTotal - restaurantNetEarnings) + platformFromDelivery + serviceFee);
+      const total                 = r2(finalProductTotal + deliveryFee + serviceFee);
 
       const { data: clientProfile } = await supabase
         .from('profiles').select('phone_number, avatar_url').eq('id', session.user.id).maybeSingle();
