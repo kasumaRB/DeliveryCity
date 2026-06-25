@@ -120,9 +120,9 @@ export const getRealDistances = async (
   for (const dest of destinations) {
     if (originCoords) {
       const distKm = calculateHaversine(originCoords.lat, originCoords.lng, dest.lat, dest.lng);
-      // Fator 1.35 para aproximar distância real de estrada vs linha reta
-      const roadDistKm = distKm * 1.35;
-      const durationMins = Math.ceil(roadDistKm * 3 + 5); // ~20km/h em zona urbana
+      // Fator 1.4 para aproximar distância real de rua vs linha reta (cidades de interior)
+      const roadDistKm = distKm * 1.4;
+      const durationMins = Math.ceil(roadDistKm * 2.4 + 3); // ~25km/h em zona urbana + 3 min margem
       results[dest.id] = {
         distanceText: `${roadDistKm.toFixed(1)} km`,
         distanceValue: Math.round(roadDistKm * 1000),

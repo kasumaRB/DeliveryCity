@@ -554,25 +554,23 @@ export const DriverView: React.FC = () => {
           return { ...order, score: 0, distanceToRest: 0, distanceToCust: 0, totalDist: '---', timeMins: 0 };
         }
 
+        // Fator 1.4 para converter linha reta em distância real de rua (cidades de interior)
+        const ROAD_FACTOR = 1.4;
         const distToRest = calculateDistance(
-          currentPos.lat,
-          currentPos.lng,
-          restaurant.coords.lat,
-          restaurant.coords.lng
-        );
+          currentPos.lat, currentPos.lng,
+          restaurant.coords.lat, restaurant.coords.lng
+        ) * ROAD_FACTOR;
 
-        let distToCust = 0;
-        if (order.coords) {
-          distToCust = calculateDistance(
-            restaurant.coords.lat,
-            restaurant.coords.lng,
-            order.coords.lat,
-            order.coords.lng
-          );
-        }
+        // Se cliente não tem coords, usa 1.5km de fallback (distância típica em cidade pequena)
+        const distToCust = order.coords
+          ? calculateDistance(
+              restaurant.coords.lat, restaurant.coords.lng,
+              order.coords.lat, order.coords.lng
+            ) * ROAD_FACTOR
+          : 1.5;
 
         const totalDist = distToRest + distToCust;
-        const timeMins = Math.round((totalDist / 30) * 60) + 5; // 30km/h + 5 min margin
+        const timeMins = Math.round((totalDist / 25) * 60) + 3; // 25km/h urbano + 3 min margem
 
         const rating = currentUserProfile?.averageRating || 5.0;
         const totalScore = (1 / (totalDist + 0.1)) * 6.0 + rating * 0.5;
