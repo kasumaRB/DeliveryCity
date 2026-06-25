@@ -1061,6 +1061,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (data.cnh !== undefined) up.cnh = data.cnh;
     if (data.isOnline !== undefined) up.is_online = data.isOnline;
     if (data.currentLocation !== undefined) up.current_location = data.currentLocation;
+    if (data.savedAddresses !== undefined) up.saved_addresses = data.savedAddresses;
 
     // Captura role ANTES do fetchData (closure stale após setState assíncrono)
     const profileRoleSnapshot = profiles.find(p => p.id === id)?.role;
