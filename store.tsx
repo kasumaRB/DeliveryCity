@@ -27,6 +27,7 @@ import {
   clearOfflineCart,
 } from './services/offlineService';
 import { PushNotifications } from '@capacitor/push-notifications';
+import { App as CapApp } from '@capacitor/app';
 
 const STORAGE_KEY_RESTAURANTS = 'deliverycity_cache_restaurants';
 const STORAGE_KEY_ORDERS = 'deliverycity_cache_orders';
@@ -669,14 +670,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') fetchData(true, sessionRef.current);
+    // Ao retornar do background: busca sessão fresca (Supabase renova o token se necessário)
+    // antes de disparar o fetchData, evitando que sessão expirada cause logout indevido.
+    const onResume = async () => {
+      try {
+        const { data: { session: fresh } } = await supabase.auth.getSession();
+        fetchData(true, fresh ?? sessionRef.current);
+      } catch {
+        fetchData(true, sessionRef.current);
+      }
     };
+
+    // Listener nativo do Capacitor — mais confiável que visibilitychange no Android
+    let capListener: { remove: () => void } | null = null;
+    CapApp.addListener('appStateChange', ({ isActive }: { isActive: boolean }) => {
+      if (isActive) onResume();
+    }).then(l => { capListener = l; }).catch(() => {
+      // Fallback para web/desktop se o plugin não estiver disponível
+      window.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') onResume();
+      });
+    });
+
     window.addEventListener('online', processSyncQueue);
-    window.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
+      capListener?.remove();
       window.removeEventListener('online', processSyncQueue);
-      window.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [processSyncQueue]);
 
@@ -691,6 +711,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } else if (payload.eventType === 'UPDATE') {
           const atualizado = mapProfile(payload.new);
           setProfiles(prev => prev.map(p => (p.id === atualizado.id ? atualizado : p)));
+          // Mantém currentUserProfile sincronizado com Realtime (evita dado stale)
+          setCurrentUserProfile(prev => prev?.id === atualizado.id ? atualizado : prev);
         } else if (payload.eventType === 'DELETE') {
           setProfiles(prev => prev.filter(p => p.id !== payload.old.id));
         }
