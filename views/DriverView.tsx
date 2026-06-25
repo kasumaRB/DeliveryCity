@@ -600,21 +600,30 @@ export const DriverView: React.FC = () => {
 
     let lastLocationUpdate = 0;
     let geoWatchId: number | null = null;
+
+    const handlePosition = (pos: GeolocationPosition) => {
+      const newPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setCurrentPos(newPos);
+      const now = Date.now();
+      // Salva imediatamente na primeira vez (lastLocationUpdate = 0) ou a cada 10s
+      if (currentUserProfile?.id && isOnline && now - lastLocationUpdate > 10000) {
+        lastLocationUpdate = now;
+        updateUserProfile(currentUserProfile.id, { currentLocation: newPos });
+      }
+    };
+
+    const handleGeoError = (err: GeolocationPositionError) => {
+      console.warn('[GPS] Erro ao obter localização:', err.message);
+    };
+
     if (navigator.geolocation) {
+      // Posição imediata ao abrir o app (não espera movimento)
+      navigator.geolocation.getCurrentPosition(handlePosition, handleGeoError, {
+        enableHighAccuracy: true, timeout: 10000, maximumAge: 60000,
+      });
+      // Continua monitorando para atualizações
       geoWatchId = navigator.geolocation.watchPosition(
-        pos => {
-          const newPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          setCurrentPos(newPos);
-          const now = Date.now();
-          if (currentUserProfile?.id && isOnline && now - lastLocationUpdate > 10000) {
-            lastLocationUpdate = now;
-            updateUserProfile(currentUserProfile.id, { currentLocation: newPos });
-          }
-        },
-        (err) => {
-          // GPS negado ou indisponível — usa última posição conhecida sem travar o app
-          console.warn('[GPS] Erro ao obter localização:', err.message);
-        },
+        handlePosition, handleGeoError,
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
       );
     }
