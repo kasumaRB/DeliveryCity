@@ -439,6 +439,10 @@ export const DriverView: React.FC = () => {
   const toggleAvailability = async () => {
     const next = !isAvailable;
     if (next) {
+      if (gpsBlocked) {
+        alert('Localização bloqueada. Vá em Configurações do celular → Permissões do app → Localização e ative o acesso.');
+        return;
+      }
       const hasBase = currentUserProfile?.savedAddresses?.some(a => a.label === 'Base' && a.coords);
       if (!hasBase) {
         alert('Configure sua região de atuação no perfil antes de ficar disponível.');
@@ -461,6 +465,7 @@ export const DriverView: React.FC = () => {
   const [isConfirmingReturn, setIsConfirmingReturn] = useState(false);
   const [returnCodeError, setReturnCodeError] = useState('');
   const [currentPos, setCurrentPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [gpsBlocked, setGpsBlocked] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   // Delivery photo state
@@ -614,6 +619,7 @@ export const DriverView: React.FC = () => {
 
     const handleGeoError = (err: GeolocationPositionError) => {
       console.warn('[GPS] Erro ao obter localização:', err.message);
+      if (err.code === 1) setGpsBlocked(true); // PERMISSION_DENIED
     };
 
     if (navigator.geolocation) {
@@ -771,13 +777,23 @@ export const DriverView: React.FC = () => {
               </button>
             )}
 
+            {/* GPS bloqueado */}
+            {gpsBlocked && (
+              <div className="mb-4 p-4 bg-red-950/60 border border-red-500/40 rounded-2xl">
+                <p className="text-red-400 font-black text-sm">📍 Localização bloqueada</p>
+                <p className="text-red-500/80 text-xs mt-1">O app precisa de acesso à sua localização para funcionar. Vá em Configurações → Permissões → Localização e ative.</p>
+              </div>
+            )}
+
             {/* Availability toggle */}
             <button
               onClick={toggleAvailability}
               className={`w-full mb-4 p-5 rounded-2xl border-2 transition-all duration-300 text-left ${
-                isAvailable
-                  ? 'bg-green-500/10 border-green-500/40'
-                  : 'bg-red-500/10 border-red-500/50 animate-pulse'
+                gpsBlocked
+                  ? 'bg-gray-800/50 border-gray-600/40 opacity-60 cursor-not-allowed'
+                  : isAvailable
+                    ? 'bg-green-500/10 border-green-500/40'
+                    : 'bg-red-500/10 border-red-500/50 animate-pulse'
               }`}
             >
               <div className="flex items-center justify-between">
