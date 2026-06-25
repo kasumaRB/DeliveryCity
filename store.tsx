@@ -135,6 +135,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [currentRole, setCurrentRole] = useState<UserRole | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const sessionRef = useRef<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState<boolean | null>(null);
   const [realDistances, setRealDistances] = useState<Record<string, any>>({});
@@ -152,6 +153,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Sync: se a sessão mudar sem fetchData (ex: logout), limpa o perfil
   useEffect(() => {
+    sessionRef.current = session;
     if (!session) setCurrentUserProfile(null);
   }, [session]);
 
@@ -668,7 +670,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') fetchData(true);
+      if (document.visibilityState === 'visible') fetchData(true, sessionRef.current);
     };
     window.addEventListener('online', processSyncQueue);
     window.addEventListener('visibilitychange', handleVisibilityChange);
