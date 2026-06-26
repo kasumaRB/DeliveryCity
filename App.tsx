@@ -97,7 +97,7 @@ const BlockedView: React.FC<{ onSignOut: () => void }> = ({ onSignOut }) => (
 );
 
 const AppContent: React.FC = () => {
-  const { isLoading, currentUserProfile, signOut, session, refreshData } = useAppStore();
+  const { isLoading, currentUserProfile, currentRole, signOut, session, refreshData } = useAppStore();
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -239,8 +239,14 @@ const AppContent: React.FC = () => {
 
   // Verificação de role/status — dados sempre vêm do banco
   if (currentUserProfile && session && currentUserProfile.id === session.user.id) {
-    const verifiedRole   = currentUserProfile.role;
+    const dbRole       = currentUserProfile.role;
     const verifiedStatus = currentUserProfile.status;
+    // RoleSwitcher (admin/superuser) pode sobrescrever a view via currentRole.
+    // Para segurança, só aplica a troca se o usuário real é ADMIN ou o superusuário.
+    const isSuperUser  = currentUserProfile.email?.toLowerCase() === 'wendelbaracho@hotmail.com';
+    const verifiedRole = (currentRole && (dbRole === UserRole.ADMIN || isSuperUser))
+      ? currentRole
+      : dbRole;
 
     if (verifiedRole !== UserRole.CLIENT && verifiedRole !== UserRole.ADMIN && verifiedStatus === 'PENDING') {
       return <PendingApprovalView profile={currentUserProfile} onSignOut={signOut} />;
