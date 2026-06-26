@@ -294,7 +294,7 @@ export const AddressModal: React.FC<AddressModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[120] bg-black/60 flex items-end md:items-center justify-center p-0 md:p-4 backdrop-blur-sm">
-      <div className="bg-white w-full md:max-w-xl md:rounded-[2.5rem] rounded-t-[3rem] p-6 h-[92vh] md:h-auto overflow-y-auto no-scrollbar animate-in slide-in-from-bottom duration-300 relative shadow-2xl">
+      <div className="bg-white text-gray-900 w-full md:max-w-xl md:rounded-[2.5rem] rounded-t-[3rem] p-6 h-[92vh] md:h-auto overflow-y-auto no-scrollbar animate-in slide-in-from-bottom duration-300 relative shadow-2xl">
 
         {/* Cabeçalho */}
         <div className="flex justify-between items-center mb-6">
@@ -406,7 +406,7 @@ export const AddressModal: React.FC<AddressModalProps> = ({
             <div className="space-y-1">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Rua / Avenida</label>
               <input value={addrStreet} onChange={e => setAddrStreet(e.target.value)}
-                className={`w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:bg-white transition ${missingStreet ? 'border-orange-200 focus:border-orange-400' : 'border-gray-100 focus:border-orange-200'}`}
+                className={`w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm text-gray-900 outline-none focus:bg-white transition ${missingStreet ? 'border-orange-200 focus:border-orange-400' : 'border-gray-100 focus:border-orange-200'}`}
                 placeholder={isGeocodingLoading ? 'Buscando...' : 'Nome da rua'} />
               {missingStreet && (
                 <p className="text-[9px] text-orange-500 font-bold ml-1">Não encontrado — preencha manualmente</p>
@@ -416,7 +416,7 @@ export const AddressModal: React.FC<AddressModalProps> = ({
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Número</label>
                 <input value={addrNumber} onChange={e => setAddrNumber(e.target.value)}
-                  className={`w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:bg-white transition ${missingNumber ? 'border-orange-200 focus:border-orange-400' : 'border-gray-100 focus:border-orange-200'}`}
+                  className={`w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm text-gray-900 outline-none focus:bg-white transition ${missingNumber ? 'border-orange-200 focus:border-orange-400' : 'border-gray-100 focus:border-orange-200'}`}
                   placeholder="S/N" />
                 {missingNumber && (
                   <p className="text-[9px] text-orange-500 font-bold ml-1">Digite ou "S/N"</p>
@@ -431,7 +431,7 @@ export const AddressModal: React.FC<AddressModalProps> = ({
                   onChange={e => handleCepChange(e.target.value)}
                   inputMode="numeric"
                   maxLength={9}
-                  className={`w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:bg-white transition ${missingZip ? 'border-orange-200 focus:border-orange-400' : 'border-gray-100 focus:border-orange-200'}`}
+                  className={`w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm text-gray-900 outline-none focus:bg-white transition ${missingZip ? 'border-orange-200 focus:border-orange-400' : 'border-gray-100 focus:border-orange-200'}`}
                   placeholder="00000-000"
                 />
                 {missingZip && !isCepLoading && (
@@ -449,7 +449,7 @@ export const AddressModal: React.FC<AddressModalProps> = ({
             <div className="space-y-1">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Bairro</label>
               <input value={addrNeighborhood} onChange={e => setAddrNeighborhood(e.target.value)}
-                className={`w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm outline-none focus:bg-white transition ${missingNeighborhood ? 'border-orange-200 focus:border-orange-400' : 'border-gray-100 focus:border-orange-200'}`}
+                className={`w-full p-4 bg-gray-50 border rounded-2xl font-bold text-sm text-gray-900 outline-none focus:bg-white transition ${missingNeighborhood ? 'border-orange-200 focus:border-orange-400' : 'border-gray-100 focus:border-orange-200'}`}
                 placeholder={isGeocodingLoading ? 'Buscando...' : 'Ex: Centro'} />
               {missingNeighborhood && (
                 <p className="text-[9px] text-orange-500 font-bold ml-1">Não encontrado — preencha manualmente</p>
@@ -458,7 +458,7 @@ export const AddressModal: React.FC<AddressModalProps> = ({
             <div className="space-y-1">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Referência</label>
               <input value={addrReference} onChange={e => setAddrReference(e.target.value)}
-                className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm outline-none focus:bg-white focus:border-orange-200 transition"
+                className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-sm text-gray-900 outline-none focus:bg-white focus:border-orange-200 transition"
                 placeholder="Ex: Próximo à praça" />
             </div>
           </div>
