@@ -1313,6 +1313,17 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                             </div>
                           )}
 
+                          {/* Código de confirmação de entrega — visível quando entregador está a caminho */}
+                          {order.status === OrderStatus.OUT_FOR_DELIVERY && order.deliveryCode && (
+                            <div className="mx-5 mb-4 bg-orange-50 border-2 border-orange-200 rounded-2xl p-4 text-center animate-in fade-in duration-500">
+                              <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-1">🔑 Código de entrega</p>
+                              <p className="text-5xl font-black text-orange-600 tracking-[0.3em] my-2 select-all">{order.deliveryCode}</p>
+                              <p className="text-[11px] text-orange-400 font-medium leading-snug">
+                                Mostre este código ao entregador quando ele chegar para confirmar o recebimento.
+                              </p>
+                            </div>
+                          )}
+
                           {/* Rastreamento do entregador em tempo real */}
                           {order.status === OrderStatus.OUT_FOR_DELIVERY && order.driverId && (() => {
                             const driver = profiles.find(p => p.id === order.driverId);
