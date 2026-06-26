@@ -62,7 +62,12 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [asaasAccountId] = useState(currentUserProfile?.asaasAccountId || '');
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
-  const baseAddr = currentUserProfile?.savedAddresses?.find(a => a.label === 'Base');
+  // A base/região de atuação é, de preferência, o endereço marcado como 'Base';
+  // caso o entregador ainda não tenha um, usa qualquer endereço com coordenadas
+  // (ex.: o 'Principal' criado no cadastro). Assim o campo já vem preenchido.
+  const baseAddr =
+    currentUserProfile?.savedAddresses?.find(a => a.label === 'Base') ||
+    currentUserProfile?.savedAddresses?.find(a => a.coords);
   const [baseAddressText, setBaseAddressText] = useState(
     baseAddr
       ? [baseAddr.street, baseAddr.number && `nº ${baseAddr.number}`, baseAddr.neighborhood, baseAddr.city]
@@ -123,7 +128,10 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     if (!currentUserProfile) return;
     setIsSaving(true);
     try {
-      const otherAddresses = (currentUserProfile.savedAddresses || []).filter(a => a.label !== 'Base');
+      // Remove qualquer 'Base' anterior e também o endereço de mesma id (caso a base
+      // tenha sido derivada de um endereço existente, como o 'Principal'), evitando duplicatas.
+      const otherAddresses = (currentUserProfile.savedAddresses || [])
+        .filter(a => a.label !== 'Base' && a.id !== baseAddressData?.id);
       const newSavedAddresses = baseAddressData
         ? [{ ...baseAddressData, label: 'Base' }, ...otherAddresses]
         : otherAddresses;
@@ -443,7 +451,9 @@ export const DriverView: React.FC = () => {
         alert('Localização bloqueada. Vá em Configurações do celular → Permissões do app → Localização e ative o acesso.');
         return;
       }
-      const hasBase = currentUserProfile?.savedAddresses?.some(a => a.label === 'Base' && a.coords);
+      // Aceita qualquer endereço com coordenadas como base de atuação (não exige
+      // o label 'Base' especificamente — o endereço de cadastro 'Principal' também vale).
+      const hasBase = currentUserProfile?.savedAddresses?.some(a => a.coords);
       if (!hasBase) {
         alert('Configure sua região de atuação no perfil antes de ficar disponível.');
         setActiveTab('profile');
