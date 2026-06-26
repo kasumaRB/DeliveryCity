@@ -443,6 +443,7 @@ export const AdminView: React.FC = () => {
     sendAdminMessage,
     restaurants,
     confirmReturn,
+    startReturn,
   } = useAppStore();
 
   const [activeTab, setActiveTab] = useState<
@@ -1506,54 +1507,68 @@ export const AdminView: React.FC = () => {
                             </div>
                           )}
 
-                          {/* Protocolo de escalação — só para DELIVERY_FAILED */}
+                          {/* ── DELIVERY_FAILED: Protocolo + autorização ── */}
                           {order.status === 'DELIVERY_FAILED' && (
-                            <div className="px-6 pb-5">
-                              <div className="bg-orange-50 border border-orange-100 rounded-xl p-4">
-                                <p className="text-xs font-black text-orange-800 mb-3">📋 Protocolo de atendimento</p>
-                                <div className="space-y-1.5 text-xs text-orange-700 font-medium mb-4">
-                                  <p>1. Envie mensagem pelo chat interno (botão "Chat")</p>
-                                  <p>2. Se não responder → ligue para o cliente</p>
-                                  <p>3. Sem resposta → envie WhatsApp</p>
-                                  <p>4. Sem comunicação → autorize a devolução abaixo</p>
+                            <div className="px-6 pb-5 space-y-3">
+                              <div className="bg-red-50 border border-red-100 rounded-xl p-4">
+                                <p className="text-xs font-black text-red-800 mb-3">📋 Protocolo de atendimento</p>
+                                <div className="space-y-1.5 text-xs text-red-700 font-medium mb-4">
+                                  <p>1. Tente contato com o cliente via Chat / Ligar / WhatsApp acima</p>
+                                  <p>2. Se não responder em até 10 min → autorize a devolução abaixo</p>
+                                  <p>3. Ao autorizar: reembolso é processado e entregador é instruído a devolver</p>
                                 </div>
                                 <button
                                   disabled={authorizingReturnId === order.id}
                                   onClick={async () => {
                                     setAuthorizingReturnId(order.id);
                                     try {
-                                      // 1. Processa o reembolso imediatamente
+                                      // 1. Muda status para RETURNING (faltava antes)
+                                      await startReturn(order.id);
+
+                                      // 2. Processa o reembolso
                                       await supabase.functions.invoke('refund-asaas-payment', { body: { orderId: order.id } });
 
-                                      // 2. Notifica o cliente que o reembolso foi aprovado
+                                      // 3. Notifica cliente — reembolso aprovado
                                       if (order.customerId) {
                                         supabase.functions.invoke('send-push-notification', {
                                           body: {
                                             userId: order.customerId,
                                             title: '💚 Reembolso aprovado',
-                                            body: 'O suporte aprovou seu reembolso. O valor será creditado em breve.',
+                                            body: `Seu pedido de ${order.restaurantName} não pôde ser entregue. O reembolso foi aprovado e será creditado em breve.`,
                                             data: { orderId: order.id, type: 'REFUND_APPROVED' },
                                           },
                                         }).catch(() => {});
                                       }
 
-                                      // 3. Notifica o entregador para devolver o pedido
+                                      // 4. Notifica entregador — deve devolver ao restaurante
                                       if (order.driverId) {
                                         supabase.functions.invoke('send-push-notification', {
                                           body: {
                                             userId: order.driverId,
-                                            title: '✅ Devolução autorizada',
-                                            body: `Leve o pedido #${order.id.slice(-4)} ao restaurante ${order.restaurantName}. Peça o código de devolução.`,
+                                            title: '🔄 Devolução autorizada pelo admin',
+                                            body: `Leve o pedido #${order.id.slice(-6)} ao restaurante ${order.restaurantName}. O restaurante confirmará o recebimento.`,
                                             data: { orderId: order.id, type: 'RETURN_AUTHORIZED' },
                                           },
                                         }).catch(() => {});
                                       }
 
-                                      // 4. Registra o evento
+                                      // 5. Notifica restaurante — pedido voltando
+                                      if (restaurantOwner?.id) {
+                                        supabase.functions.invoke('send-push-notification', {
+                                          body: {
+                                            userId: restaurantOwner.id,
+                                            title: '🔄 Devolução a caminho',
+                                            body: `Pedido #${order.id.slice(-6)} não foi entregue. O entregador está voltando com o pedido.`,
+                                            data: { orderId: order.id, type: 'RETURNING' },
+                                          },
+                                        }).catch(() => {});
+                                      }
+
+                                      // 6. Registra ticket de suporte
                                       supabase.from('support_tickets').insert({
-                                        user_id: order.driverId || order.customerId,
-                                        user_name: driver?.name || 'Admin',
-                                        user_role: 'DRIVER',
+                                        user_id: order.customerId,
+                                        user_name: order.customerName || 'Cliente',
+                                        user_role: 'CLIENT',
                                         message: `[ADMIN] Devolução autorizada + reembolso processado — Pedido #${order.id}. Motivo: ${order.failureReason || 'não informado'}`,
                                         status: 'RESOLVED',
                                         from_admin: true,
@@ -1561,62 +1576,97 @@ export const AdminView: React.FC = () => {
                                         created_at: new Date().toISOString(),
                                       }).then(null, () => {});
 
-                                      setAuthorizingReturnId(null);
                                     } catch (e: any) {
-                                      alert('Erro ao processar reembolso: ' + (e?.message || 'tente novamente'));
+                                      console.error('Erro ao autorizar devolução:', e);
+                                    } finally {
                                       setAuthorizingReturnId(null);
                                     }
                                   }}
-                                  className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-orange-600 text-white rounded-xl font-black text-sm disabled:opacity-50 active:scale-95 transition-all"
+                                  className="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-orange-600 text-white rounded-xl font-black text-sm disabled:opacity-50 active:scale-95 transition-all shadow-sm"
                                 >
                                   {authorizingReturnId === order.id
-                                    ? <><Loader size={14} className="animate-spin" /> Processando reembolso...</>
-                                    : <><RotateCcw size={14} /> Autorizar devolução + reembolsar cliente</>
+                                    ? <><Loader size={14} className="animate-spin" /> Autorizando...</>
+                                    : <><RotateCcw size={14} /> Autorizar devolução e reembolsar cliente</>
                                   }
                                 </button>
                               </div>
                             </div>
                           )}
 
+                          {/* ── RETURNING: entregador a caminho, admin confirma recebimento ── */}
                           {order.status === 'RETURNING' && (
                             <div className="px-6 pb-5 space-y-3">
-                              <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-center gap-3">
-                                <RotateCcw size={16} className="text-blue-500 animate-spin" style={{ animationDuration: '3s' }} />
+                              <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 flex items-center gap-3">
+                                <RotateCcw size={16} className="text-orange-500 shrink-0" style={{ animation: 'spin 3s linear infinite' }} />
                                 <div>
-                                  <p className="text-sm font-bold text-blue-700">Entregador a caminho do restaurante</p>
-                                  <p className="text-xs text-blue-500">O restaurante gerará um código de devolução e o entregador confirmará no app.</p>
+                                  <p className="text-sm font-bold text-orange-700">Entregador a caminho do restaurante</p>
+                                  <p className="text-xs text-orange-500 mt-0.5">
+                                    {driver?.name || 'Entregador'} está devolvendo o pedido.
+                                    Aguardando confirmação de recebimento pelo restaurante.
+                                  </p>
                                 </div>
                               </div>
-                              <button
-                                disabled={confirmingReturnId === order.id}
-                                onClick={async () => {
-                                  if (!confirm('Confirmar devolução sem código? Use apenas se o entregador não conseguir digitar o código.')) return;
-                                  setConfirmingReturnId(order.id);
-                                  try {
-                                    await confirmReturn(order.id);
-                                  } catch (e: any) {
-                                    alert(e.message || 'Erro ao confirmar devolução.');
-                                  } finally {
-                                    setConfirmingReturnId(null);
+                              <div className="bg-white border border-gray-200 rounded-xl p-4">
+                                <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3">✅ Confirmar recebimento da devolução</p>
+                                <p className="text-xs text-gray-500 mb-3">
+                                  Use quando o restaurante confirmar pessoalmente que recebeu o pedido de volta
+                                  (caso não consiga fazer pelo app do restaurante).
+                                </p>
+                                <button
+                                  disabled={confirmingReturnId === order.id}
+                                  onClick={async () => {
+                                    setConfirmingReturnId(order.id);
+                                    try {
+                                      await confirmReturn(order.id);
+                                      // Notifica entregador e cliente que a devolução foi concluída
+                                      if (order.driverId) {
+                                        supabase.functions.invoke('send-push-notification', {
+                                          body: {
+                                            userId: order.driverId,
+                                            title: '✅ Devolução confirmada',
+                                            body: `Devolução do pedido #${order.id.slice(-6)} confirmada pelo admin. Obrigado!`,
+                                            data: { orderId: order.id, type: 'RETURNED' },
+                                          },
+                                        }).catch(() => {});
+                                      }
+                                      if (order.customerId) {
+                                        supabase.functions.invoke('send-push-notification', {
+                                          body: {
+                                            userId: order.customerId,
+                                            title: '📦 Pedido devolvido ao restaurante',
+                                            body: `Seu pedido de ${order.restaurantName} foi devolvido. Reembolso já processado.`,
+                                            data: { orderId: order.id, type: 'RETURNED' },
+                                          },
+                                        }).catch(() => {});
+                                      }
+                                    } catch (e: any) {
+                                      console.error('Erro ao confirmar devolução:', e);
+                                    } finally {
+                                      setConfirmingReturnId(null);
+                                    }
+                                  }}
+                                  className="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-green-600 text-white rounded-xl font-black text-sm disabled:opacity-50 active:scale-95 transition-all"
+                                >
+                                  {confirmingReturnId === order.id
+                                    ? <><Loader size={14} className="animate-spin" /> Confirmando...</>
+                                    : <><Package size={14} /> Confirmar recebimento da devolução</>
                                   }
-                                }}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-700 text-white rounded-xl font-black text-xs disabled:opacity-50 active:scale-95 transition-all"
-                              >
-                                {confirmingReturnId === order.id
-                                  ? <><Loader size={13} className="animate-spin" /> Confirmando...</>
-                                  : <><Package size={13} /> Override — Confirmar devolução sem código</>
-                                }
-                              </button>
+                                </button>
+                              </div>
                             </div>
                           )}
 
+                          {/* ── RETURNED: devolução concluída ── */}
                           {order.status === 'RETURNED' && (
                             <div className="px-6 pb-5">
-                              <div className="bg-green-50 border border-green-100 rounded-xl px-4 py-3 flex items-center gap-3">
-                                <Package size={16} className="text-green-500" />
+                              <div className="bg-green-50 border border-green-100 rounded-xl px-4 py-3 flex items-start gap-3">
+                                <Package size={18} className="text-green-500 shrink-0 mt-0.5" />
                                 <div>
                                   <p className="text-sm font-bold text-green-700">Devolução concluída ✓</p>
-                                  <p className="text-xs text-green-500">Entregador confirmou via código. Reembolso já foi processado na autorização.</p>
+                                  <p className="text-xs text-green-500 mt-0.5">
+                                    Pedido devolvido ao restaurante e reembolso processado para o cliente.
+                                    Caso o cliente não receba o reembolso em até 3 dias úteis, entre em contato com o suporte financeiro.
+                                  </p>
                                 </div>
                               </div>
                             </div>
