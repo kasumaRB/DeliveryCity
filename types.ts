@@ -182,6 +182,8 @@ export interface Order {
   readyAt?: number;
   outForDeliveryAt?: number;
   deliveredAt?: number;
+  returningAt?: number;
+  returnPhotoUrl?: string;
   driverId?: string;
   pickupCode?: string;
   deliveryCode?: string;

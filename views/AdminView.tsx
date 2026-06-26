@@ -469,7 +469,16 @@ export const AdminView: React.FC = () => {
   const [notifyingDriverId, setNotifyingDriverId] = useState<string | null>(null);
   const [closingNoReturnId, setClosingNoReturnId] = useState<string | null>(null);
   const [confirmNoReturnId, setConfirmNoReturnId] = useState<string | null>(null);
+  const [blockingDriverId, setBlockingDriverId] = useState<string | null>(null);
+  const [chargingReturnId, setChargingReturnId] = useState<string | null>(null);
   const [ordersStatusFilter, setOrdersStatusFilter] = useState<string>('ALL');
+
+  // Relógio para detectar devoluções travadas (tick 1min)
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(t);
+  }, []);
   const [messagingOrderId, setMessagingOrderId] = useState<string | null>(null);
   const [messageTarget, setMessageTarget] = useState<'client' | 'driver' | 'restaurant' | null>(null);
   const [messageText, setMessageText] = useState('');
@@ -1712,23 +1721,72 @@ export const AdminView: React.FC = () => {
                           )}
 
                           {/* ── RETURNING: entregador a caminho, admin confirma recebimento ── */}
-                          {order.status === 'RETURNING' && (
+                          {order.status === 'RETURNING' && (() => {
+                            const staleMs = order.returningAt ? now - order.returningAt : 0;
+                            const isStale = staleMs > 2 * 60 * 60 * 1000; // >2h
+                            const staleHours = Math.floor(staleMs / 3600000);
+                            const staleMins = Math.floor((staleMs % 3600000) / 60000);
+                            return (
                             <div className="px-6 pb-5 space-y-3">
+                              {/* Alerta de devolução travada */}
+                              {isStale && (
+                                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-3">
+                                  <span className="text-red-500 text-lg shrink-0">🚨</span>
+                                  <div className="flex-1">
+                                    <p className="text-sm font-black text-red-700">Devolução travada há {staleHours > 0 ? `${staleHours}h ` : ''}{staleMins}min</p>
+                                    <p className="text-xs text-red-500 mt-0.5 mb-2">O entregador pode não estar devolvendo o produto. Tome uma ação.</p>
+                                    <button
+                                      disabled={chargingReturnId === order.id}
+                                      onClick={async () => {
+                                        if (!order.driverId) return;
+                                        setChargingReturnId(order.id);
+                                        try {
+                                          await supabase.functions.invoke('send-push-notification', {
+                                            body: {
+                                              userId: order.driverId,
+                                              title: '⚠️ Devolução pendente — ação necessária',
+                                              body: `Você precisa devolver o pedido #${order.id.slice(-6)} ao restaurante ${order.restaurantName}. O admin está monitorando.`,
+                                              data: { orderId: order.id, type: 'RETURN_OVERDUE' },
+                                            },
+                                          });
+                                        } finally { setChargingReturnId(null); }
+                                      }}
+                                      className="flex items-center gap-1.5 px-3 py-2 bg-red-100 text-red-700 rounded-lg font-bold text-xs active:scale-95 transition-all disabled:opacity-50"
+                                    >
+                                      {chargingReturnId === order.id ? <Loader size={11} className="animate-spin" /> : '📲'}
+                                      Cobrar devolução do entregador
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+
                               <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 flex items-center gap-3">
                                 <RotateCcw size={16} className="text-orange-500 shrink-0" style={{ animation: 'spin 3s linear infinite' }} />
-                                <div>
+                                <div className="flex-1">
                                   <p className="text-sm font-bold text-orange-700">Entregador a caminho do restaurante</p>
                                   <p className="text-xs text-orange-500 mt-0.5">
                                     {driver?.name || 'Entregador'} está devolvendo o pedido.
-                                    Aguardando confirmação de recebimento pelo restaurante.
+                                    {order.returningAt && ` Iniciado há ${staleHours > 0 ? `${staleHours}h ` : ''}${staleMins}min.`}
                                   </p>
                                 </div>
                               </div>
-                              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                                <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3">✅ Confirmar recebimento da devolução</p>
-                                <p className="text-xs text-gray-500 mb-3">
-                                  Use quando o restaurante confirmar pessoalmente que recebeu o pedido de volta
-                                  (caso não consiga fazer pelo app do restaurante).
+
+                              {/* Foto de devolução (se enviada pelo entregador) */}
+                              {order.returnPhotoUrl && (
+                                <div className="bg-white border border-gray-200 rounded-xl p-3">
+                                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">📷 Foto enviada pelo entregador</p>
+                                  <img
+                                    src={order.returnPhotoUrl}
+                                    alt="Foto da devolução"
+                                    className="w-full max-h-48 object-cover rounded-lg border border-gray-100"
+                                  />
+                                </div>
+                              )}
+
+                              <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+                                <p className="text-xs font-black text-gray-500 uppercase tracking-widest">✅ Confirmar recebimento da devolução</p>
+                                <p className="text-xs text-gray-500">
+                                  Use quando o restaurante confirmar pessoalmente (caso não consiga pelo app).
                                 </p>
                                 <button
                                   disabled={confirmingReturnId === order.id}
@@ -1736,13 +1794,12 @@ export const AdminView: React.FC = () => {
                                     setConfirmingReturnId(order.id);
                                     try {
                                       await confirmReturn(order.id);
-                                      // Notifica entregador e cliente que a devolução foi concluída
                                       if (order.driverId) {
                                         supabase.functions.invoke('send-push-notification', {
                                           body: {
                                             userId: order.driverId,
                                             title: '✅ Devolução confirmada',
-                                            body: `Devolução do pedido #${order.id.slice(-6)} confirmada pelo admin. Obrigado!`,
+                                            body: `Devolução do pedido #${order.id.slice(-6)} confirmada. Obrigado!`,
                                             data: { orderId: order.id, type: 'RETURNED' },
                                           },
                                         }).catch(() => {});
@@ -1770,9 +1827,40 @@ export const AdminView: React.FC = () => {
                                     : <><Package size={14} /> Confirmar recebimento da devolução</>
                                   }
                                 </button>
+
+                                {/* Suspender entregador — ação de punição */}
+                                {order.driverId && (
+                                  <button
+                                    disabled={blockingDriverId === order.id}
+                                    onClick={async () => {
+                                      if (!order.driverId) return;
+                                      setBlockingDriverId(order.id);
+                                      try {
+                                        await updateUserProfile(order.driverId, { status: 'BLOCKED' as any });
+                                        supabase.functions.invoke('send-push-notification', {
+                                          body: {
+                                            userId: order.driverId,
+                                            title: '🚫 Conta suspensa',
+                                            body: 'Sua conta foi suspensa devido ao não cumprimento da devolução. Entre em contato com o suporte.',
+                                            data: { type: 'ACCOUNT_BLOCKED' },
+                                          },
+                                        }).catch(() => {});
+                                      } catch (e: any) {
+                                        console.error('Erro ao suspender entregador:', e);
+                                      } finally {
+                                        setBlockingDriverId(null);
+                                      }
+                                    }}
+                                    className="w-full flex items-center justify-center gap-2 px-5 py-3 border border-red-200 text-red-600 bg-red-50 rounded-xl font-bold text-xs disabled:opacity-50 active:scale-95 transition-all"
+                                  >
+                                    {blockingDriverId === order.id ? <Loader size={12} className="animate-spin" /> : '🚫'}
+                                    Suspender entregador — {driver?.name || 'entregador'}
+                                  </button>
+                                )}
                               </div>
                             </div>
-                          )}
+                            );
+                          })()}
 
                           {/* ── RETURNED: devolução concluída ── */}
                           {order.status === 'RETURNED' && (
@@ -2076,7 +2164,12 @@ export const AdminView: React.FC = () => {
                 </div>
               )}
 
-              {viewingUser.role === UserRole.DRIVER && (
+              {viewingUser.role === UserRole.DRIVER && (() => {
+                const driverOrders = orders.filter(o => o.driverId === viewingUser.id);
+                const failedCount = driverOrders.filter(o => ['DELIVERY_FAILED', 'RETURNING', 'RETURNED'].includes(o.status)).length;
+                const returnedCount = driverOrders.filter(o => o.status === 'RETURNED').length;
+                const returnRate = failedCount > 0 ? Math.round((returnedCount / failedCount) * 100) : 100;
+                return (
                 <div className="space-y-5 pt-4 border-t border-gray-100">
                   <div>
                     <label className="text-[10px] font-bold text-gray-500 uppercase ml-1 tracking-widest">
@@ -2106,8 +2199,39 @@ export const AdminView: React.FC = () => {
                     </div>
                     <p className="text-[10px] text-gray-400 mt-1 ml-1">Se preenchido, sobrescreve a taxa global de entregadores para este parceiro</p>
                   </div>
+
+                  {/* Histórico de devoluções */}
+                  {failedCount > 0 && (
+                    <div className={`rounded-xl p-4 border ${returnRate >= 80 ? 'bg-amber-50 border-amber-100' : 'bg-red-50 border-red-100'}`}>
+                      <p className={`text-[10px] font-black uppercase tracking-widest mb-3 ${returnRate >= 80 ? 'text-amber-700' : 'text-red-700'}`}>
+                        ⚠️ Histórico de Devoluções
+                      </p>
+                      <div className="grid grid-cols-3 gap-3 text-center">
+                        <div>
+                          <p className="font-black text-lg text-red-700">{failedCount}</p>
+                          <p className="text-[10px] font-bold text-gray-500">Entregas falhadas</p>
+                        </div>
+                        <div>
+                          <p className="font-black text-lg text-green-700">{returnedCount}</p>
+                          <p className="text-[10px] font-bold text-gray-500">Devoluções concluídas</p>
+                        </div>
+                        <div>
+                          <p className={`font-black text-lg ${returnRate === 100 ? 'text-green-700' : returnRate >= 70 ? 'text-amber-700' : 'text-red-700'}`}>
+                            {returnRate}%
+                          </p>
+                          <p className="text-[10px] font-bold text-gray-500">Taxa de conclusão</p>
+                        </div>
+                      </div>
+                      {returnRate < 70 && (
+                        <p className="text-[10px] text-red-600 font-bold mt-2 text-center">
+                          Taxa de devolução baixa — considere suspender este entregador.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
+                );
+              })()}
             </form>
 
             <div className="px-8 py-5 border-t border-gray-100 shrink-0 space-y-3">

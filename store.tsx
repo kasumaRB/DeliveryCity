@@ -221,6 +221,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     readyAt: o.ready_at ? new Date(o.ready_at).getTime() : undefined,
     outForDeliveryAt: o.out_for_delivery_at ? new Date(o.out_for_delivery_at).getTime() : undefined,
     deliveredAt: o.delivered_at ? new Date(o.delivered_at).getTime() : undefined,
+    returningAt: o.returning_at ? new Date(o.returning_at).getTime() : undefined,
+    returnPhotoUrl: o.return_photo_url ?? undefined,
     driverId: o.driver_id,
     pickupCode: o.pickup_code,
     deliveryCode: o.delivery_code,
@@ -1316,7 +1318,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const startReturn = async (orderId: string) => {
     const order = orders.find(o => o.id === orderId);
     const { error } = await supabase.from('orders')
-      .update({ status: OrderStatus.RETURNING })
+      .update({ status: OrderStatus.RETURNING, returning_at: new Date().toISOString() })
       .eq('id', orderId).eq('status', OrderStatus.DELIVERY_FAILED);
     if (error) throw new Error(error.message);
     await fetchData();

@@ -542,6 +542,13 @@ export const DriverView: React.FC = () => {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const deliveryPhotoInputRef = useRef<HTMLInputElement>(null);
 
+  // Return photo state (mandatory before starting return)
+  const [returnPhotoStep, setReturnPhotoStep] = useState(false);
+  const [returnPhotoPreview, setReturnPhotoPreview] = useState<string | null>(null);
+  const [returnPhotoFile, setReturnPhotoFile] = useState<File | null>(null);
+  const [isStartingReturn, setIsStartingReturn] = useState(false);
+  const returnPhotoInputRef = useRef<HTMLInputElement>(null);
+
   const activeOrder = useMemo(
     () =>
       orders.find(
@@ -1390,7 +1397,7 @@ export const DriverView: React.FC = () => {
           <div className="bg-gray-900 rounded-t-[3rem] w-full max-w-lg p-6 pb-10 animate-in slide-in-from-bottom-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-black text-white">Problema na entrega</h3>
-              <button onClick={() => { setShowFailedModal(false); setFailedConfirmed(false); setFailureReason(''); }} className="p-2 text-gray-400 hover:text-white">
+              <button onClick={() => { setShowFailedModal(false); setFailedConfirmed(false); setFailureReason(''); setReturnPhotoStep(false); setReturnPhotoPreview(null); setReturnPhotoFile(null); }} className="p-2 text-gray-400 hover:text-white">
                 <X size={22} />
               </button>
             </div>
@@ -1482,14 +1489,14 @@ export const DriverView: React.FC = () => {
                   Confirmar não entrega e solicitar reembolso
                 </button>
               </>
-            ) : (
-              /* Após confirmar: instruções de devolução */
+            ) : !returnPhotoStep ? (
+              /* Após confirmar: instruções de devolução + avançar para foto */
               <div className="text-center">
                 <div className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                   <RotateCcw size={32} className="text-orange-400" />
                 </div>
                 <h4 className="text-white font-black text-lg mb-2">Reembolso solicitado</h4>
-                <p className="text-gray-400 text-sm mb-6">Agora você precisa devolver o pedido ao restaurante <strong className="text-white">{activeOrder.restaurantName}</strong>.</p>
+                <p className="text-gray-400 text-sm mb-4">Devolva o pedido ao restaurante <strong className="text-white">{activeOrder.restaurantName}</strong>.</p>
                 <a
                   href={`https://maps.google.com/?q=${encodeURIComponent(restaurants.find(r => r.id === activeOrder.restaurantId)?.address || activeOrder.restaurantName)}`}
                   target="_blank" rel="noopener noreferrer"
@@ -1497,19 +1504,107 @@ export const DriverView: React.FC = () => {
                 >
                   <MapPin size={16} /> Abrir rota no Google Maps
                 </a>
+                <div className="bg-gray-800 rounded-2xl p-4 mb-4 text-left">
+                  <p className="text-orange-400 font-black text-xs uppercase tracking-widest mb-1">📷 Foto obrigatória</p>
+                  <p className="text-gray-400 text-xs">Antes de iniciar a devolução, registre uma foto do pedido. Isso protege você em caso de disputa.</p>
+                </div>
                 <button
-                  onClick={async () => {
-                    try {
-                      await startReturn(activeOrder.id);
-                      setShowFailedModal(false);
-                    } catch (e: any) {
-                      showToast(e.message || 'Erro ao iniciar devolução.', 'error');
-                    }
-                  }}
+                  onClick={() => setReturnPhotoStep(true)}
                   className="w-full py-4 bg-orange-500 text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2"
                 >
-                  <RotateCcw size={18} /> Iniciar devolução
+                  <Camera size={18} /> Tirar foto e iniciar devolução
                 </button>
+              </div>
+            ) : (
+              /* Captura de foto obrigatória antes de iniciar devolução */
+              <div>
+                <div className="text-center mb-5">
+                  <div className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Camera size={32} className="text-orange-400" />
+                  </div>
+                  <h4 className="text-white font-black text-lg mb-1">Foto da devolução</h4>
+                  <p className="text-gray-400 text-sm">Fotografe o pedido antes de entregar ao restaurante</p>
+                </div>
+
+                <input
+                  ref={returnPhotoInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setReturnPhotoFile(file);
+                    const reader = new FileReader();
+                    reader.onload = ev => setReturnPhotoPreview(ev.target?.result as string);
+                    reader.readAsDataURL(file);
+                  }}
+                />
+
+                {returnPhotoPreview ? (
+                  <div className="relative mb-5">
+                    <img src={returnPhotoPreview} className="w-full h-48 object-cover rounded-2xl" alt="Foto devolução" />
+                    <button
+                      onClick={() => { setReturnPhotoPreview(null); setReturnPhotoFile(null); }}
+                      className="absolute top-2 right-2 p-1.5 bg-black/60 text-white rounded-full"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => returnPhotoInputRef.current?.click()}
+                    className="w-full h-36 border-2 border-dashed border-orange-500/50 rounded-2xl flex flex-col items-center justify-center gap-3 text-orange-400 hover:border-orange-400 hover:bg-orange-500/5 transition-all mb-5"
+                  >
+                    <ImagePlus size={32} />
+                    <span className="text-sm font-bold">Tirar foto / Escolher imagem</span>
+                  </button>
+                )}
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setReturnPhotoStep(false)}
+                    className="flex-1 py-4 bg-gray-700 text-gray-300 rounded-2xl font-bold text-sm"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    disabled={!returnPhotoFile || isStartingReturn}
+                    onClick={async () => {
+                      if (!returnPhotoFile) return;
+                      setIsStartingReturn(true);
+                      try {
+                        await startReturn(activeOrder.id);
+                        try {
+                          const fileName = `returns/${activeOrder.id}-${Date.now()}.jpg`;
+                          const { data, error: upErr } = await supabase.storage
+                            .from('avatars').upload(fileName, returnPhotoFile, { upsert: true });
+                          if (!upErr && data) {
+                            const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
+                            await supabase.from('orders').update({ return_photo_url: publicUrl }).eq('id', activeOrder.id);
+                          }
+                        } catch { /* foto falhou mas devolução iniciou */ }
+                        setShowFailedModal(false);
+                      } catch (e: any) {
+                        showToast(e.message || 'Erro ao iniciar devolução.', 'error');
+                      } finally {
+                        setIsStartingReturn(false);
+                      }
+                    }}
+                    className="flex-1 py-4 bg-orange-500 text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2 disabled:opacity-40"
+                  >
+                    {isStartingReturn
+                      ? <><Loader size={16} className="animate-spin" /> Iniciando...</>
+                      : <><RotateCcw size={16} /> Confirmar</>
+                    }
+                  </button>
+                </div>
+                {!returnPhotoPreview && (
+                  <p className="text-center text-red-400 text-xs mt-3 font-bold">
+                    ⚠️ A foto é obrigatória para iniciar a devolução
+                  </p>
+                )}
               </div>
             )}
           </div>
