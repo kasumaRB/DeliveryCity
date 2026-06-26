@@ -116,6 +116,13 @@ export interface Product {
   variants?: ProductVariant[];
 }
 
+export interface RestaurantReview {
+  customerName: string;
+  stars: number;
+  comment?: string;
+  timestamp: number;
+}
+
 export interface Restaurant {
   id: string;
   ownerId: string;
@@ -123,6 +130,7 @@ export interface Restaurant {
   category: string;
   rating: number;
   ratingsCount?: number;
+  reviews?: RestaurantReview[];
   image: string;
   phoneNumber?: string;
   address?: string;

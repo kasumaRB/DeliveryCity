@@ -96,6 +96,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
   const [productOk, setProductOk] = useState<boolean | null>(null);
   const [packagingOk, setPackagingOk] = useState<boolean | null>(null);
   const [ratingComment, setRatingComment] = useState('');
+  const [dismissedRatingIds] = useState<Set<string>>(() => new Set());
 
   const [cardNumber, setCardNumber] = useState('');
   const [cardHolder, setCardHolder] = useState('');
@@ -243,7 +244,10 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     if (currentUserProfile) {
       const pendingRating = orders.find(
         o =>
-          o.customerId === currentUserProfile.id && o.status === OrderStatus.DELIVERED && !o.rating
+          o.customerId === currentUserProfile.id &&
+          o.status === OrderStatus.DELIVERED &&
+          !o.rating &&
+          !dismissedRatingIds.has(o.id)
       );
       if (pendingRating && !ratingOrder) setRatingOrder(pendingRating);
 
@@ -1101,6 +1105,39 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                     );
                   })}
               </div>
+
+              {/* Avaliações do restaurante */}
+              {(selectedRestaurant.ratingsCount ?? 0) > 0 && (
+                <div className="mt-8 mb-4">
+                  <div className="flex items-center gap-3 mb-4">
+                    <h3 className="text-lg font-black text-gray-900">Avaliações</h3>
+                    <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-xl px-3 py-1">
+                      <Star size={14} fill="currentColor" className="text-amber-500" />
+                      <span className="font-black text-amber-700 text-sm">{selectedRestaurant.rating.toFixed(1)}</span>
+                      <span className="text-amber-500 text-xs font-medium">({selectedRestaurant.ratingsCount})</span>
+                    </div>
+                  </div>
+                  {(selectedRestaurant.reviews || []).filter(rv => rv.comment).length > 0 ? (
+                    <div className="space-y-3">
+                      {(selectedRestaurant.reviews || []).filter(rv => rv.comment).slice(0, 5).map((rv, i) => (
+                        <div key={i} className="bg-white border border-gray-100 rounded-2xl p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-bold text-sm text-gray-700">{rv.customerName}</span>
+                            <div className="flex items-center gap-0.5">
+                              {[1,2,3,4,5].map(s => (
+                                <Star key={s} size={11} className={s <= rv.stars ? 'fill-amber-400 text-amber-400' : 'text-gray-200 fill-gray-200'} />
+                              ))}
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-500 leading-relaxed">{rv.comment}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400 font-medium">Sem comentários ainda.</p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -2176,7 +2213,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
               Avalie sua experiência com a{' '}
               <span className="text-gray-900">{ratingOrder.restaurantName}</span>
             </p>
-            <div className="flex justify-center gap-4 mb-14">
+            <div className="flex justify-center gap-4 mb-10">
               {[1, 2, 3, 4, 5].map(star => (
                 <button
                   key={star}
@@ -2187,6 +2224,16 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                 </button>
               ))}
             </div>
+            <button
+              onClick={() => {
+                dismissedRatingIds.add(ratingOrder!.id);
+                setRatingOrder(null);
+                setStoreStars(0); setDriverStars(0); setProductOk(null); setPackagingOk(null); setRatingComment('');
+              }}
+              className="text-xs text-gray-400 font-medium underline underline-offset-2 mb-6 block mx-auto"
+            >
+              Pular avaliação
+            </button>
             {storeStars > 0 && (
               <div className="space-y-6 animate-in slide-in-from-bottom duration-500">
                   {/* Driver stars */}

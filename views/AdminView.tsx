@@ -467,6 +467,8 @@ export const AdminView: React.FC = () => {
   const [confirmingReturnId, setConfirmingReturnId] = useState<string | null>(null);
   const [notifyingClientId, setNotifyingClientId] = useState<string | null>(null);
   const [notifyingDriverId, setNotifyingDriverId] = useState<string | null>(null);
+  const [closingNoReturnId, setClosingNoReturnId] = useState<string | null>(null);
+  const [confirmNoReturnId, setConfirmNoReturnId] = useState<string | null>(null);
   const [ordersStatusFilter, setOrdersStatusFilter] = useState<string>('ALL');
   const [messagingOrderId, setMessagingOrderId] = useState<string | null>(null);
   const [messageTarget, setMessageTarget] = useState<'client' | 'driver' | 'restaurant' | null>(null);
@@ -1637,6 +1639,73 @@ export const AdminView: React.FC = () => {
                                       : <><RotateCcw size={14} /> Liberar devolução e reembolsar cliente</>
                                     }
                                   </button>
+                                </div>
+
+                                {/* Encerrar sem devolução — item danificado, comida, etc. */}
+                                <div className="border-t border-gray-200 pt-3 mt-1">
+                                  {confirmNoReturnId === order.id ? (
+                                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                                      <p className="text-xs font-black text-gray-700 mb-1">⚠️ Confirmar encerramento sem devolução?</p>
+                                      <p className="text-[11px] text-gray-500 mb-3">O reembolso será processado, o entregador fica livre e o pedido será encerrado. Não é possível desfazer.</p>
+                                      <div className="flex gap-2">
+                                        <button
+                                          disabled={closingNoReturnId === order.id}
+                                          onClick={async () => {
+                                            setClosingNoReturnId(order.id);
+                                            try {
+                                              // Encerra como CANCELLED (sem devolução física)
+                                              await supabase.from('orders')
+                                                .update({ status: 'CANCELLED' })
+                                                .eq('id', order.id);
+                                              await supabase.functions.invoke('refund-asaas-payment', { body: { orderId: order.id } });
+                                              if (order.customerId) {
+                                                supabase.functions.invoke('send-push-notification', {
+                                                  body: {
+                                                    userId: order.customerId,
+                                                    title: '💚 Reembolso aprovado',
+                                                    body: `Seu pedido de ${order.restaurantName} foi encerrado pelo suporte. O reembolso foi aprovado.`,
+                                                    data: { orderId: order.id, type: 'REFUND_APPROVED' },
+                                                  },
+                                                }).catch(() => {});
+                                              }
+                                              if (order.driverId) {
+                                                supabase.functions.invoke('send-push-notification', {
+                                                  body: {
+                                                    userId: order.driverId,
+                                                    title: '✅ Pedido encerrado',
+                                                    body: `O pedido #${order.id.slice(-6)} foi encerrado pelo admin. Não é necessário devolver. Você está livre.`,
+                                                    data: { orderId: order.id, type: 'CLOSED_NO_RETURN' },
+                                                  },
+                                                }).catch(() => {});
+                                              }
+                                              await refreshData();
+                                            } catch (e: any) {
+                                              console.error('Erro ao encerrar sem devolução:', e);
+                                            } finally {
+                                              setClosingNoReturnId(null);
+                                              setConfirmNoReturnId(null);
+                                            }
+                                          }}
+                                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-gray-700 text-white rounded-xl font-black text-xs disabled:opacity-50 active:scale-95 transition-all"
+                                        >
+                                          {closingNoReturnId === order.id ? <Loader size={12} className="animate-spin" /> : '✓'} Confirmar
+                                        </button>
+                                        <button
+                                          onClick={() => setConfirmNoReturnId(null)}
+                                          className="px-3 py-2.5 bg-gray-100 text-gray-500 rounded-xl font-bold text-xs"
+                                        >
+                                          Cancelar
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => setConfirmNoReturnId(order.id)}
+                                      className="w-full text-xs font-bold text-gray-500 py-2.5 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 transition-all"
+                                    >
+                                      Encerrar sem devolução (item danificado / comida)
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             </div>

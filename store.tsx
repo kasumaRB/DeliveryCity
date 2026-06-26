@@ -319,6 +319,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ownerId: r.owner_id,
           menu: r.menu || [],
           rating: Number(r.rating || 0),
+          ratingsCount: Number(r.ratings_count || 0),
+          reviews: Array.isArray(r.reviews) ? r.reviews : [],
           asaasAccountId: r.asaas_account_id,
           coords: r.coords ?? { lat: -9.5422, lng: -57.4486 },
           isOpen: r.is_open !== false,
@@ -1541,6 +1543,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         processSyncQueue,
         submitRating: async (id, r) => {
           await supabase.from('orders').update({ rating: r }).eq('id', id);
+
+          // Atualiza média e lista de reviews do restaurante
+          const order = orders.find(o => o.id === id);
+          if (order?.restaurantId && r.storeStars > 0) {
+            const restaurant = restaurants.find(res => res.id === order.restaurantId);
+            if (restaurant) {
+              const n = restaurant.ratingsCount || 0;
+              const newCount = n + 1;
+              const newAvg = parseFloat(((restaurant.rating * n + r.storeStars) / newCount).toFixed(2));
+              const existingReviews: any[] = restaurant.reviews || [];
+              const newReview = {
+                customerName: order.customerName || 'Cliente',
+                stars: r.storeStars,
+                comment: r.comment || null,
+                timestamp: Date.now(),
+              };
+              const updatedReviews = [newReview, ...existingReviews].slice(0, 15);
+              await supabase.from('restaurants').update({
+                rating: newAvg,
+                ratings_count: newCount,
+                reviews: updatedReviews,
+              }).eq('id', order.restaurantId);
+            }
+          }
+
           await fetchData();
         },
         assignDriver: async (oid, did) => {
