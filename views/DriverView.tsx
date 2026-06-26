@@ -549,6 +549,13 @@ export const DriverView: React.FC = () => {
   const [isStartingReturn, setIsStartingReturn] = useState(false);
   const returnPhotoInputRef = useRef<HTMLInputElement>(null);
 
+  // Câmera ao vivo (getUserMedia)
+  const [showInAppCamera, setShowInAppCamera] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [capturedFrame, setCapturedFrame] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
   const activeOrder = useMemo(
     () =>
       orders.find(
@@ -665,6 +672,57 @@ export const DriverView: React.FC = () => {
     supabase.from('platform_settings').select('support_whatsapp').maybeSingle()
       .then(({ data }) => { if (data?.support_whatsapp) setSupportWhatsapp(data.support_whatsapp); });
   }, []);
+
+  // Conecta o stream de câmera ao elemento <video> após render
+  useEffect(() => {
+    if (showInAppCamera && cameraStream && videoRef.current) {
+      videoRef.current.srcObject = cameraStream;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [showInAppCamera, cameraStream]);
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      setCameraStream(stream);
+      setCapturedFrame(null);
+      setShowInAppCamera(true);
+    } catch {
+      // Sem suporte ou permissão negada — abre seletor de arquivo como fallback
+      returnPhotoInputRef.current?.click();
+    }
+  };
+
+  const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d')?.drawImage(video, 0, 0);
+    setCapturedFrame(canvas.toDataURL('image/jpeg', 0.85));
+  };
+
+  const confirmCapture = () => {
+    if (!capturedFrame || !canvasRef.current) return;
+    canvasRef.current.toBlob(blob => {
+      if (!blob) return;
+      const file = new File([blob], `return-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      setReturnPhotoFile(file);
+      setReturnPhotoPreview(capturedFrame);
+      stopCamera();
+    }, 'image/jpeg', 0.85);
+  };
+
+  const stopCamera = () => {
+    cameraStream?.getTracks().forEach(t => t.stop());
+    setCameraStream(null);
+    setShowInAppCamera(false);
+    setCapturedFrame(null);
+  };
 
   useEffect(() => {
     const handleOnline = () => {
@@ -1397,7 +1455,7 @@ export const DriverView: React.FC = () => {
           <div className="bg-gray-900 rounded-t-[3rem] w-full max-w-lg p-6 pb-10 animate-in slide-in-from-bottom-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-black text-white">Problema na entrega</h3>
-              <button onClick={() => { setShowFailedModal(false); setFailedConfirmed(false); setFailureReason(''); setReturnPhotoStep(false); setReturnPhotoPreview(null); setReturnPhotoFile(null); }} className="p-2 text-gray-400 hover:text-white">
+              <button onClick={() => { setShowFailedModal(false); setFailedConfirmed(false); setFailureReason(''); setReturnPhotoStep(false); setReturnPhotoPreview(null); setReturnPhotoFile(null); stopCamera(); }} className="p-2 text-gray-400 hover:text-white">
                 <X size={22} />
               </button>
             </div>
@@ -1553,18 +1611,26 @@ export const DriverView: React.FC = () => {
                     </button>
                   </div>
                 ) : (
-                  <button
-                    onClick={() => returnPhotoInputRef.current?.click()}
-                    className="w-full h-36 border-2 border-dashed border-orange-500/50 rounded-2xl flex flex-col items-center justify-center gap-3 text-orange-400 hover:border-orange-400 hover:bg-orange-500/5 transition-all mb-5"
-                  >
-                    <ImagePlus size={32} />
-                    <span className="text-sm font-bold">Tirar foto / Escolher imagem</span>
-                  </button>
+                  <div className="mb-5 space-y-2">
+                    <button
+                      onClick={startCamera}
+                      className="w-full h-32 border-2 border-dashed border-orange-500/50 rounded-2xl flex flex-col items-center justify-center gap-3 text-orange-400 hover:border-orange-400 hover:bg-orange-500/5 transition-all"
+                    >
+                      <Camera size={32} />
+                      <span className="text-sm font-bold">Abrir câmera</span>
+                    </button>
+                    <button
+                      onClick={() => returnPhotoInputRef.current?.click()}
+                      className="w-full py-2 text-gray-500 text-xs font-bold hover:text-gray-400 transition-all"
+                    >
+                      ou escolher da galeria
+                    </button>
+                  </div>
                 )}
 
                 <div className="flex gap-3">
                   <button
-                    onClick={() => setReturnPhotoStep(false)}
+                    onClick={() => { setReturnPhotoStep(false); stopCamera(); }}
                     className="flex-1 py-4 bg-gray-700 text-gray-300 rounded-2xl font-bold text-sm"
                   >
                     Voltar
@@ -1741,6 +1807,66 @@ export const DriverView: React.FC = () => {
         <div className="fixed bottom-24 left-6 right-6 bg-red-600 text-white py-3 px-6 rounded-2xl flex items-center justify-center gap-3 shadow-xl animate-bounce z-40">
           <WifiOff size={20} />
           <span className="font-bold text-sm">Sem conexão — modo offline</span>
+        </div>
+      )}
+
+      {/* ── Câmera ao vivo (overlay de tela cheia) ── */}
+      {showInAppCamera && (
+        <div className="fixed inset-0 z-[300] bg-black flex flex-col">
+          {!capturedFrame ? (
+            /* Visor ao vivo */
+            <div className="flex-1 relative overflow-hidden">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+              />
+              {/* Guia de enquadramento */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-64 h-64 border-2 border-white/40 rounded-2xl" />
+              </div>
+              {/* Botão cancelar */}
+              <button
+                onClick={stopCamera}
+                className="absolute top-4 left-4 p-3 bg-black/50 text-white rounded-full"
+              >
+                <X size={22} />
+              </button>
+              <p className="absolute top-4 left-1/2 -translate-x-1/2 text-white text-xs font-bold bg-black/40 px-3 py-1.5 rounded-full">
+                Fotografe o pedido
+              </p>
+              {/* Botão capturar */}
+              <div className="absolute bottom-0 left-0 right-0 pb-10 flex items-center justify-center">
+                <button
+                  onClick={capturePhoto}
+                  className="w-20 h-20 rounded-full bg-white border-4 border-gray-300 shadow-xl active:scale-95 transition-transform"
+                />
+              </div>
+            </div>
+          ) : (
+            /* Preview da foto capturada */
+            <div className="flex-1 relative overflow-hidden">
+              <img src={capturedFrame} alt="Foto capturada" className="w-full h-full object-cover" />
+              <div className="absolute bottom-0 left-0 right-0 p-6 flex gap-4">
+                <button
+                  onClick={() => setCapturedFrame(null)}
+                  className="flex-1 py-4 bg-black/60 text-white rounded-2xl font-bold text-sm flex items-center justify-center gap-2"
+                >
+                  <RotateCcw size={16} /> Tirar outra
+                </button>
+                <button
+                  onClick={confirmCapture}
+                  className="flex-1 py-4 bg-orange-500 text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2"
+                >
+                  <CheckCircle size={16} /> Usar foto
+                </button>
+              </div>
+            </div>
+          )}
+          {/* Canvas oculto para captura do frame */}
+          <canvas ref={canvasRef} className="hidden" />
         </div>
       )}
     </div>
