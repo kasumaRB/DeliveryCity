@@ -146,6 +146,17 @@ export const RestaurantView: React.FC = () => {
     'orders' | 'menu' | 'promotions' | 'stats' | 'profile' | 'support'
   >('orders');
   const [mobileKanbanTab, setMobileKanbanTab] = useState<'pending' | 'preparing' | 'ready' | 'returning'>('pending');
+
+  // Toast system
+  const [toast, setToast] = useState<{ msg: string; type: 'error' | 'success' | 'info' } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = (msg: string, type: 'error' | 'success' | 'info' = 'info') => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ msg, type });
+    toastTimer.current = setTimeout(() => setToast(null), 4500);
+  };
+
+  const [deletingPromoId, setDeletingPromoId] = useState<string | null>(null);
   const [confirmingReturnId, setConfirmingReturnId] = useState<string | null>(null);
   const [generatingCodeId, setGeneratingCodeId] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -244,7 +255,7 @@ export const RestaurantView: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file || !myRestaurant) return;
     if (!file.type.startsWith('image/')) {
-      alert('Selecione uma imagem válida');
+      showToast('Selecione uma imagem válida', 'error');
       return;
     }
     setIsSaving(true);
@@ -264,10 +275,10 @@ export const RestaurantView: React.FC = () => {
       } = supabase.storage.from('avatars').getPublicUrl(fileName);
       await updateRestaurant(myRestaurant.id, { image: publicUrl });
       setRestaurantImage(publicUrl);
-      alert('Foto da loja atualizada!');
+      showToast('Foto da loja atualizada!', 'success');
     } catch (error: any) {
       console.error('Full error:', error);
-      alert('Erro ao atualizar foto: ' + (error.message || error));
+      showToast('Erro ao atualizar foto: ' + (error.message || error), 'error');
     } finally {
       setIsSaving(false);
     }
@@ -279,7 +290,7 @@ export const RestaurantView: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      alert('Selecione uma imagem válida');
+      showToast('Selecione uma imagem válida', 'error');
       return;
     }
     setIsSaving(true);
@@ -301,10 +312,10 @@ export const RestaurantView: React.FC = () => {
         data: { publicUrl },
       } = supabase.storage.from('avatars').getPublicUrl(fileName);
       setItemFormImage(publicUrl);
-      alert('Imagem carregada!');
+      showToast('Imagem carregada!', 'success');
     } catch (error: any) {
       console.error('Full error:', error);
-      alert('Erro ao carregar imagem: ' + (error.message || error));
+      showToast('Erro ao carregar imagem: ' + (error.message || error), 'error');
     } finally {
       setIsSaving(false);
     }
@@ -341,7 +352,7 @@ export const RestaurantView: React.FC = () => {
   const handleSaveItem = async () => {
     if (!itemFormImage) {
       setItemFormImageError(true);
-      alert('Foto do prato é obrigatória. Adicione uma imagem antes de salvar.');
+      showToast('Foto do prato é obrigatória. Adicione uma imagem antes de salvar.', 'error');
       return;
     }
     setItemFormImageError(false);
@@ -374,9 +385,9 @@ export const RestaurantView: React.FC = () => {
           category: itemFormCategory || undefined,
         });
       resetMenuForm();
-      alert('Item salvo!');
+      showToast('Item salvo!', 'success');
     } catch (e: any) {
-      alert('Erro ao salvar: ' + e.message);
+      showToast('Erro ao salvar: ' + e.message, 'error');
     }
   };
 
@@ -407,9 +418,9 @@ export const RestaurantView: React.FC = () => {
         }),
       ]);
       setShowEditModal(false);
-      alert('Perfil da loja atualizado com sucesso!');
+      showToast('Perfil da loja atualizado com sucesso!', 'success');
     } catch (e: any) {
-      alert('Erro ao salvar: ' + (e?.message || 'Tente novamente'));
+      showToast('Erro ao salvar: ' + (e?.message || 'Tente novamente'), 'error');
     } finally {
       setIsSaving(false);
     }
@@ -428,11 +439,11 @@ export const RestaurantView: React.FC = () => {
         created_at: new Date().toISOString(),
       });
       if (error) throw error;
-      alert('Mensagem enviada! Retornaremos em breve.');
+      showToast('Mensagem enviada! Retornaremos em breve.', 'success');
       setSupportMessage('');
       setActiveTab('orders');
     } catch (e: any) {
-      alert('Erro ao enviar mensagem.');
+      showToast('Erro ao enviar mensagem.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -480,9 +491,9 @@ export const RestaurantView: React.FC = () => {
 
     try {
       await updateRestaurant(myRestaurant.id, { promotions: updatedPromos });
-      alert(editingPromo ? 'Promoção atualizada!' : 'Promoção criada!');
+      showToast(editingPromo ? 'Promoção atualizada!' : 'Promoção criada!', 'success');
     } catch (e: any) {
-      alert('Erro ao salvar promoção: ' + e.message);
+      showToast('Erro ao salvar promoção: ' + e.message, 'error');
       return;
     }
 
@@ -499,7 +510,9 @@ export const RestaurantView: React.FC = () => {
   };
 
   const handleDeletePromotion = async (promoId: string) => {
-    if (!myRestaurant || !window.confirm('Tem certeza que deseja excluir esta promoção?')) return;
+    if (!myRestaurant) return;
+    if (deletingPromoId !== promoId) { setDeletingPromoId(promoId); return; }
+    setDeletingPromoId(null);
     const updatedPromos = (myRestaurant.promotions || []).filter(p => p.id !== promoId);
     await updateRestaurant(myRestaurant.id, { promotions: updatedPromos });
   };
@@ -519,6 +532,19 @@ export const RestaurantView: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F8F9FB] flex flex-col md:flex-row h-screen overflow-hidden safe-area-top safe-area-bottom">
+      {/* TOAST */}
+      {toast && (
+        <div className={`fixed top-4 left-4 right-4 z-[300] px-4 py-3 rounded-2xl text-white font-bold text-sm shadow-2xl animate-in slide-in-from-top duration-300 flex items-start gap-3 ${
+          toast.type === 'error' ? 'bg-red-600' :
+          toast.type === 'success' ? 'bg-green-600' :
+          'bg-gray-800 border border-gray-700'
+        }`}>
+          <span>{toast.type === 'error' ? '⚠️' : toast.type === 'success' ? '✅' : 'ℹ️'}</span>
+          <span className="leading-snug flex-1">{toast.msg}</span>
+          <button onClick={() => setToast(null)} className="ml-auto p-1 rounded-lg hover:bg-white/20 transition-colors shrink-0"><X size={16} /></button>
+        </div>
+      )}
+
       {/* SIDEBAR DESKTOP */}
       <aside className="hidden md:flex w-64 bg-white border-r border-gray-200 flex-col py-8 px-5 h-full">
         <div className="flex items-center gap-3 mb-10 px-2">
@@ -602,7 +628,7 @@ export const RestaurantView: React.FC = () => {
                     onClick={async () => {
                       const next = !myRestaurant.isOpen;
                       if (next && (!myRestaurant.menu || myRestaurant.menu.length === 0)) {
-                        alert('Adicione pelo menos um produto ao cardápio antes de abrir a loja.');
+                        showToast('Adicione pelo menos um produto ao cardápio antes de abrir a loja.', 'error');
                         return;
                       }
                       await updateRestaurant(myRestaurant.id, { isOpen: next });
@@ -860,7 +886,7 @@ export const RestaurantView: React.FC = () => {
                             onClick={async () => {
                               setGeneratingCodeId(order.id);
                               try { await generateReturnCode(order.id); }
-                              catch (e: any) { alert(e.message || 'Erro ao gerar código.'); }
+                              catch (e: any) { showToast(e.message || 'Erro ao gerar código.', 'error'); }
                               finally { setGeneratingCodeId(null); }
                             }}
                             className="w-full bg-orange-600 text-white py-2.5 rounded-xl font-black text-xs tracking-wide active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
@@ -1301,12 +1327,29 @@ export const RestaurantView: React.FC = () => {
                       >
                         <Edit2 size={18} />
                       </button>
-                      <button
-                        onClick={() => handleDeletePromotion(promo.id)}
-                        className="p-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-100"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                      {deletingPromoId === promo.id ? (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => handleDeletePromotion(promo.id)}
+                            className="px-3 py-2 bg-red-600 text-white rounded-xl text-xs font-black"
+                          >
+                            Confirmar
+                          </button>
+                          <button
+                            onClick={() => setDeletingPromoId(null)}
+                            className="p-2 bg-gray-100 text-gray-500 rounded-xl"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleDeletePromotion(promo.id)}
+                          className="p-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-100"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1829,9 +1872,7 @@ export const RestaurantView: React.FC = () => {
             setShowLocationModal(false);
           }}
           initialAddress={
-            storeCoords
-              ? ({ coords: storeCoords, street: storeAddress, number: '', neighborhood: '', city: 'Apiacás', state: 'MT', label: 'Loja', zipCode: '' } as UserAddress)
-              : null
+            { coords: storeCoords ?? undefined, street: '', number: '', neighborhood: '', city: 'Apiacás', state: 'MT', label: 'Loja', zipCode: '' } as UserAddress
           }
           title="Localização da Loja"
           saveButtonLabel="Confirmar Localização"
@@ -1878,7 +1919,7 @@ export const RestaurantView: React.FC = () => {
                 <div className="relative">
                   <input
                     value={storeAddress}
-                    onChange={e => setStoreAddress(e.target.value)}
+                    onChange={e => { setStoreAddress(e.target.value); setStoreCoords(null); }}
                     placeholder="Endereço da loja"
                     className="w-full p-5 pr-14 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-orange-100"
                   />
