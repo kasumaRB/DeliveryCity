@@ -476,9 +476,9 @@ export const AddressModal: React.FC<AddressModalProps> = ({
               className="flex-1 bg-gray-100 text-gray-500 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition">
               Cancelar
             </button>
-            <button onClick={handleConfirm} disabled={isGeocodingLoading}
-              className="flex-1 bg-orange-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-orange-700 transition shadow-xl shadow-orange-100 disabled:opacity-60 disabled:cursor-not-allowed">
-              {isGeocodingLoading ? 'Aguardando...' : saveButtonLabel}
+            <button onClick={handleConfirm}
+              className="flex-1 bg-orange-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-orange-700 transition shadow-xl shadow-orange-100 active:scale-95">
+              {isGeocodingLoading ? `${saveButtonLabel} ✓` : saveButtonLabel}
             </button>
           </div>
         </div>
