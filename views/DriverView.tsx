@@ -461,7 +461,21 @@ export const DriverView: React.FC = () => {
       }
     }
     setIsAvailable(next);
-    try { await updateUserProfile(currentUserProfile!.id, { isOnline: next }); }
+    try {
+      await updateUserProfile(currentUserProfile!.id, { isOnline: next });
+      // Ao ficar disponível, verifica se há pedidos READY esperando e avisa o entregador
+      if (next) {
+        const pendentes = orders.filter(o => o.status === OrderStatus.READY && !o.driverId);
+        if (pendentes.length > 0) {
+          const txt = pendentes.length === 1
+            ? `Há 1 pedido esperando entregador! Role para ver.`
+            : `Há ${pendentes.length} pedidos esperando entregador! Role para ver.`;
+          // toast leve sem bloquear — usa alert só se não houver outro mecanismo visual
+          // (o próprio card aparece na lista abaixo assim que isAvailable = true)
+          setTimeout(() => alert(txt), 300);
+        }
+      }
+    }
     catch { setIsAvailable(!next); }
   };
 

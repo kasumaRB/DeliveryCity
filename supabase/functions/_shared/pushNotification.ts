@@ -153,7 +153,8 @@ export async function sendPushToUser(
   }
 }
 
-// ── Envia para todos os entregadores aprovados e online ───────────────────
+// ── Envia para todos os entregadores aprovados (online ou offline) ────────
+// Entregadores offline recebem a notificação para que possam vir trabalhar.
 export async function sendPushToAllDrivers(
   supabase: any,
   payload: PushPayload
@@ -164,7 +165,6 @@ export async function sendPushToAllDrivers(
       .select('push_token')
       .eq('role', 'DRIVER')
       .eq('status', 'APPROVED')
-      .eq('is_online', true)
       .not('push_token', 'is', null);
 
     if (!drivers?.length) return;
