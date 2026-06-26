@@ -53,6 +53,13 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const { currentUserProfile, updateUserProfile, orders, signOut } = useAppStore();
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [profileToast, setProfileToast] = useState<{ msg: string; type: 'error' | 'success' | 'info' } | null>(null);
+  const profileToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showProfileToast = (msg: string, type: 'error' | 'success' | 'info' = 'info') => {
+    if (profileToastTimer.current) clearTimeout(profileToastTimer.current);
+    setProfileToast({ msg, type });
+    profileToastTimer.current = setTimeout(() => setProfileToast(null), 4500);
+  };
   const [vehicle, setVehicle] = useState(currentUserProfile?.vehicleType || 'Moto');
   const [plate, setPlate] = useState(currentUserProfile?.licensePlate || '');
   const [phone, setPhone] = useState(currentUserProfile?.phoneNumber || '');
@@ -118,7 +125,7 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(data.path);
       await updateUserProfile(currentUserProfile.id, { avatarUrl: publicUrl });
     } catch (e: any) {
-      alert('Erro ao enviar foto: ' + (e?.message || 'Tente novamente'));
+      showProfileToast('Erro ao enviar foto: ' + (e?.message || 'Tente novamente'), 'error');
     } finally {
       setIsUploadingAvatar(false);
     }
@@ -144,10 +151,10 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         cpf,
         savedAddresses: newSavedAddresses,
       });
-      alert('Dados atualizados!');
-      onBack();
+      showProfileToast('Dados atualizados!', 'success');
+      setTimeout(onBack, 1200);
     } catch (e: any) {
-      alert('Erro ao salvar: ' + (e?.message || 'Tente novamente'));
+      showProfileToast('Erro ao salvar: ' + (e?.message || 'Tente novamente'), 'error');
     } finally {
       setIsSaving(false);
     }
@@ -156,6 +163,22 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const vehicleIcons: Record<string, string> = { Moto: '🏍️', Bicicleta: '🚲', Carro: '🚗' };
 
   return (
+    <>
+    {profileToast && (
+      <div className={`fixed top-4 left-4 right-4 z-[300] px-4 py-3 rounded-2xl text-white font-bold text-sm shadow-2xl animate-in slide-in-from-top duration-300 flex items-start gap-3 ${
+        profileToast.type === 'error'   ? 'bg-red-600' :
+        profileToast.type === 'success' ? 'bg-green-600' :
+        'bg-gray-800 border border-gray-700'
+      }`}>
+        <span className="text-lg leading-none shrink-0">
+          {profileToast.type === 'error' ? '⚠️' : profileToast.type === 'success' ? '✅' : 'ℹ️'}
+        </span>
+        <span className="leading-snug">{profileToast.msg}</span>
+        <button onClick={() => setProfileToast(null)} className="ml-auto text-white/60 hover:text-white shrink-0">
+          <X size={16} />
+        </button>
+      </div>
+    )}
     <div className="animate-in fade-in" style={{ paddingBottom: 'max(40px, env(safe-area-inset-bottom))' }}>
       {/* Hero */}
       <div className="bg-gradient-to-br from-gray-900 via-blue-950 to-gray-900 px-6 pt-6 pb-10 relative">
@@ -391,6 +414,7 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         />
       )}
     </div>
+    </>
   );
 };
 
@@ -417,6 +441,15 @@ export const DriverView: React.FC = () => {
   const [supportMessage, setSupportMessage] = useState('');
   const [supportSending, setSupportSending] = useState(false);
   const [supportWhatsapp, setSupportWhatsapp] = useState<string | null>(null);
+
+  // Toast estilizado — substitui alert() nativo
+  const [toast, setToast] = useState<{ msg: string; type: 'error' | 'success' | 'info' } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = (msg: string, type: 'error' | 'success' | 'info' = 'info') => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ msg, type });
+    toastTimer.current = setTimeout(() => setToast(null), 4500);
+  };
   const [showTutorial, setShowTutorial] = useState(false);
   useEffect(() => {
     if (!currentUserProfile) return;
@@ -448,14 +481,14 @@ export const DriverView: React.FC = () => {
     const next = !isAvailable;
     if (next) {
       if (gpsBlocked) {
-        alert('Localização bloqueada. Vá em Configurações do celular → Permissões do app → Localização e ative o acesso.');
+        showToast('Localização bloqueada. Vá em Configurações → Permissões do app → Localização e ative o acesso.', 'error');
         return;
       }
       // Aceita qualquer endereço com coordenadas como base de atuação (não exige
       // o label 'Base' especificamente — o endereço de cadastro 'Principal' também vale).
       const hasBase = currentUserProfile?.savedAddresses?.some(a => a.coords);
       if (!hasBase) {
-        alert('Configure sua região de atuação no perfil antes de ficar disponível.');
+        showToast('Configure sua região de atuação no perfil antes de ficar disponível.', 'error');
         setActiveTab('profile');
         return;
       }
@@ -468,11 +501,9 @@ export const DriverView: React.FC = () => {
         const pendentes = orders.filter(o => o.status === OrderStatus.READY && !o.driverId);
         if (pendentes.length > 0) {
           const txt = pendentes.length === 1
-            ? `Há 1 pedido esperando entregador! Role para ver.`
-            : `Há ${pendentes.length} pedidos esperando entregador! Role para ver.`;
-          // toast leve sem bloquear — usa alert só se não houver outro mecanismo visual
-          // (o próprio card aparece na lista abaixo assim que isAvailable = true)
-          setTimeout(() => alert(txt), 300);
+            ? 'Há 1 pedido esperando entregador! Veja abaixo.'
+            : `Há ${pendentes.length} pedidos esperando entregador! Veja abaixo.`;
+          setTimeout(() => showToast(txt, 'info'), 300);
         }
       }
     }
@@ -562,10 +593,10 @@ export const DriverView: React.FC = () => {
         created_at: new Date().toISOString(),
       });
       if (error) throw error;
-      alert('Mensagem enviada! Retornaremos em breve. ✅');
+      showToast('Mensagem enviada! Retornaremos em breve.', 'success');
       setSupportMessage('');
       setActiveTab('home');
-    } catch { alert('Erro ao enviar. Tente novamente.'); }
+    } catch { showToast('Erro ao enviar. Tente novamente.', 'error'); }
     finally { setSupportSending(false); }
   };
 
@@ -674,7 +705,7 @@ export const DriverView: React.FC = () => {
         setShowCodeInput(false);
         setInputCode('');
       } else {
-        alert('Código inválido.');
+        showToast('Código inválido. Verifique e tente novamente.', 'error');
       }
       setIsVerifying(false);
     } else {
@@ -709,8 +740,7 @@ export const DriverView: React.FC = () => {
             const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
             await supabase.from('orders').update({ delivery_photo_url: publicUrl }).eq('id', activeOrder.id);
           } catch {
-            // Entrega já confirmada — foto é opcional, apenas avisa
-            alert('Entrega confirmada! Mas não foi possível salvar a foto (verifique sua conexão).');
+            showToast('Entrega confirmada! Não foi possível salvar a foto — verifique sua conexão.', 'info');
           }
         }
         setShowCodeInput(false);
@@ -719,11 +749,11 @@ export const DriverView: React.FC = () => {
         setDeliveryPhotoPreview(null);
         setDeliveryPhotoFile(null);
       } else {
-        alert('Código inválido. Volte e verifique o código.');
+        showToast('Código inválido. Volte e verifique o código.', 'error');
         setDeliveryPhotoStep(false);
       }
     } catch (e: any) {
-      alert('Erro ao confirmar entrega: ' + (e.message || 'Tente novamente'));
+      showToast('Erro ao confirmar entrega: ' + (e.message || 'Tente novamente'), 'error');
     } finally {
       setIsUploadingPhoto(false);
     }
@@ -757,6 +787,24 @@ export const DriverView: React.FC = () => {
         onClose={() => { markSeen('DRIVER'); updateUserProfile(currentUserProfile!.id, { driverTutorialSeen: true }).catch(() => {}); setShowTutorial(false); }}
       />
     )}
+
+    {/* Toast estilizado — substitui alert() nativo */}
+    {toast && (
+      <div className={`fixed top-4 left-4 right-4 z-[300] px-4 py-3 rounded-2xl text-white font-bold text-sm shadow-2xl animate-in slide-in-from-top duration-300 flex items-start gap-3 ${
+        toast.type === 'error'   ? 'bg-red-600' :
+        toast.type === 'success' ? 'bg-green-600' :
+        'bg-gray-800 border border-gray-700'
+      }`}>
+        <span className="text-lg leading-none shrink-0">
+          {toast.type === 'error' ? '⚠️' : toast.type === 'success' ? '✅' : 'ℹ️'}
+        </span>
+        <span className="leading-snug">{toast.msg}</span>
+        <button onClick={() => setToast(null)} className="ml-auto text-white/60 hover:text-white shrink-0">
+          <X size={16} />
+        </button>
+      </div>
+    )}
+
     <div className="h-dvh bg-gray-950 flex justify-center overflow-hidden">
     <div className="flex flex-col w-full md:max-w-2xl bg-gray-900 text-white overflow-hidden safe-area-top md:border-x md:border-gray-800/60">
 
@@ -917,7 +965,7 @@ export const DriverView: React.FC = () => {
                     <button
                       onClick={async () => {
                         try { await startReturn(activeOrder.id); }
-                        catch (e: any) { alert(e.message || 'Erro ao iniciar devolução.'); }
+                        catch (e: any) { showToast(e.message || 'Erro ao iniciar devolução.', 'error'); }
                       }}
                       className="w-full py-4 bg-orange-500 text-white rounded-xl font-black text-sm tracking-wide flex items-center justify-center gap-2 active:scale-95 transition-all"
                     >
@@ -1026,7 +1074,7 @@ export const DriverView: React.FC = () => {
                           onClick={async () => {
                             if (!isOnline || acceptingOrderId) return;
                             if (!currentUserProfile?.pixKey) {
-                              alert('Cadastre sua chave PIX no perfil antes de aceitar corridas — sem ela você não recebe o pagamento.');
+                              showToast('Cadastre sua chave PIX no perfil antes de aceitar corridas — sem ela você não recebe o pagamento.', 'error');
                               setActiveTab('profile');
                               return;
                             }
@@ -1034,7 +1082,7 @@ export const DriverView: React.FC = () => {
                             try {
                               await assignDriver(order.id, currentUserProfile?.id!);
                             } catch (e: any) {
-                              alert(e.message || 'Não foi possível aceitar este pedido.');
+                              showToast(e.message || 'Não foi possível aceitar este pedido.', 'error');
                             } finally {
                               setAcceptingOrderId(null);
                             }
@@ -1337,7 +1385,7 @@ export const DriverView: React.FC = () => {
                               data: { orderId: activeOrder.id, type: 'DRIVER_WAITING' },
                             },
                           }).catch(() => {});
-                          alert('Notificação enviada ao cliente!');
+                          showToast('Notificação enviada ao cliente!', 'success');
                         }}
                         className="flex-1 py-3 bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded-xl font-bold text-sm flex items-center justify-center gap-2"
                       >
@@ -1389,7 +1437,7 @@ export const DriverView: React.FC = () => {
                       await reportFailedDelivery(activeOrder.id, failureReason);
                       setFailedConfirmed(true);
                     } catch (e: any) {
-                      alert(e.message || 'Erro ao registrar falha.');
+                      showToast(e.message || 'Erro ao registrar falha.', 'error');
                     } finally {
                       setIsReportingFailed(false);
                     }
@@ -1421,7 +1469,7 @@ export const DriverView: React.FC = () => {
                       await startReturn(activeOrder.id);
                       setShowFailedModal(false);
                     } catch (e: any) {
-                      alert(e.message || 'Erro ao iniciar devolução.');
+                      showToast(e.message || 'Erro ao iniciar devolução.', 'error');
                     }
                   }}
                   className="w-full py-4 bg-orange-500 text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2"
