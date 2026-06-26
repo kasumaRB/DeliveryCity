@@ -3,6 +3,12 @@
 > Investigação por 5 agentes paralelos (store, ClientView, RestaurantView+DriverView, AdminView+EdgeFunctions, transversal).
 > Achados validados contra o banco de produção real (projeto `fnhjxqppcrbepgwcrqzw`).
 > Falsos positivos já removidos (ver seção final).
+>
+> **Total catalogado: ~204 problemas validados** em 3 rodadas —
+> Parte 1 (fluxo, 61) · Parte 2 (jornadas por persona, 93) · Parte 3 (segurança/dinheiro/infra, ~50).
+> **Mais urgentes:** RLS-1/2 (PII vaza pra `anon`), RLS-3/4 (fraude financeira + auto-promoção a ADMIN),
+> SEC-01 (reembolso sem autorização), MONEY-01 (repasse duplicado). Causa raiz de RLS:
+> `database/supabase-production-security.sql` nunca foi aplicado em produção.
 
 ---
 
@@ -290,6 +296,92 @@
 
 ### Baixos
 - **ENT-15** tick 60s re-renderiza tudo `:446`; **ENT-16** ETA 25 km/h (4ª fórmula) `:654`; **ENT-17** fallback 1.5km distorce score `:639`; **ENT-18** data da review = criação `:1306`; **ENT-19** avatar sem cache-busting `:122`; **ENT-20** três conceitos de "nota" (driverScore/averageRating/avgRating) `:235,968`; **ENT-21** fechar modal no X após reportar falha permite bypass da foto via card `:1458,1060`.
+
+---
+---
+
+# Parte 3 — Mergulho profundo: segurança, dinheiro e infraestrutura
+
+> 3ª rodada de auditoria (5 agentes especializados) cobrindo camadas ainda não exploradas:
+> Edge Functions, RLS/banco, Auth/onboarding, componentes compartilhados, Realtime/offline.
+> Achados de RLS e do `refund` **validados diretamente no banco de produção** (`pg_policies`, grants).
+
+## 🔒 Segurança do banco (RLS) — causa raiz: `database/supabase-production-security.sql` NUNCA foi aplicado
+
+### Críticos
+- **RLS-1** — Policy `"Perfis públicos para leitura"` em `profiles` tem `qual = true` para `{public}`. **Qualquer um — inclusive `anon` (sem login) — lê CPF, CNPJ, chave PIX, `saved_cards`, `asaas_account_id`, `current_location` de TODOS os usuários.** Vazamento massivo de PII e dados financeiros. ✅ confirmado em `pg_policies`.
+- **RLS-2** — Role `anon` mantém grants `SELECT,INSERT,UPDATE,DELETE` em `profiles`, `orders`, `products`, `restaurants`. A intenção (`REVOKE ... FROM anon`) nunca rodou. ✅ confirmado em `role_table_grants`.
+- **RLS-3** — `orders_update` tem `with_check = null`. O cliente pode reescrever `total`, `subtotal`, `platform_fee`, `driver_net_earnings`, `status`, `driver_split_released`, `delivery_code` do próprio pedido → marcar como pago/entregue, zerar taxas, liberar split. **Fraude financeira direta.** ✅ confirmado.
+- **RLS-4** — `profiles_update` valida só posse da linha (`auth.uid() = id`), não as colunas. **Qualquer usuário pode setar o próprio `role='ADMIN'`, `status='APPROVED'` ou inflar `commission_balance`.** Escalonamento de privilégio para ADMIN. ✅ confirmado.
+
+### Altos / Médios
+- **RLS-5** — `products_select` e `restaurants_select` com `qual = true` expõem `products.owner_price` (preço de custo do lojista) e `restaurants.cnpj`/`phone_number` a `anon`. Vazamento de margem comercial e CNPJ.
+- **RLS-6** — RPCs `SECURITY DEFINER` (`upsert_profile`, `delete_user_by_id`) executáveis por `authenticated`; `upsert_profile` aceita `p_role`/`p_status` arbitrários → 2º caminho de auto-promoção a ADMIN mesmo que RLS-4 seja corrigido.
+- **RLS-7** *(bug funcional)* — `increment_balance` faz `UPDATE profiles SET balance = ...`, mas a coluna chama `commission_balance`; `balance` não existe → função quebra em runtime.
+- **RLS-8** — "Leaked Password Protection" desabilitado (advisor); policies de `orders` usam `auth.uid()` sem `(select ...)` (re-avaliação por linha); FKs `orders.driver_id`/`products.restaurant_id` sem índice.
+
+## 💰 Edge Functions (pagamento/repasse/reembolso)
+
+### Críticos
+- **SEC-01** — `refund-asaas-payment` usa `SERVICE_ROLE_KEY` (ignora RLS) e **nunca chama `auth.getUser()`** nem valida dono/status do pedido. Qualquer usuário logado reembolsa o pedido de qualquer outro passando o `orderId` — inclusive pedidos `DELIVERED` (repasses já pagos) → plataforma paga em dobro. Único atenuante: idempotência por `refunded_at`. `refund-asaas-payment/index.ts:33-51`. ✅ confirmado lendo o código.
+- **MONEY-01** — `release-payment-splits` faz idempotência ler-depois-escrever **não-atômica** (`select driver_split_released` → `update ...=true`). Duas chamadas simultâneas leem `false` e ambas pagam → **repasse duplicado** a restaurante e entregador. Deveria ser `UPDATE ... WHERE driver_split_released=false` + checar linhas afetadas. `release-payment-splits/index.ts:107-116`.
+
+### Médios
+- **MONEY-02** — `release-payment-splits` marca `driver_split_released=true` **antes** de tentar os PIX. Se o PIX falha, vira `warning` e retorna `200 released:true` → repasse **perdido pra sempre, sem retry**. `:116,149-182`.
+- **RESIL-01** — Se o PIX do restaurante passa mas o do entregador falha (ou vice-versa), não há rollback nem reprocessamento parcial (flag já travada). Faltam flags separadas `restaurant_split_released`/`driver_split_released`. `:141-182`.
+- **SEC-03** — `handle-asaas-webhook` confia em `externalReference` sem cruzar com o `asaas_payment_id` salvo no pedido; só amarra por valor. Se o token de webhook vazar, marca qualquer pedido como pago. `:73-82`.
+- **SEC-04** — CORS `Access-Control-Allow-Origin: '*'` em todas as funções, inclusive as de dinheiro. Combinado com SEC-01, qualquer site chama do navegador da vítima. `_shared/cors.ts:2`.
+
+### Baixos / a remover
+- **SEC-02** — `release-driver-split` é **código morto** (não é mais chamado; `assignDriver` não paga no aceite). Risco real = zero hoje, mas é uma função perigosa (repasse sem idempotência) que deve ser **removida** para não ser religada por engano. Reclassificado de crítico para limpeza.
+- **CORR-02** — `detectPixKeyType` pode classificar telefone de 11 díg. como CPF → PIX rejeitado (silencioso via MONEY-02). `release-payment-splits/index.ts:36-44`.
+- **RESIL-02** — `create-asaas-account` não verifica erro do update em `restaurants`; se falhar, próxima chamada cria **outra** subconta Asaas órfã. `:139-148`.
+- **CORR-01** — `totalCents` na verdade contém reais (valor correto, nome enganoso, convida bug ×100 futuro). `create-asaas-payment/index.ts:224`.
+- **CORR-03** — `create-asaas-payment` retorna falhas de pagamento com HTTP 200; mascara erros em monitoramento.
+
+## 🔑 Auth / Sessão / Onboarding
+
+### Críticos
+- **AUTH-2** — "Self-healing" recria qualquer sessão sem perfil como `role:CLIENT, status:APPROVED`. Um parceiro BLOCKED/PENDING que perca o perfil vira **cliente aprovado**, furando a moderação. `store.tsx:369-393`.
+- **AUTH-3** — `deleteAccount` apaga `profiles` e chama `delete-auth-user` com `.catch(()=>{})` (erro engolido). Deixa órfãos: restaurante com `owner_id` morto, pedidos ativos sem contraparte, conta `auth` viva que dispara AUTH-2. `store.tsx:1140-1147`.
+
+### Médios
+- **AUTH-1** — E-mail não normalizado no `signUp`/login (profile salva lowercase, mas `auth.signUp` recebe cru); sem checagem de e-mail duplicado normalizado. `AuthView.tsx:420-424,570`.
+- **AUTH-4** — Efeito `setCurrentRole(profile.role)` reverte a troca manual de papel do admin a cada update Realtime de perfil; acoplamento frágil com `App.tsx` (que confia em `currentRole`). `store.tsx:149-153`.
+- **AUTH-5** — Onboarding força `COMPLETE_PROFILE` só para parceiros. Cliente via Google entra sem telefone nem endereço → pode chegar ao checkout com dados vazios. `AuthView.tsx:250-256,606-614`.
+- **AUTH-6** — Senha mínima 6 chars sem complexidade; sem rate limit no client para login nem reset de senha. `AuthView.tsx:309,549,566`.
+- **AUTH-7** — Erro de login genérico ("Credenciais inválidas ou e-mail não confirmado") não distingue senha errada de e-mail pendente; sem botão "reenviar confirmação". `AuthView.tsx:575`.
+- **AUTH-8** — Regex de erro dispara `signOut()` automático; em falha de refresh transitória ao voltar do background, derruba a sessão em vez de retentar. `store.tsx:441-447`.
+
+### Baixos
+- **AUTH-9** PII de terceiros (CPF/PIX/cartões de todos) em `localStorage` não criptografado durante a sessão `store.tsx:396`; **AUTH-10** `birthDate` string sem validação na edição; **AUTH-11** avatar sem checagem de tamanho, UX via `alert()`; **AUTH-12** cadastro de parceiro: `restaurants.upsert` separado do RPC pode divergir.
+- *(Mitigados/sem bug: race de `onAuthStateChange` protegida por refs/throttle; loading travado tem saída de emergência; logout presente em todos os estados.)*
+
+## 🧩 Componentes / serviços compartilhados
+
+### Críticos / Altos
+- **SHARED-5** — Chave Gemini exposta no bundle client (`VITE_GEMINI_API_KEY`). Qualquer um extrai do bundle → abuso de cota/custo. Deveria ser proxiada por Edge Function. `services/geminiService.ts:4`.
+- **SHARED-2** — `geocodeAddress`/`searchAddresses` retornam `{lat:NaN, lng:NaN}` sem validação se Nominatim devolve item inválido → coords inválidas salvas ou distância NaN. `services/mapsService.ts:45,162`.
+- **SHARED-4** — `AddressModal.handleConfirm` salva sem validar número/CEP/rua; cai em fallbacks (rua = "lat, lng", CEP genérico da cidade) sem bloquear o botão → entregador recebe endereço inútil. `components/AddressModal.tsx:261-281`.
+- **SHARED-3** — `getRealDistances` nunca consulta roteamento real (Haversine ×1.4 + estimativa) mas marca `isFallback:false`; o nome e a flag enganam — distância "real" é sempre aproximada. `services/mapsService.ts:113-143`.
+
+### Médios / Baixos
+- **SHARED-1** — Sistema de toast oficial (`components/Notification.tsx`) é **código morto**; cada view reimplementa o seu, divergente (durações e empilhamento diferentes). `RestaurantView.tsx:162`, `DriverView.tsx:56`.
+- **SHARED-6** fallback de UF errado p/ estados fora do map (ex: "Distrito Federal"→"DI"); **SHARED-7** `useApi` com `immediate` entra em loop se `apiFunction` não memoizada; **SHARED-8** `throw lastError` lança string, não `Error`; **SHARED-9** auto-dismiss do toast reinicia timer a cada render do pai; **SHARED-10** AddressModal remove `<style>` global no unmount.
+- *(Sem bug: `useAndroidBack`, `DriverTrackingMap`, `DeleteAccountModal`, `offlineService`, `lookupCEP` — cleanup e validação corretos.)*
+
+## 🔄 Realtime / Offline / Sincronização
+
+### Críticos
+- **SYNC-1** — Os 3 canais (`profiles/orders/restaurants-realtime`) chamam `.subscribe()` **sem callback de status** — sem tratar `CHANNEL_ERROR`/`TIMED_OUT`/`CLOSED` nem refetch ao reconectar. Socket cai (background, troca de rede) → eventos param **silenciosamente** e o estado congela sem aviso. `store.tsx:740,755,783`.
+- **SYNC-2** — Handlers Realtime aplicam `payload.new` cegamente sem comparar versão/timestamp. Evento atrasado pode **reverter** estado mais novo (incl. sobrescrever update otimista offline). Não há `updated_at`/seq para resolver conflito. `store.tsx:742-755`.
+- **SYNC-3** — `processSyncQueue` sem guard de reentrância (gatilho `online` + resume) → confirmação enviada 2x; `clearSyncQueue()` no fim apaga a fila inteira se um item falha. Atenuado por updates condicionais por status, mas duplicação por flapping é real. `store.tsx:573-588`.
+
+### Médios / Baixos
+- **SYNC-4** — Sem polling de fallback: se o Realtime cair de forma persistente com app em foreground, o estado nunca atualiza (lojista não vê pedidos novos). `store.tsx`.
+- **SYNC-6** — `updateOrderStatus` e edição de cardápio (read-modify-write do JSON `menu`) **não-atômicos**; 2 lojistas em 2 abas → última gravação sobrescreve a outra (produto perdido). `store.tsx:1481,1666-1701`.
+- **SYNC-5** stale closure parcial em `processSyncQueue` registrado em listener; **SYNC-8** camada offline usa `localStorage` (limpável pelo WebView) em vez de Capacitor Preferences; **SYNC-9** reentrância de `onResume` (protegida por ref).
+- *(Sem bug: aceite de pedido `assignDriver` protegido por `.is('driver_id',null).maybeSingle()`.)*
 
 ---
 ---
