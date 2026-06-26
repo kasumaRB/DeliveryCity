@@ -1090,10 +1090,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const { error } = await supabase.from('profiles').update(up).eq('id', id);
     if (error) throw error;
+
+    // Atualiza currentUserProfile imediatamente (antes do fetchData) para que
+    // verificações como hasBase sejam refletidas instantaneamente na UI.
+    if (id === sessionRef.current?.user?.id) {
+      setCurrentUserProfile(prev => prev ? { ...prev, ...data } : prev);
+    }
+
     // Se a única mudança é currentLocation, não faz fetchData completo (seria chamado a cada GPS update)
     const isOnlyLocationUpdate =
       Object.keys(data).length === 1 && data.currentLocation !== undefined;
-    if (!isOnlyLocationUpdate) await fetchData();
+    if (!isOnlyLocationUpdate) await fetchData(true);
 
     if (data.status === 'APPROVED') {
       const profile = { role: profileRoleSnapshot } as any;
