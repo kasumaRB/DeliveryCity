@@ -1168,7 +1168,13 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                         travelMins = Math.ceil(distKm * 1.35 * 3 + 5);
                       }
                       const totalEstMins = prepMins + travelMins;
-                      const eta = order.confirmedAt ? order.confirmedAt + totalEstMins * 60 * 1000 : null;
+                      // Se pedido já está READY ou além, usa readyAt como base para ETA de entrega
+                      const etaBase = order.readyAt ?? order.outForDeliveryAt ?? null;
+                      const eta = etaBase
+                        ? etaBase + travelMins * 60 * 1000
+                        : order.confirmedAt
+                          ? order.confirmedAt + totalEstMins * 60 * 1000
+                          : null;
                       const remainingMs = eta ? eta - now : null;
                       const isOverdue = remainingMs !== null && remainingMs < 0;
                       const remainingMins = remainingMs !== null ? Math.ceil(remainingMs / 60000) : null;

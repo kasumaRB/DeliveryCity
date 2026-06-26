@@ -442,6 +442,18 @@ export const DriverView: React.FC = () => {
   const [supportSending, setSupportSending] = useState(false);
   const [supportWhatsapp, setSupportWhatsapp] = useState<string | null>(null);
 
+  // Relógio para badges de tempo decorrido
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(t);
+  }, []);
+  const elapsedMins = (ts?: number) => ts ? Math.floor((now - ts) / 60000) : 0;
+  const fmtElapsed = (ts?: number) => {
+    const m = elapsedMins(ts);
+    return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h${m % 60 > 0 ? ` ${m % 60}m` : ''}`;
+  };
+
   // Toast estilizado — substitui alert() nativo
   const [toast, setToast] = useState<{ msg: string; type: 'error' | 'success' | 'info' } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -908,7 +920,18 @@ export const DriverView: React.FC = () => {
                 {/* READY — Retirada */}
                 {activeOrder.status === 'READY' && (
                   <div>
-                    <p className="text-[10px] font-black text-orange-400 tracking-widest uppercase mb-2">Retirada</p>
+                    <div className="flex items-center gap-2 mb-2">
+                      <p className="text-[10px] font-black text-orange-400 tracking-widest uppercase">Retirada</p>
+                      {(activeOrder.readyAt ?? activeOrder.confirmedAt) && (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${
+                          elapsedMins(activeOrder.readyAt ?? activeOrder.confirmedAt) >= 10
+                            ? 'bg-red-900/40 text-red-400'
+                            : 'bg-orange-900/40 text-orange-400'
+                        }`}>
+                          ⏰ {fmtElapsed(activeOrder.readyAt ?? activeOrder.confirmedAt)} esperando
+                        </span>
+                      )}
+                    </div>
                     <h2 className="text-3xl font-black text-white leading-tight mb-1">{activeOrder.restaurantName}</h2>
                     <p className="text-gray-500 text-sm mb-5">Vá até o restaurante e retire o pedido</p>
                     <button
@@ -924,7 +947,14 @@ export const DriverView: React.FC = () => {
                 {/* OUT_FOR_DELIVERY — Entregando */}
                 {activeOrder.status === 'OUT_FOR_DELIVERY' && (
                   <div>
-                    <p className="text-[10px] font-black text-green-400 tracking-widest uppercase mb-2">Entregando</p>
+                    <div className="flex items-center gap-2 mb-2">
+                      <p className="text-[10px] font-black text-green-400 tracking-widest uppercase">Entregando</p>
+                      {activeOrder.outForDeliveryAt && (
+                        <span className="text-[10px] bg-green-900/40 text-green-400 px-2 py-0.5 rounded-md font-bold">
+                          🚴 {fmtElapsed(activeOrder.outForDeliveryAt)} em rota
+                        </span>
+                      )}
+                    </div>
                     <h2 className="text-3xl font-black text-white leading-tight mb-1">{activeOrder.customerName}</h2>
                     <p className="text-gray-500 text-sm mb-5">{activeOrder.customerAddress}</p>
                     <div className="flex gap-3">
@@ -1061,13 +1091,17 @@ export const DriverView: React.FC = () => {
                         </p>
                         <div className="flex flex-wrap gap-2 mb-3">
                           <span className="text-[10px] bg-gray-800 text-gray-400 px-2 py-1 rounded-md">
-                            ~{order.timeMins} min
+                            ~{order.timeMins} min rota
                           </span>
                           <span className="text-[10px] bg-gray-800 text-gray-400 px-2 py-1 rounded-md">
                             {order.distanceToRest}km até rest.
                           </span>
-                          <span className="text-[10px] bg-gray-800 text-gray-400 px-2 py-1 rounded-md">
-                            ★ {order.score.toFixed(1)}
+                          <span className={`text-[10px] px-2 py-1 rounded-md font-black ${
+                            elapsedMins(order.readyAt ?? order.timestamp) >= 10
+                              ? 'bg-red-900/60 text-red-400'
+                              : 'bg-amber-900/40 text-amber-400'
+                          }`}>
+                            ⏰ {fmtElapsed(order.readyAt ?? order.timestamp)} esperando
                           </span>
                         </div>
                         <button

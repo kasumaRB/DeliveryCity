@@ -147,6 +147,18 @@ export const RestaurantView: React.FC = () => {
   >('orders');
   const [mobileKanbanTab, setMobileKanbanTab] = useState<'pending' | 'preparing' | 'ready' | 'returning'>('pending');
 
+  // Relógio para badges de tempo decorrido (atualiza a cada minuto)
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(t);
+  }, []);
+  const elapsedMins = (ts?: number) => ts ? Math.floor((now - ts) / 60000) : 0;
+  const fmtElapsed = (ts?: number) => {
+    const m = elapsedMins(ts);
+    return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h${m % 60 > 0 ? ` ${m % 60}m` : ''}`;
+  };
+
   // Toast system
   const [toast, setToast] = useState<{ msg: string; type: 'error' | 'success' | 'info' } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -702,8 +714,8 @@ export const RestaurantView: React.FC = () => {
                           </div>
                           <div className="text-right shrink-0">
                             <span className="font-black text-gray-900 text-sm">#{order.id.slice(-4)}</span>
-                            <p className="text-gray-400 text-[10px]">
-                              {new Date(order.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            <p className={`text-[10px] font-black ${elapsedMins(order.timestamp) >= 5 ? 'text-red-500 animate-pulse' : 'text-gray-400'}`}>
+                              ⏰ {fmtElapsed(order.timestamp)} aguardando
                             </p>
                           </div>
                         </div>
@@ -752,7 +764,9 @@ export const RestaurantView: React.FC = () => {
                           </div>
                           <div className="text-right shrink-0">
                             <span className="font-black text-gray-900 text-sm">#{order.id.slice(-4)}</span>
-                            <p className="text-blue-500 text-[10px] font-black animate-pulse">Cozinhando</p>
+                            <p className={`text-[10px] font-black ${elapsedMins(order.confirmedAt) >= (myRestaurant?.prepTime ?? 30) ? 'text-red-500 animate-pulse' : 'text-blue-500 animate-pulse'}`}>
+                              🍳 {order.confirmedAt ? fmtElapsed(order.confirmedAt) : '--'} em preparo
+                            </p>
                           </div>
                         </div>
                         <div className="border-t border-gray-50 pt-2 space-y-1 mb-3">
@@ -801,21 +815,18 @@ export const RestaurantView: React.FC = () => {
                             </div>
                             <div className="text-right shrink-0">
                               <span className="font-black text-gray-900 text-sm">#{order.id.slice(-4)}</span>
-                              <div className="flex items-center gap-1 justify-end mt-0.5">
-                                <Bike
-                                  size={12}
-                                  className={order.driverId ? 'text-green-500' : 'text-gray-300'}
-                                />
-                                <span
-                                  className={`text-[9px] font-black uppercase ${order.driverId ? 'text-green-600' : 'text-orange-500'}`}
-                                >
-                                  {order.status === OrderStatus.OUT_FOR_DELIVERY
-                                    ? 'Em Trânsito'
-                                    : order.driverId
-                                      ? 'A caminho'
-                                      : 'Buscando'}
-                                </span>
-                              </div>
+                              {order.status === OrderStatus.READY && !order.driverId ? (
+                                <p className={`text-[10px] font-black ${elapsedMins(order.readyAt) >= 5 ? 'text-red-500 animate-pulse' : 'text-orange-500'}`}>
+                                  🛵 {order.readyAt ? fmtElapsed(order.readyAt) : '--'} sem entregador
+                                </p>
+                              ) : (
+                                <div className="flex items-center gap-1 justify-end mt-0.5">
+                                  <Bike size={12} className={order.driverId ? 'text-green-500' : 'text-gray-300'} />
+                                  <span className={`text-[9px] font-black uppercase ${order.driverId ? 'text-green-600' : 'text-orange-500'}`}>
+                                    {order.status === OrderStatus.OUT_FOR_DELIVERY ? 'Em Trânsito' : order.driverId ? 'A caminho' : 'Buscando'}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           </div>
                           <div className="bg-gray-900 px-4 py-3 rounded-xl text-center">

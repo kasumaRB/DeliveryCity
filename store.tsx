@@ -218,6 +218,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     timestamp: o.timestamp ? new Date(o.timestamp).getTime() : Date.now(),
     cancelledAt: o.cancelled_at ? new Date(o.cancelled_at).getTime() : undefined,
     confirmedAt: o.confirmed_at ? new Date(o.confirmed_at).getTime() : undefined,
+    readyAt: o.ready_at ? new Date(o.ready_at).getTime() : undefined,
+    outForDeliveryAt: o.out_for_delivery_at ? new Date(o.out_for_delivery_at).getTime() : undefined,
+    deliveredAt: o.delivered_at ? new Date(o.delivered_at).getTime() : undefined,
     driverId: o.driver_id,
     pickupCode: o.pickup_code,
     deliveryCode: o.delivery_code,
@@ -466,7 +469,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Update atômico: verifica código e status no banco para evitar race condition
     const { data: updated } = await supabase
       .from('orders')
-      .update({ status: OrderStatus.OUT_FOR_DELIVERY })
+      .update({ status: OrderStatus.OUT_FOR_DELIVERY, out_for_delivery_at: new Date().toISOString() })
       .eq('id', orderId)
       .eq('pickup_code', code)
       .eq('status', OrderStatus.READY)
@@ -509,7 +512,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Update atômico: verifica código e status no banco
     const { data: updated } = await supabase
       .from('orders')
-      .update({ status: OrderStatus.DELIVERED })
+      .update({ status: OrderStatus.DELIVERED, delivered_at: new Date().toISOString() })
       .eq('id', orderId)
       .eq('delivery_code', code)
       .eq('status', OrderStatus.OUT_FOR_DELIVERY)
@@ -517,6 +520,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .maybeSingle();
 
     if (!updated) return false;
+
+    // Atualiza tempo médio real de preparo do restaurante (EMA com alpha=0.15)
+    if (order.restaurantId && order.readyAt && order.confirmedAt) {
+      const realPrepMins = Math.round((order.readyAt - order.confirmedAt) / 60000);
+      if (realPrepMins > 1 && realPrepMins < 120) {
+        const restaurant = restaurants.find(r => r.id === order.restaurantId);
+        if (restaurant) {
+          const currentPrep = restaurant.prepTime ?? 30;
+          const newPrep = Math.round(currentPrep * 0.85 + realPrepMins * 0.15);
+          supabase.from('restaurants').update({ prep_time: newPrep }).eq('id', order.restaurantId).then(null, () => {});
+        }
+      }
+    }
 
     // Repasses pós-entrega: restaurante e entregador recebem somente agora
     supabase.functions.invoke('release-payment-splits', { body: { orderId } }).catch(() => {});
@@ -1459,6 +1475,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateOrderStatus: async (id, s) => {
           const extraFields: Record<string, any> = {};
           if (s === OrderStatus.PREPARING) extraFields.confirmed_at = new Date().toISOString();
+          if (s === OrderStatus.READY) extraFields.ready_at = new Date().toISOString();
           await supabase.from('orders').update({ status: s, ...extraFields }).eq('id', id);
           await fetchData();
 

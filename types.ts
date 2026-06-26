@@ -179,6 +179,9 @@ export interface Order {
   timestamp: number;
   cancelledAt?: number;
   confirmedAt?: number;
+  readyAt?: number;
+  outForDeliveryAt?: number;
+  deliveredAt?: number;
   driverId?: string;
   pickupCode?: string;
   deliveryCode?: string;
