@@ -12,6 +12,30 @@
 
 ---
 
+## ✅ CORRIGIDO (rodada de fixes — segurança crítica aplicada em produção)
+
+Aplicado e validado contra o banco (testes com `ROLLBACK` simulando usuário comum). Ver
+`database/security-hardening-applied.sql` e as Edge Functions `create-asaas-payment`,
+`release-payment-splits`, `refund-asaas-payment`.
+
+| ID | Correção | Como |
+|----|----------|------|
+| **RLS-1/2/5** | `anon` (não logado) não acessa mais `profiles/orders/restaurants/products/...` | `REVOKE` de todo DML do role `anon` |
+| **RLS-3** | Cliente não altera mais `total`/taxas/`driver_split_released`/`asaas_payment_id`/`refunded_at` do pedido | Trigger `guard_orders_financial_columns` (bypass só p/ service_role) |
+| **RLS-4** | Usuário não se auto-promove a ADMIN nem muda status/saldo/nota/score | Trigger `guard_profiles_privileged_columns` |
+| **RLS-6** | `upsert_profile` não aceita mais `role=ADMIN`; parceiro entra `PENDING`; em conflito preserva status | RPC sanitizado + flag transacional confiável |
+| **RLS-7** | `increment_balance` agora usa `commission_balance` (antes quebrava em runtime) | coluna corrigida |
+| **SEC-01** | `refund-asaas-payment` valida o chamador (admin/cliente/entregador/dono) e bloqueia reembolso de pedido `DELIVERED` | `auth.getUser()` + guard de status |
+| **MONEY-01 / C1** | Repasse e reembolso com idempotência **atômica** (`UPDATE ... WHERE flag=false/refunded_at IS NULL`) | sem mais duplicação por corrida |
+| **BÔNUS** | Cadastro estava quebrando: `auth.users.confirmed_at` virou coluna gerada (mudança de plataforma do Supabase) | `upsert_profile` não escreve mais `confirmed_at` |
+
+**Pendências de segurança conhecidas (não resolvidas nesta rodada):**
+- Usuário **autenticado** ainda lê PII de outros perfis (o app carrega `profiles.select('*')`). Fix correto = view `public_profiles` com colunas seguras + refatorar `store.tsx`. *(maior, agendado)*
+- SEC-03 (webhook amarra só por valor), SEC-04 (CORS `*`), SHARED-5 (chave Gemini no bundle), e os demais Médios/Baixos seguem em aberto.
+- "Leaked Password Protection" (RLS-8): habilitar no painel Auth do Supabase.
+
+---
+
 ## 🔴 CRÍTICO — dinheiro ou corrupção de dados
 
 ### C1. Reembolso duplicado possível (`refund-asaas-payment`)

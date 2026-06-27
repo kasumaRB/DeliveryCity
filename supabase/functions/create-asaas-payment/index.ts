@@ -86,6 +86,12 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
       { global: { headers: { Authorization: authHeader } } }
     );
+    // Client service_role PURO (sem Authorization do usuário) para gravações de
+    // colunas financeiras protegidas por trigger (asaas_payment_id etc.).
+    const admin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
@@ -270,8 +276,8 @@ serve(async (req) => {
         String(e.description ?? '').toLowerCase().includes('declined')
       );
 
-      // Cancelar pedido para não ficar travado em PENDING_PAYMENT
-      await supabase.from('orders')
+      // Cancelar pedido para não ficar travado em PENDING_PAYMENT (write via admin)
+      await admin.from('orders')
         .update({ status: 'CANCELLED' })
         .eq('id', orderId)
         .catch(() => {});
@@ -290,7 +296,7 @@ serve(async (req) => {
 
     // Pagamento aceito mas status DECLINED (Asaas retornou 200 porém status = DECLINED)
     if (payment.status === 'DECLINED') {
-      await supabase.from('orders')
+      await admin.from('orders')
         .update({ status: 'CANCELLED' })
         .eq('id', orderId)
         .catch(() => {});
@@ -313,7 +319,7 @@ serve(async (req) => {
       if (pixStatus < 200 || pixStatus >= 300 || !pixData?.payload) {
         console.error('[create-asaas-payment] pixQrCode indisponível:', JSON.stringify(pixData));
         // Cancelar o pedido para não ficar travado em PENDING_PAYMENT sem QR code
-        await supabase.from('orders').update({ status: 'CANCELLED' }).eq('id', orderId).catch(() => {});
+        await admin.from('orders').update({ status: 'CANCELLED' }).eq('id', orderId).catch(() => {});
         return new Response(JSON.stringify({
           error: 'PIX gerado mas QR Code indisponível. Verifique se sua conta Asaas tem PIX habilitado e tente novamente.',
           errorCode: 'PIX_QRCODE_UNAVAILABLE',
@@ -333,7 +339,7 @@ serve(async (req) => {
     if (pixQrCode)      updatePayload.pix_qr_code       = pixQrCode;
     if (pixQrCodeImage) updatePayload.pix_qr_code_image = pixQrCodeImage;
 
-    await supabase.from('orders').update(updatePayload).eq('id', orderId);
+    await admin.from('orders').update(updatePayload).eq('id', orderId);
 
     // ── 9. Responder ───────────────────────────────────────────────────────────
     return new Response(JSON.stringify({

@@ -71,11 +71,11 @@ serve(async (req) => {
       });
     }
 
-    const authHeader = req.headers.get('Authorization') ?? '';
+    // Client service_role PURO: este endpoint faz repasses financeiros e grava
+    // driver_split_released (coluna protegida por trigger). Não usa o JWT do usuário.
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
     const { orderId } = await req.json() as { orderId: string };
@@ -104,16 +104,23 @@ serve(async (req) => {
       });
     }
 
-    // Idempotência: evita repassar duas vezes (ex: retry de rede)
-    if (order.driver_split_released === true) {
+    // Idempotência ATÔMICA (MONEY-01): só uma chamada consegue "reservar" o repasse.
+    // O update condicional .eq('driver_split_released', false) é atômico no Postgres;
+    // chamadas concorrentes que perderem a corrida recebem 0 linhas e abortam.
+    const { data: claimed } = await supabase
+      .from('orders')
+      .update({ driver_split_released: true })
+      .eq('id', orderId)
+      .eq('driver_split_released', false)
+      .select('id')
+      .maybeSingle();
+
+    if (!claimed) {
       console.log(`[splits] Pedido ${orderId} já teve repasses liberados — ignorando.`);
       return new Response(JSON.stringify({ released: true, skipped: true }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    // Marcar imediatamente para prevenir corrida entre chamadas concorrentes
-    await supabase.from('orders').update({ driver_split_released: true }).eq('id', orderId);
 
     // Buscar owner_id do restaurante e pix_key do entregador em paralelo
     const [{ data: restaurant }, { data: driverProfile }] = await Promise.all([
