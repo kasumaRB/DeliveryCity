@@ -4,8 +4,8 @@
 > Achados validados contra o banco de produção real (projeto `fnhjxqppcrbepgwcrqzw`).
 > Falsos positivos já removidos (ver seção final).
 >
-> **Total catalogado: ~204 problemas validados** em 3 rodadas —
-> Parte 1 (fluxo, 61) · Parte 2 (jornadas por persona, 93) · Parte 3 (segurança/dinheiro/infra, ~50).
+> **Total catalogado: ~257 problemas validados** em 4 rodadas —
+> Parte 1 (fluxo, 61) · Parte 2 (jornadas por persona, 93) · Parte 3 (segurança/dinheiro/infra, ~50) · Parte 4 (admin/lojista/perf/a11y, ~53).
 > **Mais urgentes:** RLS-1/2 (PII vaza pra `anon`), RLS-3/4 (fraude financeira + auto-promoção a ADMIN),
 > SEC-01 (reembolso sem autorização), MONEY-01 (repasse duplicado). Causa raiz de RLS:
 > `database/supabase-production-security.sql` nunca foi aplicado em produção.
@@ -406,6 +406,71 @@ Aplicado e validado contra o banco (testes com `ROLLBACK` simulando usuário com
 - **SYNC-6** — `updateOrderStatus` e edição de cardápio (read-modify-write do JSON `menu`) **não-atômicos**; 2 lojistas em 2 abas → última gravação sobrescreve a outra (produto perdido). `store.tsx:1481,1666-1701`.
 - **SYNC-5** stale closure parcial em `processSyncQueue` registrado em listener; **SYNC-8** camada offline usa `localStorage` (limpável pelo WebView) em vez de Capacitor Preferences; **SYNC-9** reentrância de `onResume` (protegida por ref).
 - *(Sem bug: aceite de pedido `assignDriver` protegido por `.is('driver_id',null).maybeSingle()`.)*
+
+---
+---
+
+# Parte 4 — AdminView, RestaurantView, performance e acessibilidade
+
+> 4ª rodada (4 agentes): AdminView linha-a-linha, RestaurantView completo, performance/re-renders, a11y/responsividade/i18n. ~53 achados.
+
+## 🛠️ AdminView (painel admin) — ADM-1..14
+
+### Críticos
+- **ADM-1** — "Liberar devolução e reembolsar" dispara push "💚 Reembolso aprovado" ao cliente/entregador/restaurante **sem checar o `error` do `invoke('refund-asaas-payment')`**. `AdminView.tsx:1591-1650`. (reforça C4)
+- **ADM-2** — "Encerrar sem devolução": marca `CANCELLED` e avisa reembolso sem checar nenhum dos dois `invoke`; update sem `.eq('status',...)` (race). `:1662-1700`.
+- **ADM-3** — Erros das ações destrutivas/financeiras só caem em `console.error`; admin vê "sucesso". `:1638,1691,1817,1848`.
+
+### Médios
+- **ADM-4** — `platform_settings` salvas sem validar limites: comissão pode passar de 100%, taxas negativas (o `max="100"` do HTML não é checado no submit). `:83-115,160-177`.
+- **ADM-5** — Reset de taxa custom em loop; falhas só em `console.error`, sem reportar. `:89-97`.
+- **ADM-6** — "Avisar cliente/entregador" e "cobrar devolução" não checam o resultado do push. `:1538,1560,1740`.
+- **ADM-7** — Suspender entregador: trava por `order.id` (não por driver), permite suspensão/push duplicados quando o driver tem vários pedidos. `:1833-1859`.
+- **ADM-8** — Confirmar recebimento de devolução: erro só em `console.error`, sem alerta. `:1791-1829`.
+
+### Baixos
+- **ADM-9** card "GMV" só conta `DELIVERED` mas rotula "Volume" (ignora em andamento) `:620`; **ADM-10** taxa de devolução do dossiê pune entregador com devoluções **em andamento** (denominador inclui RETURNING/DELIVERY_FAILED) `:2167-2171`; **ADM-11** listas sem paginação (`slice(0,50)` esconde o resto) `:1946`; **ADM-12** média da loja inclui pedidos sem `storeStars` como nota 0 `:1172`; **ADM-13** salvar dossiê pode **apagar CNPJ** (form sem input `cnpj` → grava `null`) `:517-518,2096`; **ADM-14** `delete-auth-user` com `.catch(()=>{})` deixa conta órfã no auth sem aviso `:1641`.
+
+## 🏪 RestaurantView (painel lojista) — LOJ2-1..16
+
+### Críticos
+- **LOJ2-1** — Edição de cardápio é **read-modify-write não-atômico** (`updateMenu/updateProduct/deleteProduct`): duas abas → produto somem/revertem. `store.tsx:1665-1702`.
+- **LOJ2-2** — `handleSaveItem` salva produto sem validar: preço `NaN`/negativo/zero e nome vazio entram no cardápio (cliente vê `R$ NaN`, repasse quebra). `RestaurantView.tsx:364-404`.
+- **LOJ2-3** — `updateOrderStatus` ignora `error` do update e **notifica o cliente mesmo em falha**. `store.tsx:1477-1559`.
+- **LOJ2-4** — Botões "Aceitar/Marcar pronto"/toggle aberto sem trava de double-click → pushes duplicados. `RestaurantView.tsx:729,779,639`.
+
+### Médios
+- **LOJ2-5** ticket médio = GMV-de-todos ÷ entregues (populações diferentes) `:1390`; **LOJ2-6** "Taxa plataforma" mistura GMV total com receita de entregues `:1481`; **LOJ2-7** KPI "Pedidos" ignora o filtro de período (mostra histórico total) `:1455`; **LOJ2-8** receita por produto usa preço **atual** do cardápio, não o pago `:1403`; **LOJ2-9** toggle `is_open` sem tratar erro e **sem fechar automático por `openingHours`** (loja fica aberta 24h se esquecer) `:639-658`; **LOJ2-10** imagens sem `onError`; upload sem limite de bytes `:1091,301`; **LOJ2-11** pedido em status terminal some da tela sem feedback; `refreshData` desestruturado mas **nunca usado** (sem resync se o Realtime cair) `:109`.
+
+### Baixos
+- **LOJ2-12** código de devolução pode ser exibido sem ter sido gravado (update afeta 0 linhas, sem `.select()`) `store.tsx:1343`; **LOJ2-13** cálculo de repasse com `customFeePct===0` mostra 100% `:1664`; **LOJ2-14** avaliação "0.0" indistinguível de loja sem nota `:1413`; **LOJ2-15** validade de promoção com bug de fuso (volta 1 dia) `:539`; **LOJ2-16** promoção aceita desconto `NaN`/negativo/>100% `:474-510`.
+
+## ⚡ Performance — PERF-1..8
+
+### Críticos
+- **PERF-1** — Context Provider reprovê **objeto novo a cada render** (sem `useMemo`, ~20 funções inline). Todo evento Realtime/`setState` re-renderiza a **view ativa inteira** (nenhuma view usa `React.memo`). `store.tsx:1462-1758`.
+- **PERF-2** — Cada mutation chama `fetchData()` que refaz `select('*')` de restaurants+orders+profiles (todos) — **redundante com o Realtime** que já patcha incrementalmente. `store.tsx:305-311` + ~15 call sites.
+
+### Médios/Baixos
+- **PERF-3** sem code-splitting: as 5 views (~513 KB) entram no bundle inicial; zero `React.lazy` `App.tsx:3-7`; **PERF-4** `<img>` de listas sem `loading="lazy"`/dimensões (CLS) `ClientView.tsx:845+`; **PERF-5** `localStorage.setItem(JSON.stringify(...))` de listas inteiras a cada fetch (bloqueia main thread) `store.tsx:338,345,396`; **PERF-6** `setCurrentPos` a cada amostra de GPS re-renderiza DriverView (sem throttle no estado) `DriverView.tsx:739`; **PERF-7** `setNow` por `setInterval` (30-60s) re-renderiza a view inteira `*View.tsx`; **PERF-8** `filter/sort/map` sobre orders/profiles recomputados inline sem `useMemo` `AdminView.tsx`.
+- *(OK: subscriptions Realtime registradas uma vez com cleanup; GPS já evita fetchData completo.)*
+
+## ♿ Acessibilidade / Responsividade / i18n — A11Y-1..15
+
+### Críticos
+- **A11Y-1** — **Nenhum modal** tem `role="dialog"`/`aria-modal`/ESC/trap de foco (sistêmico, ~15 modais). `AddressModal/DeleteAccountModal/TutorialModal` + modais inline.
+- **A11Y-2** — Zoom desabilitado (`maximum-scale=1.0, user-scalable=no`) — viola WCAG 1.4.4. `index.html:5`.
+- **A11Y-3** — `alert()`/`confirm()` nativos espalhados (~50 ocorrências) — péssimo em mobile e inconsistente com os Toasts já existentes.
+- **A11Y-4** — Botões só-ícone sem `aria-label` (sistêmico; muitos usam só `title`).
+- **A11Y-5** — Alvos de toque <44px (ex.: +/− de quantidade no carrinho ~21px). `ClientView.tsx:1075,1086`.
+
+### Médios
+- **A11Y-6** inputs sem `<label>` e sem `type="tel"`/`inputMode` (telefone/CPF/CNPJ) → teclado mobile errado; **A11Y-7** `type="number"` para moeda (bloqueia vírgula pt-BR) `RestaurantView.tsx:1038`; **A11Y-8** moeda formatada com ponto (`R$ 12.50`) em ~20 lugares, inconsistente com o `Intl` usado em outros; **A11Y-9** imagens sem `alt`; **A11Y-10** toasts/spinners sem `aria-live`/`role="alert"`; **A11Y-11** `Form.tsx`/`Notification.tsx` fora do design mobile; **A11Y-12** safe-area não-global (depende de classe por-view; modais full-screen sob o notch).
+
+### Baixos
+- **A11Y-13** texto `gray-300/400` em `8-10px` (contraste); **A11Y-14** `<option>` de status em inglês no admin + emoji como único indicador; **A11Y-15** `toLocaleDateString` com `hour/minute` ignorados `DriverView.tsx:1249`.
+
+> **Total acumulado: ~257 problemas** (Parte 1: 61 · Parte 2: 93 · Parte 3: ~50 · Parte 4: ~53).
 
 ---
 ---
