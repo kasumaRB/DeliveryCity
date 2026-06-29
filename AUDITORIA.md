@@ -4,8 +4,9 @@
 > Achados validados contra o banco de produção real (projeto `fnhjxqppcrbepgwcrqzw`).
 > Falsos positivos já removidos (ver seção final).
 >
-> **Total catalogado: ~307 problemas validados** em 5 rodadas —
-> Parte 1 (fluxo, 61) · Parte 2 (jornadas por persona, 93) · Parte 3 (segurança/dinheiro/infra, ~50) · Parte 4 (admin/lojista/perf/a11y, ~53) · Parte 5 (cliente/auth/cálculos/resiliência, ~50).
+> **Total catalogado: ~361 problemas validados** em 6 rodadas —
+> Parte 1 (fluxo, 61) · Parte 2 (jornadas, 93) · Parte 3 (segurança/dinheiro/infra, ~50) · Parte 4 (admin/lojista/perf/a11y, ~53) · Parte 5 (cliente/auth/cálculos/resiliência, ~50) · Parte 6 (driver/edge/tipos/navegação, ~54).
+> **Destaque P6:** TYPE-1 (avaliação de loja nunca salva — coluna inexistente no UPDATE), UI-1 (troca de papel é feature morta), UI-5 (lojista para de ser alertado de pedidos), ENT2-2 (foto de entrega offline descartada), EDGE-3 (phishing via push).
 > **Mais urgentes:** RLS-1/2 (PII vaza pra `anon`), RLS-3/4 (fraude financeira + auto-promoção a ADMIN),
 > SEC-01 (reembolso sem autorização), MONEY-01 (repasse duplicado). Causa raiz de RLS:
 > `database/supabase-production-security.sql` nunca foi aplicado em produção.
@@ -536,6 +537,60 @@ Aplicado e validado contra o banco (testes com `ROLLBACK` simulando usuário com
 - **ERR-13** `useAndroidBack` sem try/catch (botão voltar inerte se handler lança); **ERR-14** `AddressModal` rejeita Promise com string e com objeto (formatos mistos); **ERR-15** `setupNotifications` mascara erro real como "não suportado"; **ERR-16** `submitRating` pode propagar `NaN` da média ao banco (deriva do M2).
 
 > **Total acumulado: ~307 problemas** (Parte 1: 61 · Parte 2: 93 · Parte 3: ~50 · Parte 4: ~53 · Parte 5: ~50).
+
+---
+---
+
+# Parte 6 — DriverView, edge functions restantes, tipos e navegação
+
+> 6ª rodada (4 agentes): DriverView completo, edge functions não-pagamento, types.ts/mapeamento (validado contra schema real), navegação/componentes. ~54 achados.
+
+## 🧬 Tipos & mapeamento — TYPE-1..11 (validado contra schema de produção)
+
+### Críticos
+- **TYPE-1 ✅** — `submitRating` faz UPDATE com `ratings_count` numa coluna **que NÃO existe** em `restaurants` (só há `rating`, `reviews`). O Postgres rejeita o UPDATE **inteiro** e não há checagem de `error` → **nota, contagem E comentários da loja NUNCA são salvos**. `store.tsx:1582-1586`.
+- **TYPE-2 ✅** — `Restaurant.ratingsCount` lê `r.ratings_count` (coluna inexistente) → sempre 0; exibe "(0) avaliações" e zera a base da média. `store.tsx:327`.
+- **TYPE-3** — `mapProfile` faz `driver_score !== undefined ? Number(...) : 100`, mas o banco devolve `null` (não undefined) → `Number(null)=0`. Entregador com score null recebe **0 pts → app bloqueado** (<70). *(latente: 0/1 driver afetado hoje; dispara em driver novo sem score)*. `store.tsx:194`.
+
+### Médios/Baixos
+- **TYPE-4 ✅** `Restaurant.deliveryFee`/`minOrder` não têm coluna no banco → sempre `undefined` (frete/pedido mínimo por loja não existem) `types.ts:140`; **TYPE-5** `lastOrderTimestamp` existe no banco mas `mapProfile` não lê; **TYPE-6 ✅** `Order.feedback` é campo fantasma (sem coluna); **TYPE-7** `updateUserProfile` não grava `pushToken` (reforça ERR-5); **TYPE-8** default de leitura de `status` é `APPROVED` enquanto banco/criação é `PENDING` → parceiro não-aprovado pode aparecer aprovado na UI; **TYPE-9** `Order.changeFor` (troco) morto; **TYPE-10** falta um `mapRestaurant` único (Realtime vs fetchData divergem); **TYPE-11** `coords` jsonb lido sem validar `{lat,lng}` numéricos.
+
+## 🏍️ DriverView — ENT2-1..17
+
+### Críticos
+- **ENT2-2** — Foto de entrega é **descartada em modo offline**: `confirmDelivery` offline retorna `true` sem enfileirar a foto; o upload falha no catch silencioso e nunca é reenviado. Entrega offline = sem comprovante. `DriverView.tsx:803-837`.
+- **ENT2-3** — `assignDriver` só recalcula `driver_net_earnings` para quem tem `customFeePct`; no caminho padrão mantém o valor da criação → exibido (fallback com fee atual) pode divergir do gravado. `store.tsx:1596-1606`.
+
+### Médios
+- **ENT2-1** janela temporal de "7 dias" diverge entre soma de ganhos e contagem `:585,1341`; **ENT2-4** `gpsBlocked` nunca volta a `false` → entregador trava offline após liberar GPS `:752`; **ENT2-5/ENT2-6** `watchPosition` reinicia a cada toggle online/offline (bateria + grava local extra); **ENT2-7** estados de devolução/câmera não resetam ao concluir → modal reabre em estado errado `:1104`; **ENT2-8** câmera ao vivo **nunca para no unmount** (stream/LED vazando) `:684-725`; **ENT2-9** foto não corrige orientação/espelho; **ENT2-10** código de entrega sem `trim()`/normalização → "inválido" com código certo `:1701`; **ENT2-11** perde GPS depois de online e segue "Disponível" → pedidos roteados sem posição `:492`.
+
+### Baixos
+- **ENT2-12** `confirmPickup/Delivery` ignoram `error` → falha de rede vira "Código inválido"; **ENT2-13** push usa `restaurantName` stale; **ENT2-14** restaurante sem `coords` → `NaNkm`/crash na lista; **ENT2-15** `clearSyncQueue` incondicional (= ERR-1); **ENT2-16** histórico exibe `R$ NaN` sem `||0` `:1254`; **ENT2-17** `hasBase` aceita `coords:{}` sem lat/lng numéricos.
+
+## 📡 Edge Functions (não-pagamento) — EDGE-1..10
+
+### Altos
+- **EDGE-1** — `delete-auth-user` deleta o `auth.user` mas **não faz cleanup server-side** de `profiles`/`restaurants`/`orders` (depende do front que engole erro) → órfãos. `delete-auth-user/index.ts:40`.
+- **EDGE-3** — `send-push-notification` repassa `title`/`body`/`data` **arbitrários** ao FCM sem sanitização → **phishing in-app** ("Conta aprovada", "Pagamento recebido") para qualquer `userId`; `data` arbitrário pode disparar deep-links. (compõe com M13)
+
+### Médios
+- **EDGE-2** `delete-auth-user` não checa `authError` do `getUser()` (inconsistente com push); **EDGE-4** FCM falha mas a função retorna `200 {sent:true}` (falhas silenciosas de push) `_shared/pushNotification.ts:130`; **EDGE-5** sem rate limit; `notifyDrivers` faz fan-out N abusável (amplificação); **EDGE-6** `create-asaas-account` tem race/gap de idempotência no update de `profiles` → **subcontas Asaas duplicadas** `:115-142`; **EDGE-7 ✅** `release-driver-split` confirmado morto, mas se religado **não valida `order.driver_id===driverId` nem status** → desviar ganhos de pedido alheio para a própria subconta.
+
+### Baixos
+- **EDGE-8** CORS `*` em todas (inclui as de dinheiro); **EDGE-9** `create-asaas-account` retorna `details: asaasData` ao cliente e loga PII; **EDGE-10** respostas de erro do `delete-auth-user` sem `Content-Type: json`.
+
+## 🧭 Navegação / Componentes / Infra — UI-1..16
+
+### Críticos
+- **UI-1** — `RoleSwitcher` **nunca é renderizado/importado** → troca de papel do admin é **feature morta**; `currentRole` fica sempre `null` e toda a lógica dependente em `App.tsx` é código morto. `components/RoleSwitcher.tsx`.
+
+### Altos
+- **UI-3** mapa de tracking não atualiza o marcador de destino quando `destCoords` muda (geocode assíncrono) `DriverTrackingMap.tsx`; **UI-4** mapa sem guard de coords `NaN`/inválidas → exceção no init; **UI-5** som de novo pedido cria `AudioContext` a cada beep e **nunca fecha** (limite ~6 → para de tocar) + `suspended` sem `resume()` → **lojista deixa de ser alertado, perde pedidos** `RestaurantView.tsx:120-143`; **UI-6** `components/ErrorBoundary.tsx` usa `window.addEventListener` e **não captura erros de render** (falsa proteção; `[object Object]`).
+
+### Médios/Baixos
+- **UI-2** `currentRole` não reseta no `signOut` (admin "preso" na última view) *(a confirmar)*; **UI-7** tiles OSM + ícones via `unpkg.com` (CDN externo, sem fallback offline); **UI-8** mapa Leaflet: `import()` async sem flag de cancelamento → vazamento se desmontar antes do await; **UI-9** `useApi` `execute`/`refetch` muda de identidade com função inline (loop); **UI-10** `getDerivedStateFromError` chama `window.location.reload()` (efeito colateral; loop de reload sem backoff) `App.tsx:20`; **UI-11** = ENT2-5 (watch GPS re-registra); **UI-12** Realtime assina tabelas **inteiras** sem filtro → todo usuário recebe mudanças de pedidos/perfis alheios (reforça vazamento de PII p/ logados); **UI-13** `GoogleAuth.initialize` no topo do módulo sem guard de plataforma; **UI-14** sem controle de StatusBar/SplashScreen; **UI-15** tutorial marca "visto" ao fechar e não há como reabrir; **UI-16** `NotificationContainer` (possível componente morto) sem safe-area.
+
+> **Total acumulado: ~361 problemas** (P1: 61 · P2: 93 · P3: ~50 · P4: ~53 · P5: ~50 · P6: ~54).
 
 ---
 ---
