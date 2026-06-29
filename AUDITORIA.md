@@ -4,8 +4,8 @@
 > Achados validados contra o banco de produção real (projeto `fnhjxqppcrbepgwcrqzw`).
 > Falsos positivos já removidos (ver seção final).
 >
-> **Total catalogado: ~257 problemas validados** em 4 rodadas —
-> Parte 1 (fluxo, 61) · Parte 2 (jornadas por persona, 93) · Parte 3 (segurança/dinheiro/infra, ~50) · Parte 4 (admin/lojista/perf/a11y, ~53).
+> **Total catalogado: ~307 problemas validados** em 5 rodadas —
+> Parte 1 (fluxo, 61) · Parte 2 (jornadas por persona, 93) · Parte 3 (segurança/dinheiro/infra, ~50) · Parte 4 (admin/lojista/perf/a11y, ~53) · Parte 5 (cliente/auth/cálculos/resiliência, ~50).
 > **Mais urgentes:** RLS-1/2 (PII vaza pra `anon`), RLS-3/4 (fraude financeira + auto-promoção a ADMIN),
 > SEC-01 (reembolso sem autorização), MONEY-01 (repasse duplicado). Causa raiz de RLS:
 > `database/supabase-production-security.sql` nunca foi aplicado em produção.
@@ -475,6 +475,71 @@ Aplicado e validado contra o banco (testes com `ROLLBACK` simulando usuário com
 ---
 ---
 
+# Parte 5 — ClientView, Auth, cálculos e resiliência
+
+> 5ª rodada (4 agentes): ClientView completo, AuthView/onboarding, cálculos numéricos, tratamento de erros/offline. ~50 achados novos (após validar contra produção e descartar overlaps).
+
+## 🛒 ClientView (cliente) — CLI2-1..14
+
+### Críticos
+- **CLI2-1** — Total exibido no checkout pode **não bater com o cobrado**: o cliente envia `deliveryFee`/`discount`, mas o servidor recalcula `serviceFee` do banco; se `platformSettings` no React estiver stale, `cartTotal` ≠ `total` gravado. `ClientView.tsx:553-563`, `store.tsx:966,1020`.
+- **CLI2-2** — `cancelOrder` decide reembolso por `order.status` **stale** do array React (ramo `store.tsx:1240`), não pelo status real → se webhook acabou de marcar PENDING (pago), refund nunca dispara. (= ERR-6)
+- **CLI2-3** — Cupom **FIXED legítimo > subtotal** zera o repasse: loja entrega e recebe **R$0** (`finalProductTotal = subtotal - discount = 0`). Sem clamp ao subtotal nem limite no servidor. `ClientView.tsx:490-496`, `store.tsx:1009-1011`.
+
+### Médios
+- **CLI2-4** auto-seleção cega de `savedAddresses[0]` (pode não ter coords → frete fallback) `:254`; **CLI2-5** `handleSaveAddress` não checa erro de `updateAddress` e fecha como sucesso `:286`; **CLI2-6** `deleteAddress` read-modify-write sobre perfil stale → endereço "ressuscita" `:316`,`store.tsx:1717`; **CLI2-7** **cartão de crédito mostra "Pedido enviado!" antes do webhook confirmar** (cai em `showOrderSuccess` imediato, pedido ainda `PENDING_PAYMENT`) `:670-677`; **CLI2-8** avaliação grava `productOk/packagingOk = false` quando o cliente deixou `null` (penaliza loja/entregador) `:325-341`; **CLI2-9** pedido órfão `PENDING_PAYMENT` após recusa trava o cliente na idempotência de 2 min `:616-625`; **CLI2-10** frete base do client (R$4) ≠ piso do server.
+
+### Baixos
+- **CLI2-11** quantidade sem teto/estoque; **CLI2-12** desconto absoluto re-somado após remover itens; **CLI2-13** coords viram texto de rua em `recalculateDistances` (`"...,undefined"`); **CLI2-14** timeout de 15 min do PIX não cancela o pedido órfão.
+
+## 🔑 Auth / Onboarding — AUTH2-1..14
+
+### Críticos
+- **AUTH2-1** — Campos de veículo condicionados a `partnerType` (não a `roleToSet`) → dados de veículo podem vazar para cadastro de cliente. `AuthView.tsx:436-447`.
+- **AUTH2-2 ✅(confirmado no banco)** — Checagem de CPF/telefone duplicado é **só client-side**, ignora o `error` da query (falha sob RLS → sempre "único") e há TOCTOU. **Não existe constraint UNIQUE em `cpf`/`phone_number`/`cnpj`** (só em `email`). `AuthView.tsx:390-417`.
+
+### Altos/Médios
+- **AUTH2-4** cadastro de parceiro: `restaurants.upsert` sem checar erro → conta PENDING órfã sem restaurante `:459-485`; **AUTH2-6** check de perfil OAuth nativo usa `.single()` (ruidoso) em vez de `maybeSingle()` `:600`; **AUTH2-7** trocar de fluxo (lojista→cliente) não reseta campos → `acceptedTerms` "fantasma" persiste `:925`; **AUTH2-8** avatar sem limite de bytes, acumula órfãos no storage `:209`; **AUTH2-9** query de `platform_settings` **dentro do render** (efeito colateral, pode loopar) `:729`; **AUTH2-10** double-submit possível antes do `setLoading` `:381`; **AUTH2-11** telefone salvo sem normalizar máscara → duplicatas escapam `:386`.
+
+### Baixos
+- **AUTH2-12** código morto (`!== 'LOGIN_EMAIL'` sempre true); **AUTH2-13** campo "CPF" aceita 14 dígitos (CNPJ) como válido `:1147`; **AUTH2-14** reset de senha/confirmação usa `window.location.origin` → **quebra deep link no Capacitor nativo** `store.tsx:1733`.
+
+## 🧮 Cálculos — CALC-1..9
+
+### Altos/Médios (válidos)
+- **CALC-2** — `assignDriver` grava `driver_net_earnings`/`platform_fee` **sem arredondar** → lixo de ponto flutuante no banco (ex.: `8.280000000000001`). `store.tsx:1600-1605`.
+- **CALC-3** — `assignDriver` usa **fórmula de split diferente** de `createOrder` (frete cheio × `customFeePct` vs piso + excesso); o **mesmo campo `custom_fee_pct`** é taxa do lojista em `createOrder` e taxa do entregador em `assignDriver` (colisão de semântica); pode gerar `platform_fee` negativo. `:1598-1605` vs `:962-1019`.
+- **CALC-5** — Frete cobrado usa Haversine **reto**; ETA/distância real do entregador usa Haversine **×1.4** → frete não cobre a distância realmente rodada. `ClientView.tsx:421` vs `mapsService.ts:124`.
+- **CALC-6** — Recibo não mostra **linha de desconto** → com cupom, `subtotal+entrega+serviço ≠ Total` exibido (cliente vê soma que não fecha). `ClientView.tsx:2175-2194`.
+- **CALC-7** — Cupom PERCENT congela o desconto absoluto; mudar o carrinho depois não recalcula (demo: 20% de 50 = 10 fixo; vira 80 → ainda 10). `ClientView.tsx:490-496`.
+
+### Baixos (robustez)
+- **CALC-8** — `geocode` retorna `{lat:NaN}` → `deliveryFee=NaN` **passa pelo guard** (`NaN<0||NaN>100` é false) → `total=NaN` gravado. `store.tsx:999`, `mapsService.ts:45`.
+- **CALC-9** — `Number(realProduct.price)` sem checar `NaN`/vazio no subtotal → `total=NaN` sem bloqueio (tolerância de 0,01 também falha com NaN). `store.tsx:942-952`.
+
+## 🛡️ Resiliência / Erros / Offline — ERR-1..16
+
+### Críticos
+- **ERR-1** — `processSyncQueue` chama `clearSyncQueue()` em bloco no fim; `confirmDelivery/confirmPickup` retornam `false` (sem exceção) se o pedido não está no array local (comum após restart). **Confirmação de entrega feita offline é descartada pra sempre → split nunca dispara, entregador trabalha de graça.** `store.tsx:573-588,499`.
+- **ERR-2** — Confirmação offline depende de `order.deliveryCode` em cache; se o WebView limpou o cache, entregador vê "Código inválido" com o código certo, sem recuperação. `store.tsx:462,503`.
+
+### Altos
+- **ERR-3** — **Toque na push não navega pra lugar nenhum**: só há listener `registration`; não existe `pushNotificationActionPerformed`. Toda a UX de notificação acionável (`data.orderId`) está morta. `store.tsx:243-272`.
+- **ERR-5** — Listener `registration` anexado **depois** de `register()` → no Android o token pode disparar antes e nunca ser salvo em `push_token`; `update` do token sem checar erro. `store.tsx:260-267`.
+- **ERR-6** — `cancelOrder` decide refund por estado local stale + `.catch(()=>{})` engole falha. (= CLI2-2)
+- **ERR-7** — `release-payment-splits`/`refund` invocados com `.catch(()=>{})` no cliente → se o invoke falha (cold start/timeout), **repasse/reembolso some sem log nem retry nem ticket**. `store.tsx:540,1241,1290`.
+
+### Médios
+- **ERR-4** dois listeners `online` disparam `processSyncQueue` em paralelo (sem guard de reentrância) `store.tsx:715`+`DriverView.tsx:730`; **ERR-8** `updateOrderStatus`/`submitRating` não checam erro do update e notificam mesmo em falha `:1481,1564`; **ERR-9** cache de orders/restaurants sem TTL nem checagem de dono → pedidos do usuário anterior aparecem após troca de conta `:127`; **ERR-10** `getSession()` no resume/refresh fora do timeout → `fetchInProgressRef` pode travar permanentemente `:695`; **ERR-11** resume não chama `processSyncQueue` e Android não dispara `online` ao voltar → fila offline parada `:695-713`; **ERR-12** self-healing com `catch{}` vazio cria CLIENT/APPROVED sem log `:376-391`.
+
+### Baixos
+- **ERR-13** `useAndroidBack` sem try/catch (botão voltar inerte se handler lança); **ERR-14** `AddressModal` rejeita Promise com string e com objeto (formatos mistos); **ERR-15** `setupNotifications` mascara erro real como "não suportado"; **ERR-16** `submitRating` pode propagar `NaN` da média ao banco (deriva do M2).
+
+> **Total acumulado: ~307 problemas** (Parte 1: 61 · Parte 2: 93 · Parte 3: ~50 · Parte 4: ~53 · Parte 5: ~50).
+
+---
+---
+
 ## ❌ Falsos positivos (descartados após validar no banco de produção)
 
 - ~~`cancelled_at`/`timestamp` gravados como número em coluna TIMESTAMPTZ~~ → as colunas são **`bigint`**; `Date.now()` está **correto**.
@@ -486,3 +551,6 @@ Aplicado e validado contra o banco (testes com `ROLLBACK` simulando usuário com
 - ~~RLS de `platform_settings` admin-only bloqueia clientes~~ → SELECT **liberado para qualquer logado**.
 - ~~Race condition de aceite de pedido~~ → **protegida** por `.is('driver_id', null).maybeSingle()`.
 - ~~Cobertura de badges de status no ClientView incompleta~~ → **completa** (10 status tratados).
+- ~~**CALC-1**: plataforma paga do próprio bolso em entregas curtas (piso do entregador > frete)~~ → **não dispara em produção**: `min_delivery_fee = 4.00` = base do frete do client; conservação `restaurantNet+driver+platform = total` fecha. **Latente** — só vira bug se admin subir `min_delivery_fee` acima de 4 (ver ADM-4, sem validação).
+- ~~**CALC-4**: default de `driver_fee_pct` divergente (0.08 vs 0)~~ → produção tem `driver_fee_pct = 40`; só afeta se a linha `platform_settings` sumir. **Latente/baixo.**
+- ~~**AUTH2-3**: `birth_date` `DD/MM/AAAA` faz insert falhar~~ → coluna é **`text`**; insert **não falha**. Sobra só inconsistência cosmética de formato.
