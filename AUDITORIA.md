@@ -4,9 +4,9 @@
 > Achados validados contra o banco de produção real (projeto `fnhjxqppcrbepgwcrqzw`).
 > Falsos positivos já removidos (ver seção final).
 >
-> **Total catalogado: ~361 problemas validados** em 6 rodadas —
-> Parte 1 (fluxo, 61) · Parte 2 (jornadas, 93) · Parte 3 (segurança/dinheiro/infra, ~50) · Parte 4 (admin/lojista/perf/a11y, ~53) · Parte 5 (cliente/auth/cálculos/resiliência, ~50) · Parte 6 (driver/edge/tipos/navegação, ~54).
-> **Destaque P6:** TYPE-1 (avaliação de loja nunca salva — coluna inexistente no UPDATE), UI-1 (troca de papel é feature morta), UI-5 (lojista para de ser alertado de pedidos), ENT2-2 (foto de entrega offline descartada), EDGE-3 (phishing via push).
+> **Total catalogado: ~407 problemas validados** em 7 rodadas —
+> Parte 1 (fluxo, 61) · Parte 2 (jornadas, 93) · Parte 3 (segurança/dinheiro/infra, ~50) · Parte 4 (admin/lojista/perf/a11y, ~53) · Parte 5 (cliente/auth/cálculos/resiliência, ~50) · Parte 6 (driver/edge/tipos/navegação, ~54) · Parte 7 (storage/promoções/concorrência/UX, ~46).
+> **Destaques recentes:** SEC2-1/2 (fotos de entrega públicas + qualquer um sobrescreve comprovante), TYPE-1 (avaliação de loja nunca salva), PROMO-4 (horário de funcionamento é feature morta), RACE-2 (split pago + reembolso = perda dupla), UI-1 (troca de papel morta).
 > **Mais urgentes:** RLS-1/2 (PII vaza pra `anon`), RLS-3/4 (fraude financeira + auto-promoção a ADMIN),
 > SEC-01 (reembolso sem autorização), MONEY-01 (repasse duplicado). Causa raiz de RLS:
 > `database/supabase-production-security.sql` nunca foi aplicado em produção.
@@ -591,6 +591,60 @@ Aplicado e validado contra o banco (testes com `ROLLBACK` simulando usuário com
 - **UI-2** `currentRole` não reseta no `signOut` (admin "preso" na última view) *(a confirmar)*; **UI-7** tiles OSM + ícones via `unpkg.com` (CDN externo, sem fallback offline); **UI-8** mapa Leaflet: `import()` async sem flag de cancelamento → vazamento se desmontar antes do await; **UI-9** `useApi` `execute`/`refetch` muda de identidade com função inline (loop); **UI-10** `getDerivedStateFromError` chama `window.location.reload()` (efeito colateral; loop de reload sem backoff) `App.tsx:20`; **UI-11** = ENT2-5 (watch GPS re-registra); **UI-12** Realtime assina tabelas **inteiras** sem filtro → todo usuário recebe mudanças de pedidos/perfis alheios (reforça vazamento de PII p/ logados); **UI-13** `GoogleAuth.initialize` no topo do módulo sem guard de plataforma; **UI-14** sem controle de StatusBar/SplashScreen; **UI-15** tutorial marca "visto" ao fechar e não há como reabrir; **UI-16** `NotificationContainer` (possível componente morto) sem safe-area.
 
 > **Total acumulado: ~361 problemas** (P1: 61 · P2: 93 · P3: ~50 · P4: ~53 · P5: ~50 · P6: ~54).
+
+---
+---
+
+# Parte 7 — Storage/RLS, promoções/horários, concorrência e UX
+
+> 7ª rodada (4 agentes): Storage + RLS restante (validado por queries reais), promoções/cupons/horários, race conditions transversais, estados vazios/UX textual. ~46 achados.
+
+## 🗄️ Storage & RLS restante — SEC2-1..6 (validado com queries reais)
+
+### Críticos
+- **SEC2-1 ✅** — Único bucket `avatars` é **público** (`public=true`) e guarda as fotos de **entrega** (`delivery/{orderId}-{ts}.jpg`) e **devolução** (`returns/...`), lidas via `getPublicUrl` (sem signed URL, ignora RLS). Comprovantes com fachada/endereço/rosto do cliente ficam acessíveis a **qualquer URL, sem login**; nome enumerável (`orderId` + `Date.now()`). `DriverView.tsx:812,1646`.
+- **SEC2-2 ✅** — Policy `avatars_insert` só exige `bucket_id='avatars'` (**não amarra o path ao `auth.uid()`**) + `upsert:true` no código → **qualquer usuário logado sobrescreve a foto/comprovante de qualquer pedido** (fraude em disputa de reembolso), logo de loja, avatar alheio.
+
+### Altos/Médios
+- **SEC2-3 ✅** policies UPDATE/DELETE de storage são "mortas" (esperam UID como 1ª pasta, mas o path nunca tem UID) → órfãos nunca limpos + falsa sensação de proteção; **SEC2-4** bucket sem `file_size_limit`/`allowed_mime_types` → upload irrestrito (DoS/hospedar HTML/SVG malicioso em domínio confiável); **SEC2-5 ✅** `products_select` é `USING(true)` e expõe **`owner_price`** (margem/custo do lojista) publicamente; **SEC2-6** `support_tickets` sem policy de DELETE (impossível expurgar PII/LGPD) e `admin_note` (nota interna) visível ao dono do ticket.
+- *(Verificado: nenhuma tabela `public` sem RLS; `support_tickets` NÃO vaza entre clientes; `promotions` não existe como tabela — fica no JSON de `restaurants`.)*
+
+## 🎟️ Promoções / Cupons / Horários — PROMO-1..14
+
+### Críticos
+- **PROMO-1** — Desconto é 100% confiado do cliente: `createOrder` recebe `discountAmount` pronto, **nunca valida o cupom no servidor** (código do cupom nem é enviado). Cliente pode forjar `discountAmount = subtotal` sem cupom → loja recebe sobre `finalProductTotal = 0`. `store.tsx:881,1009`.
+- **PROMO-2** — Frete grátis idem: `deliveryFeeOverride=0` aceito sem cupom `FREE_DELIVERY` validado → frete grátis universal forjável. `store.tsx:998`.
+
+### Altos
+- **PROMO-3** `maxUsage`/`usageCount` nunca verificados nem incrementados → cupom de uso único usável infinitas vezes; **PROMO-4** `isRestaurantOpenNow` **nunca é chamada** → horário de funcionamento é **feature morta** (só vale o toggle manual `is_open`; loja aceita 24h fora do horário); **PROMO-5** toda a lógica de horário usa o fuso **do dispositivo**, não `America/Cuiaba` (UTC-4); **PROMO-6** turno que cruza meia-noite (18h–02h) → `close<open` → loja considerada **sempre fechada**; sem múltiplos turnos.
+
+### Médios/Baixos
+- **PROMO-7** "válido até" vira UTC-midnight → cupom expira ~4h antes (20h do dia anterior em Apiacás); **PROMO-8** PERCENT sem teto (>100% / negativo) e `PRODUCT_SPECIFIC` aplica no subtotal inteiro ignorando `productIds`; **PROMO-9** desconto não amarrado à loja no servidor (deriva de PROMO-1); **PROMO-10** promoções/horários read-modify-write do estado local (perda concorrente); **PROMO-11** `FREE_DELIVERY` usa piso R$30 hardcoded, ignora `minOrderValue`; **PROMO-12** match de cupom sem `.trim()`; **PROMO-13** sem data fim vira 7 dias silencioso; **PROMO-14** editar promoção reseta `validFrom`/`usageCount`.
+
+## 🔀 Concorrência / Race Conditions — RACE-1..10
+
+### Críticos
+- **RACE-2** — Admin dispara `refund` num pedido `DELIVERED` cujo split **já foi pago** (refund só bloqueia DELIVERED para não-admin e **não checa `driver_split_released`**) → **paga split E reembolsa = perda dupla**. `refund-asaas-payment` vs `release-payment-splits`.
+- **RACE-1** — Cancelar pedido recém-pago decide reembolso por `order.status` **local stale** → se o webhook marcou PENDING mas o Realtime não chegou, cancela sem reembolsar → **cliente perde o dinheiro**. `store.tsx:1240`.
+
+### Altos
+- **RACE-3** `assignDriver` grava `platform_fee`/`driver_net_earnings` a partir do `order` local stale; **RACE-4** `submitRating` incrementa rating/reviews read-modify-write do estado local (perde avaliação concorrente); **RACE-5** promoções RMW (= PROMO-10); **RACE-6** patch Realtime antigo sobrescreve mutation otimista (sem coluna de versão/`updated_at`).
+
+### Médios
+- **RACE-7** `clearSyncQueue` apaga itens que falharam (= ERR-1, reforçado); **RACE-8** `fetchInProgressRef` pode travar permanentemente (frágil, sem watchdog); **RACE-9** idempotência de pedido é select-then-insert (TOCTOU entre abas → **pedido + cobrança duplicados**); **RACE-10** `updateOrderStatus` e `assignDriver` **sem guard condicional de status** → pedido CANCELLED com entregador atribuído / transições inválidas vencem.
+
+## 💬 UX / Estados vazios / Conteúdo — UX-1..16
+
+### Altos
+- **UX-1** erros técnicos do Postgres/RLS/Asaas (em inglês) vazam crus na tela de cadastro/perfil `AuthView.tsx:487,521`; **UX-2** "Pedidos Recentes" do admin **não ordena por data** (`slice(0,6)` sem sort) → mostra antigos como recentes; **UX-3** histórico do entregador mostra ganho verde (ou `R$ NaN`) em pedidos cancelados/falhados.
+
+### Médios
+- **UX-4** excluir produto sem confirmação (inconsistente com promoção que confirma); **UX-5** colunas do Kanban da cozinha sem estado vazio (tela "quebrada" sem pedidos); **UX-6** toast fixo de 4,5s corta instruções longas + sem safe-area; **UX-7** `alert/confirm` nativos em pontos de fluxo (sair, limpar carrinho, copiar PIX); **UX-8** pluralização "1 Itens"/"item(s)"; **UX-9** remover cartão com `confirm()` nativo; **UX-10** comentário só-espaços renderiza aspas vazias.
+
+### Baixos
+- **UX-11** typo "imagem válido"; **UX-12** categoria `" Japonesa"` com espaço → fragmenta filtro; **UX-13** datas sem `timeZone` e formatos inconsistentes entre telas; **UX-14** cards de restaurante/loja sem `onError` de imagem; **UX-15** vitrine "Em destaque" re-embaralha a cada update Realtime (itens pulam sob o dedo); **UX-16** modal PIX não mostra contador de expiração.
+
+> **Total acumulado: ~407 problemas** (P1: 61 · P2: 93 · P3: ~50 · P4: ~53 · P5: ~50 · P6: ~54 · P7: ~46).
 
 ---
 ---
