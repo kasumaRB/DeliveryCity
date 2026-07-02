@@ -30,6 +30,18 @@ Aplicado e validado contra o banco (testes com `ROLLBACK` simulando usuário com
 | **MONEY-01 / C1** | Repasse e reembolso com idempotência **atômica** (`UPDATE ... WHERE flag=false/refunded_at IS NULL`) | sem mais duplicação por corrida |
 | **BÔNUS** | Cadastro estava quebrando: `auth.users.confirmed_at` virou coluna gerada (mudança de plataforma do Supabase) | `upsert_profile` não escreve mais `confirmed_at` |
 
+### ✅ CORRIGIDO (lote 2)
+
+| ID | Correção | Como |
+|----|----------|------|
+| **REGRESSÃO** | Parceiros estavam sendo **auto-aprovados**: `handle_new_user` cria placeholder `CLIENT/APPROVED` no signup e o `upsert_profile` (lote 1) preservava o `APPROVED` | `upsert_profile`: no conflito preserva status só se o papel **não muda**; papel muda → status sanitizado (parceiro=PENDING). Verificado em rollback |
+| **TYPE-1/2** | Avaliação de loja **nunca salvava** (UPDATE gravava `ratings_count` em coluna inexistente → falha silenciosa) | Coluna `restaurants.ratings_count` criada + backfill; checagem de `error` no `submitRating` |
+| **ERR-1** | Fila offline descartava confirmação de entrega válida (`clearSyncQueue` em bloco) | `processSyncQueue` mantém itens que falharam (`setSyncQueue`), teto de 8 tentativas + TTL 4h |
+| **RACE-2** | Reembolso de pedido com split **já pago** = pagamento em dobro | `refund-asaas-payment` bloqueia (409) se `driver_split_released=true`, inclusive admin *(código pronto; deploy pendente de aprovação)* |
+| **RLS-10** | `profiles_insert` permitia auto-inserção como ADMIN | `with_check` restringe `role IN (CLIENT,RESTAURANT,DRIVER)`. Verificado (SQLSTATE 42501) |
+
+> **RLS-11 reclassificado como FALSO POSITIVO:** existe FK `profiles_id_fkey → auth.users ON DELETE CASCADE`, então a exclusão do auth user já remove o perfil (sem órfão). A policy `profiles_delete_own` foi adicionada mesmo assim (inofensiva, deixa o `.delete()` do client suceder em vez de falhar silencioso).
+
 **Pendências de segurança conhecidas (não resolvidas nesta rodada):**
 - Usuário **autenticado** ainda lê PII de outros perfis (o app carrega `profiles.select('*')`). Fix correto = view `public_profiles` com colunas seguras + refatorar `store.tsx`. *(maior, agendado)*
 - SEC-03 (webhook amarra só por valor), SEC-04 (CORS `*`), SHARED-5 (chave Gemini no bundle), e os demais Médios/Baixos seguem em aberto.

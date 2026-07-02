@@ -21,6 +21,7 @@ import {
   clearOfflineActiveOrder,
   getSyncQueue,
   clearSyncQueue,
+  setSyncQueue,
   addToSyncQueue,
   saveCartToOffline,
   getCartFromOffline,
@@ -575,15 +576,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const queue = getSyncQueue();
     if (queue.length === 0) return;
 
+    // ERR-1: NÃO limpa a fila em bloco. Só remove itens que sincronizaram com
+    // sucesso; mantém os que falharam para retentar (o TTL de 4h + o teto de
+    // tentativas evitam retenção infinita de itens definitivamente inválidos).
+    const MAX_ATTEMPTS = 8;
+    const remaining: typeof queue = [];
     for (const item of queue) {
       try {
-        if (item.type === 'pickup') await confirmPickup(item.orderId, item.code);
-        else await confirmDelivery(item.orderId, item.code);
+        const ok = item.type === 'pickup'
+          ? await confirmPickup(item.orderId, item.code)
+          : await confirmDelivery(item.orderId, item.code);
+        if (!ok) {
+          const attempts = (item.attempts ?? 0) + 1;
+          if (attempts < MAX_ATTEMPTS) remaining.push({ ...item, attempts });
+          else console.warn('[sync] confirmação descartada após', MAX_ATTEMPTS, 'tentativas:', item.orderId);
+        }
       } catch (e) {
         console.error('Erro na sincronização offline:', e);
+        const attempts = (item.attempts ?? 0) + 1;
+        if (attempts < MAX_ATTEMPTS) remaining.push({ ...item, attempts });
       }
     }
-    clearSyncQueue();
+    setSyncQueue(remaining);
     await fetchData();
   }, [orders]);
 
@@ -1579,11 +1593,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 timestamp: Date.now(),
               };
               const updatedReviews = [newReview, ...existingReviews].slice(0, 15);
-              await supabase.from('restaurants').update({
+              const { error: ratingErr } = await supabase.from('restaurants').update({
                 rating: newAvg,
                 ratings_count: newCount,
                 reviews: updatedReviews,
               }).eq('id', order.restaurantId);
+              if (ratingErr) console.error('[submitRating] Falha ao salvar avaliação da loja:', ratingErr);
             }
           }
 

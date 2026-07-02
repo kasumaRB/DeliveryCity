@@ -66,7 +66,7 @@ serve(async (req) => {
     // ── 2. Buscar pedido + dono do restaurante para checagem de autorização ───
     const { data: order } = await admin
       .from('orders')
-      .select('id, asaas_payment_id, total, status, refunded_at, customer_id, driver_id, restaurant_id')
+      .select('id, asaas_payment_id, total, status, refunded_at, driver_split_released, customer_id, driver_id, restaurant_id')
       .eq('id', orderId)
       .single();
 
@@ -98,6 +98,14 @@ serve(async (req) => {
     // Não-admin não pode reembolsar pedido já entregue (repasses já liberados).
     if (!isAdmin && order.status === 'DELIVERED') {
       return json({ error: 'Pedido já entregue — reembolso requer suporte.' }, 409);
+    }
+
+    // RACE-2: se o split PIX já foi repassado a restaurante/entregador, um reembolso
+    // ao cliente pagaria em dobro. Bloqueia (inclusive admin) — exige reversão manual.
+    if (order.driver_split_released === true) {
+      return json({
+        error: 'Repasse já liberado a restaurante/entregador — reembolso automático bloqueado para evitar pagamento em dobro. Faça a reversão manual.',
+      }, 409);
     }
 
     if (!order.asaas_payment_id) {

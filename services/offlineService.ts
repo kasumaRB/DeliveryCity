@@ -131,6 +131,8 @@ export interface OfflineConfirmation {
   code: string;
   type: 'pickup' | 'delivery';
   timestamp: number;
+  /** Nº de tentativas de sincronização já feitas (para não retentar infinitamente). */
+  attempts?: number;
 }
 
 const SYNC_QUEUE_TTL = 4 * 60 * 60 * 1000; // 4 horas
@@ -168,6 +170,22 @@ export const addToSyncQueue = (confirmation: OfflineConfirmation): void => {
     localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(queue));
   } catch (error) {
     console.error("Falha ao adicionar na fila de sincronização:", error);
+  }
+};
+
+/**
+ * Substitui a fila inteira (usado para manter apenas os itens que ainda não
+ * sincronizaram, sem descartar confirmações válidas que falharam).
+ */
+export const setSyncQueue = (queue: OfflineConfirmation[]): void => {
+  try {
+    if (queue.length === 0) {
+      localStorage.removeItem(SYNC_QUEUE_KEY);
+    } else {
+      localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(queue));
+    }
+  } catch (error) {
+    console.error("Falha ao salvar fila de sincronização:", error);
   }
 };
 
