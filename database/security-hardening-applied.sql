@@ -117,3 +117,19 @@ END; $$;
 --   AUTO-APROVANDO parceiros e pulando a moderação.
 -- (Definições aplicadas via migrations fix_upsert_profile_generated_confirmed_at
 --  e fix_upsert_profile_partner_auto_approval_regression.)
+
+-- ── 7. Storage: limite de tamanho e tipo no bucket 'avatars' (SEC2-4) ─
+--   Bucket estava sem file_size_limit nem allowed_mime_types (DoS + upload de
+--   HTML/SVG malicioso servido do dominio publico). Restringe a imagens raster
+--   (SVG/HTML bloqueados) e 10 MB. Aplicado via execute_sql (nao e DDL):
+--     UPDATE storage.buckets
+--       SET file_size_limit = 10485760,
+--           allowed_mime_types = ARRAY['image/jpeg','image/jpg','image/png',
+--             'image/webp','image/gif','image/heic','image/heif']
+--     WHERE id = 'avatars';
+--
+--   PENDENTE (exigem mudanca no app, nao so SQL):
+--     - SEC2-1: bucket e publico e guarda fotos de entrega/devolucao (PII).
+--       Fix = bucket privado + createSignedUrl (toca leitura de imagem no app).
+--     - SEC2-2: policy de INSERT nao amarra path ao dono + upsert -> qualquer um
+--       sobrescreve comprovante. Fix = caminhos {ownerId}/... + policy por pasta.
