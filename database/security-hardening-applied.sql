@@ -133,3 +133,18 @@ END; $$;
 --       Fix = bucket privado + createSignedUrl (toca leitura de imagem no app).
 --     - SEC2-2: policy de INSERT nao amarra path ao dono + upsert -> qualquer um
 --       sobrescreve comprovante. Fix = caminhos {ownerId}/... + policy por pasta.
+
+-- ── 8. PROMO-1/PROMO-2 + RLS-9 (parcial) ─────────────────────────────
+--   RLS-9 (parcial): view public_profiles criada (migration create_public_profiles_view)
+--     — só colunas nao-sensiveis. O FECHAMENTO da policy de profiles fica pendente
+--       porque o rastreamento ao vivo do entregador depende do Realtime em profiles;
+--       exige migrar location p/ tabela driver_locations antes (mini-projeto).
+--
+--   PROMO-1/PROMO-2 (migration promo1_guard_order_discount_on_insert):
+--     Trigger BEFORE INSERT em orders valida no servidor (criacao de pedido e client-side
+--     e um atacante pode inserir direto via API):
+--       - conservacao: restaurant_net + driver_net + platform_fee = total
+--       - desconto implicito (subtotal+entrega+servico-total) <= melhor promocao ATIVA da loja
+--       - frete abaixo do minimo so com promocao FREE_DELIVERY ativa
+--     Testado em rollback: legitimo aceita; 100%-sem-promo, frete-gratis-sem-promo e
+--     desconto-acima-da-promo sao bloqueados.
