@@ -148,3 +148,22 @@ END; $$;
 --       - frete abaixo do minimo so com promocao FREE_DELIVERY ativa
 --     Testado em rollback: legitimo aceita; 100%-sem-promo, frete-gratis-sem-promo e
 --     desconto-acima-da-promo sao bloqueados.
+
+-- ── 9. RLS-9 FECHADO (vazamento de PII para todo usuario logado) ─────
+--   Antes: policy SELECT de profiles era USING(true) -> qualquer logado lia
+--   CPF/PIX/cartoes/enderecos de TODOS (e o Realtime broadcastava tudo).
+--   Agora (migrations rls9_*):
+--     - Tabela driver_locations (sem PII) + RLS: so o entregador escreve a propria;
+--       cliente/lojista/admin de um pedido ATIVO leem. Realtime habilitado.
+--     - View profiles_safe: todas as colunas, mas as SENSIVEIS mascaradas (NULL)
+--       para quem nao e o dono nem admin (CASE ... auth.uid()/is_admin()).
+--     - Policy de profiles SELECT fechada: id = auth.uid() OR is_admin().
+--     - is_admin() virou SECURITY DEFINER (evita recursao na policy).
+--   App (commit 47fd473): le profiles_safe no lugar de profiles.select('*');
+--     tracking do entregador via driver_locations; fee do dono via profiles_safe.
+--   Testado (rollback): nao-admin le so o proprio perfil direto (1 linha), mas ve
+--     todos via profiles_safe (4); admin ve todos nos dois. Deploy validado antes de fechar.
+--
+--   NOTA advisor: profiles_safe dispara "security_definer_view" (ERROR generico).
+--   E INTENCIONAL: a view precisa bypassar RLS p/ retornar todas as linhas; a
+--   protecao e o mascaramento por coluna (CASE). Sem vazamento (testado).
