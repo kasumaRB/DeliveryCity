@@ -211,7 +211,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
     if (!file || !currentUserProfile) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Selecione uma imagem válido');
+      alert('Selecione uma imagem válida.');
       return;
     }
 

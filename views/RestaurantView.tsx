@@ -379,7 +379,17 @@ export const RestaurantView: React.FC = () => {
       return;
     }
     setItemFormImageError(false);
+    // LOJ2-2: valida nome e preço — sem isso salvava preço NaN/negativo/zero e nome
+    // vazio no cardápio (cliente via "R$ NaN" e o repasse quebrava).
+    if (!itemFormName.trim()) {
+      showToast('Informe o nome do produto.', 'error');
+      return;
+    }
     const price = parseFloat(itemFormOwnerPrice);
+    if (!Number.isFinite(price) || price <= 0) {
+      showToast('Informe um preço válido (maior que zero).', 'error');
+      return;
+    }
     const feePct = currentUserProfile?.customFeePct !== undefined
       ? currentUserProfile.customFeePct / 100
       : (platformSettings?.restaurantFeePct ?? 0.08);
@@ -999,7 +1009,7 @@ export const RestaurantView: React.FC = () => {
                         <option value="Bebida">Bebida</option>
                         <option value="Sobremesa">Sobremesa</option>
                         <option value="Salgado">Salgado</option>
-                        <option value=" Japonesa">Japonesa</option>
+                        <option value="Japonesa">Japonesa</option>
                         <option value="Mexicana">Mexicana</option>
                         <option value="Italiana">Italiana</option>
                         <option value="Brasileira">Brasileira</option>

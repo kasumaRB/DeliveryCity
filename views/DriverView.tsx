@@ -1256,12 +1256,12 @@ export const DriverView: React.FC = () => {
                         <div className="flex-1 min-w-0 mr-3">
                           <p className="font-bold text-white text-sm truncate">{order.restaurantName}</p>
                           <p className="text-gray-600 text-xs mt-0.5">
-                            {new Date(order.timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            {new Date(order.timestamp).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                             {' · '}{order.customerName}
                           </p>
                         </div>
                         <div className="text-right shrink-0">
-                          <p className="text-green-400 font-black text-sm">{formatCurrency(order.driverNetEarnings)}</p>
+                          <p className="text-green-400 font-black text-sm">{formatCurrency(order.driverNetEarnings || 0)}</p>
                           <span className={`text-[9px] font-black uppercase ${
                             order.status === OrderStatus.DELIVERED ? 'text-green-600'
                             : order.status === OrderStatus.CANCELLED ? 'text-red-500'
@@ -1707,8 +1707,10 @@ export const DriverView: React.FC = () => {
 
                 <input
                   type="text"
+                  inputMode="numeric"
                   value={inputCode}
-                  onChange={e => setInputCode(e.target.value)}
+                  /* ENT2-10: só dígitos — evita "código inválido" por espaço/colagem */
+                  onChange={e => setInputCode(e.target.value.replace(/\D/g, ''))}
                   className="w-full p-6 bg-gray-700/50 rounded-2xl text-center text-3xl font-black text-white tracking-[0.5em] border-2 border-gray-600 outline-none focus:border-blue-500 mb-6"
                   placeholder="0000"
                   maxLength={4}

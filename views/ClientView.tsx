@@ -463,7 +463,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     const now = Date.now();
     const promo = selectedRestaurant.promotions?.find(
       p =>
-        p.code.toUpperCase() === couponCode.toUpperCase() &&
+        p.code.trim().toUpperCase() === couponCode.trim().toUpperCase() &&
         p.isActive &&
         now >= p.validFrom &&
         now <= p.validUntil
@@ -1225,7 +1225,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                                 </p>
                               ))}
                               {order.items.length > 3 && (
-                                <p className="text-xs text-gray-400">+{order.items.length - 3} item(s)</p>
+                                <p className="text-xs text-gray-400">+{order.items.length - 3} {order.items.length - 3 === 1 ? 'item' : 'itens'}</p>
                               )}
                             </div>
 
@@ -1484,7 +1484,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
               </div>
               <div className="flex flex-col items-start leading-none">
                 <span className="text-[9px] uppercase tracking-widest opacity-80 mb-0.5">
-                  {cart.reduce((acc, item) => acc + item.quantity, 0)} Itens
+                  {(() => { const n = cart.reduce((acc, item) => acc + item.quantity, 0); return `${n} ${n === 1 ? 'Item' : 'Itens'}`; })()}
                 </span>
                 <span className="text-base font-black">
                   {cartTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
