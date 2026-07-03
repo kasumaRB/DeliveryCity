@@ -494,6 +494,16 @@ export const RestaurantView: React.FC = () => {
 
   const handleSavePromotion = async () => {
     if (!myRestaurant || !promoCode || !promoDiscountValue) return;
+    // LOJ2-16/PROMO-8: valida o valor do desconto (evita NaN/negativo e % > 100).
+    const discVal = parseFloat(promoDiscountValue);
+    if (!Number.isFinite(discVal) || discVal <= 0) {
+      showToast('Informe um valor de desconto válido (maior que zero).', 'error');
+      return;
+    }
+    if (promoDiscountType === 'PERCENT' && discVal > 100) {
+      showToast('Desconto em porcentagem não pode passar de 100%.', 'error');
+      return;
+    }
     const now = Date.now();
     const validUntil = promoValidUntil
       ? new Date(promoValidUntil).getTime()
@@ -1121,7 +1131,8 @@ export const RestaurantView: React.FC = () => {
                             <Edit2 size={16} />
                           </button>
                           <button
-                            onClick={() => deleteProduct(myRestaurant.id, item.id)}
+                            /* UX-4: confirma antes de excluir (evita apagar prato por toque acidental) */
+                            onClick={() => { if (window.confirm(`Remover "${item.name}" do cardápio?`)) deleteProduct(myRestaurant.id, item.id); }}
                             className="p-2 bg-white/95 backdrop-blur-md text-red-600 rounded-xl shadow-md hover:bg-white transition active:scale-90"
                           >
                             <Trash2 size={16} />
