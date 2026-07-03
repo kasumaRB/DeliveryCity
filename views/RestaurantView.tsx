@@ -117,11 +117,22 @@ export const RestaurantView: React.FC = () => {
 
   // Som de alerta quando chega novo pedido PENDING
   const prevPendingCount = useRef<number | null>(null);
+  // UI-5: reutiliza UM único AudioContext (criar um a cada beep estoura o limite
+  // (~6) do navegador e o som para; fecha no unmount).
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  useEffect(() => {
+    return () => { audioCtxRef.current?.close().catch(() => {}); audioCtxRef.current = null; };
+  }, []);
   useEffect(() => {
     const pendingCount = myOrders.filter(o => o.status === 'PENDING').length;
     if (prevPendingCount.current !== null && pendingCount > prevPendingCount.current) {
       try {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        if (!audioCtxRef.current) {
+          audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        }
+        const ctx = audioCtxRef.current;
+        // navegadores iniciam o contexto 'suspended' até um gesto do usuário
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
         const playBeep = (freq: number, start: number, duration: number) => {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();

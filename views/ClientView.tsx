@@ -893,7 +893,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                     >
                       {/* Imagem do restaurante */}
                       <div className="h-36 bg-gray-100 relative overflow-hidden">
-                        <img src={restaurant.image} className={`w-full h-full object-cover ${isClosed ? 'grayscale' : ''}`} />
+                        <img src={restaurant.image} loading="lazy" decoding="async" className={`w-full h-full object-cover ${isClosed ? 'grayscale' : ''}`} />
                         {/* Badge de categoria no canto */}
                         <span className="absolute top-3 left-3 bg-white/90 backdrop-blur text-gray-700 text-[10px] font-black px-2 py-1 rounded-lg">
                           {restaurant.category}
@@ -1036,6 +1036,8 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                         {/* Imagem quadrada à esquerda */}
                         <div className="w-20 h-20 bg-gray-100 rounded-xl overflow-hidden shrink-0 relative">
                           <img
+                            loading="lazy"
+                            decoding="async"
                             src={
                               product.image ||
                               'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500'
