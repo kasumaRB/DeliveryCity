@@ -991,6 +991,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const realPrice = Number(realProduct.price);
         const frontendPrice = Number(item.product.price);
 
+        // CALC-9: rejeita preço inválido no banco (evita subtotal/total = NaN)
+        if (!Number.isFinite(realPrice) || realPrice < 0) {
+          throw new Error(`Preço inválido para "${item.product.name}". Tente novamente.`);
+        }
+
         // 🔒 Tolerância de R$0,01 para diferenças de arredondamento
         if (Math.abs(realPrice - frontendPrice) > 0.01) {
           throw new Error(
@@ -1047,7 +1052,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // ═══════════════════════════════════════════════════════
       let deliveryFee = minDeliveryFee;
       if (deliveryFeeOverride !== undefined) {
-        if (deliveryFeeOverride < 0 || deliveryFeeOverride > maxDeliveryFee) {
+        // CALC-8: coords NaN geram deliveryFeeOverride=NaN; sem checar isFinITE,
+        // NaN passa pelos comparadores (< 0 e > max são false) e vira total=NaN.
+        if (!Number.isFinite(deliveryFeeOverride) || deliveryFeeOverride < 0 || deliveryFeeOverride > maxDeliveryFee) {
           throw new Error('Taxa de entrega inválida. Por favor, tente novamente.');
         }
         deliveryFee = deliveryFeeOverride;
@@ -1657,10 +1664,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           let updatePayload: any = { driver_id: did, status: OrderStatus.READY, driver_name: driver?.name ?? null };
 
           if (driver && order && driver.customFeePct !== undefined) {
+            // CALC-2: arredonda para 2 casas — sem isso gravava lixo de float
+            // (ex.: 8.280000000000001) nas colunas de dinheiro.
+            const r2 = (n: number) => parseFloat(n.toFixed(2));
             const driverFeePct = driver.customFeePct / 100;
-            const newDriverEarnings = order.deliveryFee * (1 - driverFeePct);
+            const newDriverEarnings = r2(order.deliveryFee * (1 - driverFeePct));
             const diff = newDriverEarnings - order.driverNetEarnings;
-            const newPlatformFee = order.platformFee - diff;
+            const newPlatformFee = r2(order.platformFee - diff);
 
             updatePayload.driver_net_earnings = newDriverEarnings;
             updatePayload.platform_fee = newPlatformFee;

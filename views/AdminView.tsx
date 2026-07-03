@@ -721,7 +721,7 @@ export const AdminView: React.FC = () => {
                     </button>
                   </div>
                   <div className="divide-y divide-gray-50">
-                    {orders.slice(0, 6).map(o => {
+                    {[...orders].sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0)).slice(0, 6).map(o => {
                       const statusMap: Record<string,{label:string;color:string}> = {
                         PENDING: {label:'Aguardando', color:'text-yellow-600 bg-yellow-50'},
                         PREPARING: {label:'Preparando', color:'text-blue-600 bg-blue-50'},

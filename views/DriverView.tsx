@@ -681,6 +681,12 @@ export const DriverView: React.FC = () => {
     }
   }, [showInAppCamera, cameraStream]);
 
+  // ENT2-8: garante que a câmera (LED/stream) seja desligada ao desmontar a view,
+  // mesmo se o usuário sair sem passar por stopCamera().
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  useEffect(() => { cameraStreamRef.current = cameraStream; }, [cameraStream]);
+  useEffect(() => () => { cameraStreamRef.current?.getTracks().forEach(t => t.stop()); }, []);
+
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -738,6 +744,9 @@ export const DriverView: React.FC = () => {
 
     const handlePosition = (pos: GeolocationPosition) => {
       const newPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      // ENT2-4: recebeu posição => GPS liberado; limpa o bloqueio se o usuário
+      // concedeu a permissão sem reabrir o app.
+      setGpsBlocked(false);
       setCurrentPos(newPos);
       const now = Date.now();
       // Salva imediatamente na primeira vez (lastLocationUpdate = 0) ou a cada 10s
