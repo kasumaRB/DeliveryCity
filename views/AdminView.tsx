@@ -430,6 +430,23 @@ const AdminSidebar: React.FC<{
   </aside>
 );
 
+// SEC2-1/2: comprovantes ficam em bucket PRIVADO. O campo guarda o PATH; aqui
+// geramos uma signed URL temporária para exibir (compat: se vier URL http antiga, usa direto).
+const ProofImage: React.FC<{ path: string; alt?: string; className?: string }> = ({ path, alt, className }) => {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (!path) { setUrl(null); return; }
+    if (path.startsWith('http')) { setUrl(path); return; }
+    supabase.storage.from('delivery-proofs').createSignedUrl(path, 3600).then(({ data }) => {
+      if (!cancelled) setUrl(data?.signedUrl ?? null);
+    }, () => { if (!cancelled) setUrl(null); });
+    return () => { cancelled = true; };
+  }, [path]);
+  if (!url) return <div className={`bg-gray-100 animate-pulse rounded-lg ${className ?? ''}`} style={{ minHeight: 96 }} />;
+  return <img src={url} alt={alt ?? 'Comprovante'} className={className} />;
+};
+
 export const AdminView: React.FC = () => {
   const {
     profiles,
@@ -1775,8 +1792,8 @@ export const AdminView: React.FC = () => {
                               {order.returnPhotoUrl && (
                                 <div className="bg-white border border-gray-200 rounded-xl p-3">
                                   <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">📷 Foto enviada pelo entregador</p>
-                                  <img
-                                    src={order.returnPhotoUrl}
+                                  <ProofImage
+                                    path={order.returnPhotoUrl}
                                     alt="Foto da devolução"
                                     className="w-full max-h-48 object-cover rounded-lg border border-gray-100"
                                   />

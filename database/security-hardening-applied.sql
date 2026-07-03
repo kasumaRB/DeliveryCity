@@ -167,3 +167,18 @@ END; $$;
 --   NOTA advisor: profiles_safe dispara "security_definer_view" (ERROR generico).
 --   E INTENCIONAL: a view precisa bypassar RLS p/ retornar todas as linhas; a
 --   protecao e o mascaramento por coluna (CASE). Sem vazamento (testado).
+
+-- ── 10. SEC2-1/SEC2-2: comprovantes de entrega/devolução (PII) ───────
+--   Antes: fotos iam para o bucket PUBLICO 'avatars' (delivery/, returns/) com
+--   getPublicUrl -> qualquer um com a URL via a porta/endereco do cliente, e
+--   qualquer usuario logado sobrescrevia a prova (fraude em disputa de reembolso).
+--   Agora (migration sec2_create_delivery_proofs_private_bucket):
+--     - Bucket PRIVADO 'delivery-proofs' (public=false, 10MB, so imagens).
+--     - path = '{orderId}/...'; RLS: so o entregador ATRIBUIDO ao pedido grava;
+--       partes (cliente/entregador/dono) + admin leem.
+--   App (DriverView): upload para delivery-proofs, guarda o PATH (nao URL).
+--   App (AdminView): componente ProofImage gera signed URL (1h) a partir do path.
+--   Testado (rollback): entregador grava OK; estranho bloqueado (42501);
+--     cliente le; estranho nao le.
+--   RESIDUAL (Medio, nao critico): assets publicos (avatar/produto/logo) no bucket
+--     'avatars' ainda tem INSERT permissivo (defacement). Exige repath por dono.

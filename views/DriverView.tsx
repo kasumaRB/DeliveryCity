@@ -809,13 +809,14 @@ export const DriverView: React.FC = () => {
       if (success) {
         if (deliveryPhotoFile) {
           try {
-            const fileName = `delivery/${activeOrder.id}-${Date.now()}.jpg`;
+            // SEC2-1/2: comprovante vai para o bucket PRIVADO delivery-proofs,
+            // path amarrado ao pedido ({orderId}/...). Guarda o PATH (não URL pública).
+            const fileName = `${activeOrder.id}/delivery-${Date.now()}.jpg`;
             const { data, error: uploadErr } = await supabase.storage
-              .from('avatars')
+              .from('delivery-proofs')
               .upload(fileName, deliveryPhotoFile, { upsert: true });
             if (uploadErr || !data) throw uploadErr || new Error('upload falhou');
-            const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
-            await supabase.from('orders').update({ delivery_photo_url: publicUrl }).eq('id', activeOrder.id);
+            await supabase.from('orders').update({ delivery_photo_url: data.path }).eq('id', activeOrder.id);
           } catch {
             showToast('Entrega confirmada! Não foi possível salvar a foto — verifique sua conexão.', 'info');
           }
@@ -1643,12 +1644,12 @@ export const DriverView: React.FC = () => {
                       try {
                         await startReturn(activeOrder.id);
                         try {
-                          const fileName = `returns/${activeOrder.id}-${Date.now()}.jpg`;
+                          // SEC2-1/2: bucket PRIVADO delivery-proofs, path por pedido, guarda o PATH.
+                          const fileName = `${activeOrder.id}/return-${Date.now()}.jpg`;
                           const { data, error: upErr } = await supabase.storage
-                            .from('avatars').upload(fileName, returnPhotoFile, { upsert: true });
+                            .from('delivery-proofs').upload(fileName, returnPhotoFile, { upsert: true });
                           if (!upErr && data) {
-                            const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
-                            await supabase.from('orders').update({ return_photo_url: publicUrl }).eq('id', activeOrder.id);
+                            await supabase.from('orders').update({ return_photo_url: data.path }).eq('id', activeOrder.id);
                           }
                         } catch { /* foto falhou mas devolução iniciou */ }
                         setShowFailedModal(false);
