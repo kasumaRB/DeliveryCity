@@ -55,6 +55,7 @@ interface AppContextType {
   restaurants: Restaurant[];
   orders: Order[];
   profiles: UserProfile[];
+  driverLocations: Record<string, { lat: number; lng: number }>;
   currentRole: UserRole | null;
   isLoading: boolean;
   isSupabaseConnected: boolean | null;
@@ -142,6 +143,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isSupabaseConnected, setIsSupabaseConnected] = useState<boolean | null>(null);
   const [realDistances, setRealDistances] = useState<Record<string, any>>({});
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings | null>(null);
+  // RLS-9: localização ao vivo dos entregadores (de driver_locations, sem PII).
+  const [driverLocations, setDriverLocations] = useState<Record<string, { lat: number; lng: number }>>({});
 
   // 🔒 SEGURANÇA: currentUserProfile agora tem estado próprio para evitar race condition
   // onde profiles.find() roda ANTES de setProfiles() ser commitado pelo React
@@ -303,15 +306,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     try {
-      const [restData, orderData, profileData, settingsData] = await Promise.race([
+      const [restData, orderData, profileData, settingsData, driverLocData] = await Promise.race([
         Promise.all([
           supabase.from('restaurants').select('*').order('rating', { ascending: false }),
           supabase.from('orders').select('*').order('timestamp', { ascending: false }).limit(100),
-          supabase.from('profiles').select('*'),
+          // RLS-9: profiles_safe mascara PII de terceiros (CPF/PIX/cartões etc.).
+          supabase.from('profiles_safe').select('*'),
           supabase.from('platform_settings').select('*').maybeSingle(),
+          // Localização do entregador (tabela própria, sem PII; RLS filtra por pedido ativo).
+          supabase.from('driver_locations').select('driver_id, coords'),
         ]),
         queryTimeout,
       ]);
+
+      if (driverLocData?.data) {
+        const map: Record<string, { lat: number; lng: number }> = {};
+        for (const row of driverLocData.data as any[]) {
+          if (row?.driver_id && row?.coords) map[row.driver_id] = row.coords;
+        }
+        setDriverLocations(map);
+      }
 
       devLog('[DEV] Dados carregados:', {
         restaurantes: restData.data?.length ?? 0,
@@ -753,6 +767,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })
       .subscribe();
 
+    // RLS-9: localização ao vivo do entregador via driver_locations (sem PII).
+    // A RLS entrega só as linhas que o usuário pode ver (entregador do seu pedido ativo).
+    const driverLocChannel = supabase
+      .channel('driver-locations-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'driver_locations' }, payload => {
+        if (payload.eventType === 'DELETE') {
+          setDriverLocations(prev => {
+            const next = { ...prev };
+            delete next[(payload.old as any).driver_id];
+            return next;
+          });
+        } else {
+          const row = payload.new as any;
+          if (row?.driver_id && row?.coords) {
+            setDriverLocations(prev => ({ ...prev, [row.driver_id]: row.coords }));
+          }
+        }
+      })
+      .subscribe();
+
     const ordersChannel = supabase
       .channel('orders-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, payload => {
@@ -798,6 +832,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     return () => {
       supabase.removeChannel(profilesChannel);
+      supabase.removeChannel(driverLocChannel);
       supabase.removeChannel(ordersChannel);
       supabase.removeChannel(restaurantsChannel);
     };
@@ -994,8 +1029,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       // Taxa personalizada do lojista (buscada do banco via profiles)
+      // RLS-9: lê via profiles_safe (custom_fee_pct é exposto; PII fica mascarada).
+      // Necessário porque o cliente não terá mais SELECT direto no perfil do dono.
       const { data: ownerData } = await supabase
-        .from('profiles')
+        .from('profiles_safe')
         .select('custom_fee_pct')
         .eq('id', restaurantData.owner_id)
         .maybeSingle();
@@ -1124,6 +1161,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const { error } = await supabase.from('profiles').update(up).eq('id', id);
     if (error) throw error;
+
+    // RLS-9: espelha a localização em driver_locations (tabela sem PII) para o
+    // rastreamento ao vivo sobreviver ao fechamento da policy de profiles.
+    if (data.currentLocation !== undefined && id === sessionRef.current?.user?.id) {
+      supabase.from('driver_locations')
+        .upsert({ driver_id: id, coords: data.currentLocation, updated_at: new Date().toISOString() })
+        .then(null, () => {});
+    }
 
     // Atualiza currentUserProfile imediatamente (antes do fetchData) para que
     // verificações como hasBase sejam refletidas instantaneamente na UI.
@@ -1478,6 +1523,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         restaurants,
         orders,
         profiles,
+        driverLocations,
         currentRole,
         isLoading,
         session,

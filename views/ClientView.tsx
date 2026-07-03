@@ -70,6 +70,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     deleteAddress,
     platformSettings,
     profiles,
+    driverLocations = {},
     toggleFavorite,
     cancelOrder,
     updateUserProfile,
@@ -1370,7 +1371,9 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                           {/* Rastreamento do entregador em tempo real */}
                           {order.status === OrderStatus.OUT_FOR_DELIVERY && order.driverId && (() => {
                             const driver = profiles.find(p => p.id === order.driverId);
-                            const driverLoc = driver?.currentLocation;
+                            // RLS-9: localização vem de driver_locations (ao vivo, sem PII),
+                            // com fallback para o snapshot do perfil (compat).
+                            const driverLoc = driverLocations[order.driverId!] || driver?.currentLocation;
                             const custCoords = order.coords;
                             const distMeters = (driverLoc && custCoords)
                               ? calculateDistance(driverLoc.lat, driverLoc.lng, custCoords.lat, custCoords.lng) * 1000
