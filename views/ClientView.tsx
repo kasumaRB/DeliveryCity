@@ -744,6 +744,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
           <div className="flex justify-between items-center w-full">
             {selectedRestaurant ? (
               <button
+                aria-label="Voltar"
                 onClick={() => setSelectedRestaurant(null)}
                 className="p-2 text-gray-700 hover:bg-gray-50 rounded-xl active:scale-95 transition-all"
               >
@@ -900,6 +901,8 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                         </span>
                         {currentUserProfile && (
                           <button
+                            aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                            aria-pressed={isFav}
                             onClick={e => {
                               e.stopPropagation();
                               toggleFavorite?.(restaurant.id);
@@ -1008,6 +1011,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                 />
                 {productSearch && (
                   <button
+                    aria-label="Limpar busca"
                     onClick={() => setProductSearch('')}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500"
                   >
@@ -1076,6 +1080,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                           ) : cartItem ? (
                             <div className="flex items-center gap-2 bg-gray-50 px-2 py-1.5 rounded-xl border border-gray-100">
                               <button
+                                aria-label="Diminuir quantidade"
                                 onClick={() =>
                                   updateCartQuantity(product.id, cartItem.quantity - 1)
                                 }
@@ -1087,6 +1092,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                                 {cartItem.quantity}
                               </span>
                               <button
+                                aria-label="Aumentar quantidade"
                                 onClick={() =>
                                   updateCartQuantity(product.id, cartItem.quantity + 1)
                                 }
@@ -1559,6 +1565,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                 </p>
               </div>
               <button
+                aria-label="Fechar sacola"
                 onClick={() => setIsCheckoutOpen(false)}
                 className="p-3 bg-gray-50 text-gray-400 rounded-full hover:bg-red-50 hover:text-red-500 transition-all"
               >
@@ -1594,6 +1601,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                     </div>
                     <div className="flex items-center gap-3 bg-white p-1 rounded-xl shadow-sm border border-gray-50">
                       <button
+                        aria-label="Diminuir quantidade"
                         onClick={() => updateCartQuantity(item.product.id, item.quantity - 1)}
                         className="p-1.5 text-gray-400 hover:text-gray-900 transition-all"
                       >
@@ -1603,6 +1611,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                         {item.quantity}
                       </span>
                       <button
+                        aria-label="Aumentar quantidade"
                         onClick={() => updateCartQuantity(item.product.id, item.quantity + 1)}
                         className="p-1.5 text-gray-400 hover:text-gray-900 transition-all"
                       >
