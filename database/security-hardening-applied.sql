@@ -182,3 +182,18 @@ END; $$;
 --     cliente le; estranho nao le.
 --   RESIDUAL (Medio, nao critico): assets publicos (avatar/produto/logo) no bucket
 --     'avatars' ainda tem INSERT permissivo (defacement). Exige repath por dono.
+
+-- ── 11. CORREÇÃO DE REGRESSÃO: recursão infinita em profiles (RLS-9) ──
+--   Sintoma: excluir/editar endereço, favoritos e editar perfil falhavam com
+--   "infinite recursion detected in policy for relation profiles" (42P17).
+--   Causa: as policies profiles_update e "Admin pode deletar perfis" usavam
+--   EXISTS(SELECT FROM profiles ...) INLINE. Com a policy de SELECT fechada
+--   (profiles_select_own_or_admin, que chama is_admin()), o subquery inline
+--   auto-referente recursava no UPDATE/DELETE (o SELECT puro nao recursava, por
+--   isso passou no teste inicial do RLS-9).
+--   Fix (migration fix_profiles_update_delete_recursion): trocar o EXISTS inline
+--   por public.is_admin() (SECURITY DEFINER, bypassa RLS) — sem auto-referencia.
+--     profiles_update:  USING/CHECK (auth.uid()=id OR is_admin())
+--     profiles_delete_admin: USING (is_admin())
+--   Verificado: cliente atualiza o proprio, admin atualiza outro, orders update OK.
+--   NOTA: fix 100% no banco (policies) — NAO exige rebuild do APK; vale na hora.
