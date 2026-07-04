@@ -572,7 +572,18 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
       await refreshData();
       onClose();
     } catch (e: any) {
-      setErrors({ auth: 'Credenciais inválidas ou e-mail não confirmado.' });
+      // Não mascara tudo como "credenciais inválidas": erros de rede/servidor no APK
+      // ficavam indistinguíveis de senha errada. Mostra a causa real quando não é login inválido.
+      const msg = (e?.message || '').toLowerCase();
+      if (msg.includes('invalid login') || msg.includes('credentials') || msg.includes('invalid')) {
+        setErrors({ auth: 'E-mail ou senha incorretos.' });
+      } else if (msg.includes('not confirmed') || msg.includes('email not confirmed')) {
+        setErrors({ auth: 'E-mail ainda não confirmado. Verifique sua caixa de entrada.' });
+      } else if (msg.includes('failed to fetch') || msg.includes('network') || msg.includes('fetch')) {
+        setErrors({ auth: 'Falha de conexão. Verifique sua internet e tente novamente.' });
+      } else {
+        setErrors({ auth: e?.message || 'Não foi possível entrar. Tente novamente.' });
+      }
     } finally {
       setLoading(false);
     }
