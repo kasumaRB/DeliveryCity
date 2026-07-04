@@ -1133,6 +1133,9 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <input
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
                     value={phone}
                     onChange={e => setPhone(e.target.value)}
                     placeholder="WhatsApp"
@@ -1144,6 +1147,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
                 </div>
                 <div>
                   <input
+                    inputMode="numeric"
                     value={cpf}
                     onChange={e => setCpf(formatCpfCnpj(e.target.value))}
                     placeholder="CPF"
@@ -1158,6 +1162,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
                 <div>
                   <div className="relative">
                     <input
+                      inputMode="numeric"
                       value={birthDate}
                       onChange={e => setBirthDate(formatDate(e.target.value))}
                       placeholder="Nascimento (DD/MM/AAAA)"
@@ -1274,6 +1279,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onClose }) => {
                   )}
                 </div>
                 <input
+                  inputMode="numeric"
                   value={cnpj}
                   onChange={e => setCnpj(formatCpfCnpj(e.target.value))}
                   placeholder="CNPJ da Empresa (Opcional)"
