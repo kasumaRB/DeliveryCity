@@ -1295,11 +1295,12 @@ export const AdminView: React.FC = () => {
 
                             {/* Badges produto/embalagem */}
                             <div className="flex gap-2 mb-2">
-                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${r?.productOk ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
-                                {r?.productOk ? '✓ Produto OK' : '✗ Produto com problema'}
+                              {/* CLI2-8: undefined = não avaliado (neutro), não "com problema" */}
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${r?.productOk === undefined ? 'bg-gray-50 text-gray-400' : r.productOk ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+                                {r?.productOk === undefined ? '— Produto não avaliado' : r.productOk ? '✓ Produto OK' : '✗ Produto com problema'}
                               </span>
-                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${r?.packagingOk ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
-                                {r?.packagingOk ? '✓ Embalagem OK' : '✗ Embalagem com problema'}
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${r?.packagingOk === undefined ? 'bg-gray-50 text-gray-400' : r.packagingOk ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+                                {r?.packagingOk === undefined ? '— Embalagem não avaliada' : r.packagingOk ? '✓ Embalagem OK' : '✗ Embalagem com problema'}
                               </span>
                             </div>
 

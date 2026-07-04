@@ -328,8 +328,8 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     const finalRating: OrderRating = {
       storeStars,
       driverStars: driverStars || undefined,
-      productOk: productOk === true,
-      packagingOk: packagingOk === true,
+      productOk: productOk ?? undefined,       // CLI2-8: null = não respondeu (não força false)
+      packagingOk: packagingOk ?? undefined,
       comment: ratingComment.trim() || undefined,
     };
     await submitRating(ratingOrder.id, finalRating);

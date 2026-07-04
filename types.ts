@@ -200,8 +200,8 @@ export interface Order {
 export interface OrderRating {
   storeStars: number;
   driverStars?: number;
-  productOk: boolean;
-  packagingOk: boolean;
+  productOk?: boolean;   // undefined = não avaliado (CLI2-8)
+  packagingOk?: boolean; // undefined = não avaliado
   comment?: string;
 }
 
