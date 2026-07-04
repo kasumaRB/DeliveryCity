@@ -42,10 +42,28 @@ Aplicado e validado contra o banco (testes com `ROLLBACK` simulando usuário com
 
 > **RLS-11 reclassificado como FALSO POSITIVO:** existe FK `profiles_id_fkey → auth.users ON DELETE CASCADE`, então a exclusão do auth user já remove o perfil (sem órfão). A policy `profiles_delete_own` foi adicionada mesmo assim (inofensiva, deixa o `.delete()` do client suceder em vez de falhar silencioso).
 
-**Pendências de segurança conhecidas (não resolvidas nesta rodada):**
-- Usuário **autenticado** ainda lê PII de outros perfis (o app carrega `profiles.select('*')`). Fix correto = view `public_profiles` com colunas seguras + refatorar `store.tsx`. *(maior, agendado)*
-- SEC-03 (webhook amarra só por valor), SEC-04 (CORS `*`), SHARED-5 (chave Gemini no bundle), e os demais Médios/Baixos seguem em aberto.
-- "Leaked Password Protection" (RLS-8): habilitar no painel Auth do Supabase.
+### ✅ CORRIGIDO (lote 3 — RLS-9, SEC2 storage e Médios; tudo com `tsc`+`build` OK)
+
+| ID | Correção |
+|----|----------|
+| **RLS-9** | Vazamento de PII fechado: view `profiles_safe` (colunas sensíveis mascaradas p/ não-dono), tabela `driver_locations` (tracking sem PII, RLS por pedido ativo), policy de `profiles` SELECT = próprio+admin, `is_admin()` SECURITY DEFINER. App lê `profiles_safe` + `driver_locations`. |
+| **SEC2-1/2** | Comprovantes de entrega/devolução → bucket **privado** `delivery-proofs` (RLS: só o entregador do pedido grava; partes+admin leem via signed URL). |
+| **SEC2-4** | Bucket `avatars`: limite 10 MB + só imagens (bloqueia HTML/SVG). |
+| **PERF-3** | Code-splitting das 5 views (bundle 796→432 KB; leaflet separado). |
+| **PERF-4** | `loading=lazy` nas imagens de lista. |
+| **UI-5** | Som do lojista reutiliza 1 `AudioContext` + `resume()` + fecha no unmount (parava de alertar). |
+| **CALC-2/8/9** | `assignDriver` arredonda; `createOrder` rejeita `deliveryFee`/preço não-finito (evita `total=NaN`). |
+| **LOJ2-2/16** | Validação de produto (preço/nome) e promoção (desconto >0, %≤100). |
+| **ENT2-4/8/10/15/16** | GPS destrava; câmera fecha no unmount; código só-dígitos; data/hora; `R$ NaN`. |
+| **UX-2/4/5/8/10/11/12** | Pedidos recentes ordenados; confirmar exclusão; estados vazios do Kanban; pluralização; comentário vazio; typo; categoria. |
+| **A11Y-2** | Zoom liberado (pinch-zoom). |
+| **PROMO-12** | Cupom com `trim()`. |
+
+**Pendências conhecidas (nenhuma crítica):**
+- **PERF-1** (Context sem `useMemo` → re-render geral) e **PERF-2** (`fetchData` redundante c/ Realtime): adiados — risco de stale-closure/comportamental, exigem QA rodando o app.
+- Cauda de **a11y/UX**: `alert()`/`confirm()` nativos → toast; `aria-label` em botões-ícone; `type=tel`/`inputMode` em formulários; moeda pt-BR consistente.
+- Residual **SEC2-2** (bucket `avatars` público — avatar/produto/logo sobrescrevíveis; defacement, não PII).
+- **SEC-03** (webhook por valor), **SHARED-5** (chave Gemini no bundle), **RLS-8** ("Leaked Password Protection" — ativar no painel Auth).
 
 ---
 
