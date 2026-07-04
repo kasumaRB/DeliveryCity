@@ -1127,6 +1127,9 @@ export const RestaurantView: React.FC = () => {
                       <div className="relative h-44 overflow-hidden">
                         <img
                           src={item.image}
+                          loading="lazy"
+                          decoding="async"
+                          onError={e => { e.currentTarget.style.display = 'none'; }}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
                         <div className="absolute top-3 right-3 flex gap-1.5">
