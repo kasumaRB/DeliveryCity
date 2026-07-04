@@ -2072,6 +2072,8 @@ export const RestaurantView: React.FC = () => {
                     />
                   </div>
                   <input
+                    type="tel"
+                    inputMode="tel"
                     value={storePhoneNumber}
                     onChange={e => setStorePhoneNumber(e.target.value)}
                     placeholder="Tel. da loja"
@@ -2099,12 +2101,15 @@ export const RestaurantView: React.FC = () => {
                 />
                 <div className="grid grid-cols-2 gap-4">
                   <input
+                    type="tel"
+                    inputMode="tel"
                     value={respPhone}
                     onChange={e => setRespPhone(e.target.value)}
                     placeholder="Telefone"
                     className="w-full p-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-orange-100"
                   />
                   <input
+                    inputMode="numeric"
                     value={respCpf}
                     onChange={e => setRespCpf(e.target.value)}
                     placeholder="CPF"

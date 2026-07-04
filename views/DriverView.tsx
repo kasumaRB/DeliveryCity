@@ -302,6 +302,9 @@ const DriverProfile: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             <Phone size={14} className="text-green-400" /> Contato e Documentos
           </p>
           <input
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
             value={phone}
             onChange={e => setPhone(e.target.value)}
             className="w-full p-4 bg-gray-700/50 rounded-2xl font-bold border-2 border-transparent outline-none text-white focus:border-blue-500 transition-all mb-3"
