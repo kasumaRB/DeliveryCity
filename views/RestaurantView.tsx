@@ -724,7 +724,9 @@ export const RestaurantView: React.FC = () => {
                     </h3>
                   </div>
                   <div className="flex-1 space-y-3 overflow-y-auto no-scrollbar">
-                    {getOrdersByStatus([OrderStatus.PENDING]).map(order => (
+                    {getOrdersByStatus([OrderStatus.PENDING]).length === 0 ? (
+                      <p className="text-gray-300 text-xs text-center pt-6">Nenhum pedido pendente</p>
+                    ) : getOrdersByStatus([OrderStatus.PENDING]).map(order => (
                       <div
                         key={order.id}
                         className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 animate-in zoom-in-95 hover:shadow-md transition-all"
@@ -777,7 +779,9 @@ export const RestaurantView: React.FC = () => {
                     </h3>
                   </div>
                   <div className="flex-1 space-y-3 overflow-y-auto no-scrollbar">
-                    {getOrdersByStatus([OrderStatus.PREPARING]).map(order => (
+                    {getOrdersByStatus([OrderStatus.PREPARING]).length === 0 ? (
+                      <p className="text-gray-300 text-xs text-center pt-6">Nada na cozinha</p>
+                    ) : getOrdersByStatus([OrderStatus.PREPARING]).map(order => (
                       <div
                         key={order.id}
                         className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 animate-in zoom-in-95"
@@ -827,7 +831,9 @@ export const RestaurantView: React.FC = () => {
                     </h3>
                   </div>
                   <div className="flex-1 space-y-3 overflow-y-auto no-scrollbar">
-                    {getOrdersByStatus([OrderStatus.READY, OrderStatus.OUT_FOR_DELIVERY]).map(
+                    {getOrdersByStatus([OrderStatus.READY, OrderStatus.OUT_FOR_DELIVERY]).length === 0 ? (
+                      <p className="text-gray-300 text-xs text-center pt-6">Nenhum pedido pronto</p>
+                    ) : getOrdersByStatus([OrderStatus.READY, OrderStatus.OUT_FOR_DELIVERY]).map(
                       order => (
                         <div
                           key={order.id}
@@ -1588,7 +1594,7 @@ export const RestaurantView: React.FC = () => {
                               </div>
                               <span className="text-gray-400 text-[10px]">{new Date(order.timestamp).toLocaleDateString('pt-BR')}</span>
                             </div>
-                            {comment && <p className="text-gray-600 text-sm mt-2 italic">"{comment}"</p>}
+                            {comment?.trim() && <p className="text-gray-600 text-sm mt-2 italic">"{comment}"</p>}
                           </div>
                         );
                       })}
