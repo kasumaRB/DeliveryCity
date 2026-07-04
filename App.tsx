@@ -1,11 +1,13 @@
-import React, { useState, Suspense, lazy } from 'react';
+import React, { useState } from 'react';
 import { AppProvider, useAppStore } from './store';
-// PERF-3: code-splitting por view — cada papel baixa só a sua tela (bundle inicial menor).
-const ClientView = lazy(() => import('./views/ClientView').then(m => ({ default: m.ClientView })));
-const RestaurantView = lazy(() => import('./views/RestaurantView').then(m => ({ default: m.RestaurantView })));
-const DriverView = lazy(() => import('./views/DriverView').then(m => ({ default: m.DriverView })));
-const AdminView = lazy(() => import('./views/AdminView').then(m => ({ default: m.AdminView })));
-const AuthView = lazy(() => import('./views/AuthView').then(m => ({ default: m.AuthView })));
+// NOTA: imports ESTÁTICOS de propósito. O code-splitting com React.lazy (import()
+// dinâmico) quebra no APK/Capacitor (o WebView não resolve os chunks e a tela fica
+// presa no Suspense). Bundle único é seguro no nativo.
+import { ClientView } from './views/ClientView';
+import { RestaurantView } from './views/RestaurantView';
+import { DriverView } from './views/DriverView';
+import { AdminView } from './views/AdminView';
+import { AuthView } from './views/AuthView';
 import { UserRole } from './types';
 import { Clock, LogOut, Phone, XCircle, RefreshCw, AlertTriangle, Loader } from 'lucide-react';
 import { useAndroidBack } from './hooks/useAndroidBack';
@@ -279,13 +281,7 @@ const App: React.FC = () => (
   <ErrorBoundary>
     <AppProvider>
       <ErrorBoundary>
-        <Suspense fallback={
-          <div className="h-screen w-screen flex items-center justify-center bg-[#F8F9FC]">
-            <div className="w-12 h-12 border-4 border-orange-100 border-t-orange-600 rounded-full animate-spin" />
-          </div>
-        }>
-          <AppContent />
-        </Suspense>
+        <AppContent />
       </ErrorBoundary>
     </AppProvider>
   </ErrorBoundary>
