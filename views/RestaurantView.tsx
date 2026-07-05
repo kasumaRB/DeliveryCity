@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppStore } from '../store';
 import { supabase } from '../lib/supabase';
 import { OrderStatus, Product, UserRole, Promotion, UserAddress, DaySchedule } from '../types';
+import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_STORE_CATEGORIES } from '../lib/categories';
 import { AddressModal } from '../components/AddressModal';
 import { DeleteAccountModal } from '../components/DeleteAccountModal';
 
@@ -1017,19 +1018,9 @@ export const RestaurantView: React.FC = () => {
                         className="w-full p-5 bg-gray-50 rounded-2xl font-bold border-none outline-none focus:ring-2 focus:ring-orange-100 shadow-inner"
                       >
                         <option value="">Selecione...</option>
-                        <option value="Lanche">Lanche</option>
-                        <option value="Pizza">Pizza</option>
-                        <option value="Hambúrguer">Hambúrguer</option>
-                        <option value="Açai">Açai</option>
-                        <option value="Sorvete">Sorvete</option>
-                        <option value="Bebida">Bebida</option>
-                        <option value="Sobremesa">Sobremesa</option>
-                        <option value="Salgado">Salgado</option>
-                        <option value="Japonesa">Japonesa</option>
-                        <option value="Mexicana">Mexicana</option>
-                        <option value="Italiana">Italiana</option>
-                        <option value="Brasileira">Brasileira</option>
-                        <option value="Outro">Outro</option>
+                        {(platformSettings?.productCategories ?? DEFAULT_PRODUCT_CATEGORIES).map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
                       </select>
                     </div>
                     <div className="space-y-2">
@@ -1428,7 +1419,10 @@ export const RestaurantView: React.FC = () => {
 
             const delivered = filteredOrders.filter(o => o.status === OrderStatus.DELIVERED);
             const totalRevenue = delivered.reduce((s, o) => s + (o.restaurantNetEarnings || o.total), 0);
-            const totalGMV = filteredOrders.reduce((s, o) => s + o.total, 0);
+            // GMV, taxa da plataforma e ticket médio consideram apenas pedidos ENTREGUES (vendas concluídas).
+            // Antes o GMV somava TODOS os pedidos (incl. cancelados/estornados), o que inflava o volume e fazia
+            // a "taxa da plataforma" (GMV - líquido) aparecer como o valor inteiro do estorno.
+            const totalGMV = delivered.reduce((s, o) => s + o.total, 0);
             const avgTicket = delivered.length > 0 ? totalGMV / delivered.length : 0;
             const cancelledCount = filteredOrders.filter(o => o.status === 'CANCELLED').length;
             const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -2046,18 +2040,9 @@ export const RestaurantView: React.FC = () => {
                   className="w-full p-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-orange-100"
                 >
                   <option value="">Categoria da loja</option>
-                  <option value="Lanche">Lanche</option>
-                  <option value="Pizza">Pizza</option>
-                  <option value="Hambúrguer">Hambúrguer</option>
-                  <option value="Açaí">Açaí</option>
-                  <option value="Sorvete">Sorvete</option>
-                  <option value="Japonesa">Japonesa</option>
-                  <option value="Mexicana">Mexicana</option>
-                  <option value="Italiana">Italiana</option>
-                  <option value="Brasileira">Brasileira</option>
-                  <option value="Marmita">Marmita</option>
-                  <option value="Padaria">Padaria</option>
-                  <option value="Outro">Outro</option>
+                  {(platformSettings?.storeCategories ?? DEFAULT_STORE_CATEGORIES).map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
                 </select>
                 <div className="grid grid-cols-3 gap-4">
                   <div>

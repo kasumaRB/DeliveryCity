@@ -14,6 +14,7 @@ import {
   DaySchedule,
 } from './types';
 import { supabase } from './lib/supabase';
+import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_STORE_CATEGORIES } from './lib/categories';
 import { Session } from '@supabase/supabase-js';
 import { getRealDistances, calculateHaversine } from './services/mapsService';
 import {
@@ -444,6 +445,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           minDeliveryFee: settingsData.data.min_delivery_fee ?? 5.0,
           minOrderValue: settingsData.data.min_order_value ?? 15.0,
           serviceFee: settingsData.data.service_fee ?? 4.0,
+          productCategories: settingsData.data.product_categories ?? DEFAULT_PRODUCT_CATEGORIES,
+          storeCategories: settingsData.data.store_categories ?? DEFAULT_STORE_CATEGORIES,
         });
       }
       setIsSupabaseConnected(true);

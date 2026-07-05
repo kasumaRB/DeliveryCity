@@ -228,6 +228,8 @@ export interface PlatformSettings {
   minDeliveryFee: number;
   minOrderValue: number;
   serviceFee?: number;
+  productCategories?: string[];
+  storeCategories?: string[];
 }
 
 // Retorna se um restaurante está aberto agora com base nos horários estruturados

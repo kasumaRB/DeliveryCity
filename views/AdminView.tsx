@@ -33,8 +33,143 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { UserRole, UserProfile } from '../types';
+import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_STORE_CATEGORIES } from '../lib/categories';
 import { supabase } from '../lib/supabase';
 import Logo from '../assets/Logo.png';
+
+// ────────────────────────────────────────────────────────────
+// CategoriesTab: gerência das categorias de produto e de loja
+// (add / editar / excluir) — salvas em platform_settings
+// ────────────────────────────────────────────────────────────
+const CategoriesTab: React.FC = () => {
+  const [productCats, setProductCats] = useState<string[]>([]);
+  const [storeCats, setStoreCats] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [newProduct, setNewProduct] = useState('');
+  const [newStore, setNewStore] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('platform_settings')
+          .select('product_categories, store_categories')
+          .maybeSingle();
+        setProductCats((data as any)?.product_categories ?? DEFAULT_PRODUCT_CATEGORIES);
+        setStoreCats((data as any)?.store_categories ?? DEFAULT_STORE_CATEGORIES);
+      } catch {
+        setProductCats(DEFAULT_PRODUCT_CATEGORIES);
+        setStoreCats(DEFAULT_STORE_CATEGORIES);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const cleanP = Array.from(new Set(productCats.map(s => s.trim()).filter(Boolean)));
+      const cleanS = Array.from(new Set(storeCats.map(s => s.trim()).filter(Boolean)));
+      const { error } = await supabase.from('platform_settings').upsert({
+        id: 1,
+        product_categories: cleanP,
+        store_categories: cleanS,
+        updated_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+      setProductCats(cleanP);
+      setStoreCats(cleanS);
+      setMsg('✅ Categorias salvas! Os lojistas veem ao recarregar o app.');
+    } catch (e: any) {
+      setMsg('❌ Erro ao salvar: ' + e.message);
+    } finally {
+      setSaving(false);
+      setTimeout(() => setMsg(''), 5000);
+    }
+  };
+
+  const renderList = (
+    title: string,
+    items: string[],
+    setItems: (v: string[]) => void,
+    newVal: string,
+    setNewVal: (v: string) => void
+  ) => {
+    const add = () => {
+      const v = newVal.trim();
+      if (!v) return;
+      setItems([...items, v]);
+      setNewVal('');
+    };
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+        <h4 className="font-black text-gray-800 flex items-center gap-2">
+          <Package size={16} className="text-purple-500" /> {title}
+          <span className="text-xs font-bold text-gray-400">({items.length})</span>
+        </h4>
+        <div className="flex gap-2">
+          <input
+            value={newVal}
+            onChange={e => setNewVal(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+            placeholder="Nova categoria..."
+            className="flex-1 p-3 bg-gray-50 rounded-xl font-bold outline-none border border-gray-100 focus:border-purple-300"
+          />
+          <button onClick={add} className="px-4 py-3 bg-purple-600 text-white rounded-xl font-black text-sm hover:bg-purple-700">
+            Adicionar
+          </button>
+        </div>
+        <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+          {items.map((c, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input
+                value={c}
+                onChange={e => { const cp = [...items]; cp[i] = e.target.value; setItems(cp); }}
+                className="flex-1 p-2.5 bg-gray-50 rounded-lg font-bold text-sm outline-none border border-transparent focus:border-purple-200"
+              />
+              <button
+                onClick={() => setItems(items.filter((_, j) => j !== i))}
+                className="p-2.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-100"
+                title="Excluir"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))}
+          {items.length === 0 && (
+            <p className="text-center text-gray-400 text-sm py-6 font-bold">Nenhuma categoria</p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  if (loading) {
+    return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-purple-100 border-t-purple-600 rounded-full animate-spin" /></div>;
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto animate-in fade-in space-y-6">
+      <div>
+        <h3 className="text-2xl font-black text-gray-900 tracking-tighter mb-1">Categorias</h3>
+        <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Gerencie as categorias de produto e de loja</p>
+      </div>
+      {renderList('Categorias de Produto', productCats, setProductCats, newProduct, setNewProduct)}
+      {renderList('Categorias de Loja', storeCats, setStoreCats, newStore, setNewStore)}
+      {msg && <div className="text-center font-bold text-sm text-gray-700">{msg}</div>}
+      <button
+        onClick={save}
+        disabled={saving}
+        className="w-full py-4 bg-purple-600 text-white rounded-2xl font-black hover:bg-purple-700 disabled:opacity-60 flex items-center justify-center gap-2"
+      >
+        <Save size={18} /> {saving ? 'Salvando...' : 'Salvar Categorias'}
+      </button>
+    </div>
+  );
+};
 
 // ────────────────────────────────────────────────────────────
 // SettingsTab: componente próprio para evitar violação das
@@ -397,6 +532,7 @@ const AdminSidebar: React.FC<{
         { id: 'failures', label: 'Devoluções', icon: AlertTriangle, badge: failureCount || undefined },
         { id: 'reviews', label: 'Avaliações', icon: Star },
         { id: 'settings', label: 'Configurações', icon: DollarSign },
+        { id: 'categories', label: 'Categorias', icon: Package },
         { id: 'system', label: 'Status & Logs', icon: Terminal },
       ].map(item => (
         <button
@@ -1997,6 +2133,8 @@ export const AdminView: React.FC = () => {
           })()}
 
           {activeTab === 'settings' && <SettingsTab />}
+
+          {activeTab === 'categories' && <CategoriesTab />}
 
           {activeTab === 'system' && (
             <div className="space-y-6 animate-in fade-in">
