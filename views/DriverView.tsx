@@ -488,41 +488,54 @@ export const DriverView: React.FC = () => {
 
   // Driver availability (persisted to profiles.is_online)
   const [isAvailable, setIsAvailable] = useState(currentUserProfile?.isOnline ?? false);
+  // Trava contra cliques repetidos rápidos no toggle de disponibilidade.
+  // Sem isso, ligar/desligar rápido gerava enxurrada de escritas + ecos realtime + re-renders, travando/derrubando o app.
+  const togglingRef = useRef(false);
+  const [isToggling, setIsToggling] = useState(false);
   useEffect(() => {
     setIsAvailable(currentUserProfile?.isOnline ?? false);
   }, [currentUserProfile?.id]);
 
   const toggleAvailability = async () => {
-    const next = !isAvailable;
-    if (next) {
-      if (gpsBlocked) {
-        showToast('Localização bloqueada. Vá em Configurações → Permissões do app → Localização e ative o acesso.', 'error');
-        return;
-      }
-      // Aceita qualquer endereço com coordenadas como base de atuação (não exige
-      // o label 'Base' especificamente — o endereço de cadastro 'Principal' também vale).
-      const hasBase = currentUserProfile?.savedAddresses?.some(a => a.coords);
-      if (!hasBase) {
-        showToast('Configure sua região de atuação no perfil antes de ficar disponível.', 'error');
-        setActiveTab('profile');
-        return;
-      }
-    }
-    setIsAvailable(next);
+    // Ignora cliques enquanto um toggle anterior ainda está processando (ref = síncrono, à prova de corrida).
+    if (togglingRef.current) return;
+    togglingRef.current = true;
+    setIsToggling(true);
     try {
-      await updateUserProfile(currentUserProfile!.id, { isOnline: next });
-      // Ao ficar disponível, verifica se há pedidos READY esperando e avisa o entregador
+      const next = !isAvailable;
       if (next) {
-        const pendentes = orders.filter(o => o.status === OrderStatus.READY && !o.driverId);
-        if (pendentes.length > 0) {
-          const txt = pendentes.length === 1
-            ? 'Há 1 pedido esperando entregador! Veja abaixo.'
-            : `Há ${pendentes.length} pedidos esperando entregador! Veja abaixo.`;
-          setTimeout(() => showToast(txt, 'info'), 300);
+        if (gpsBlocked) {
+          showToast('Localização bloqueada. Vá em Configurações → Permissões do app → Localização e ative o acesso.', 'error');
+          return;
+        }
+        // Aceita qualquer endereço com coordenadas como base de atuação (não exige
+        // o label 'Base' especificamente — o endereço de cadastro 'Principal' também vale).
+        const hasBase = currentUserProfile?.savedAddresses?.some(a => a.coords);
+        if (!hasBase) {
+          showToast('Configure sua região de atuação no perfil antes de ficar disponível.', 'error');
+          setActiveTab('profile');
+          return;
         }
       }
+      setIsAvailable(next);
+      try {
+        await updateUserProfile(currentUserProfile!.id, { isOnline: next });
+        // Ao ficar disponível, verifica se há pedidos READY esperando e avisa o entregador
+        if (next) {
+          const pendentes = orders.filter(o => o.status === OrderStatus.READY && !o.driverId);
+          if (pendentes.length > 0) {
+            const txt = pendentes.length === 1
+              ? 'Há 1 pedido esperando entregador! Veja abaixo.'
+              : `Há ${pendentes.length} pedidos esperando entregador! Veja abaixo.`;
+            setTimeout(() => showToast(txt, 'info'), 300);
+          }
+        }
+      }
+      catch { setIsAvailable(!next); }
+    } finally {
+      togglingRef.current = false;
+      setIsToggling(false);
     }
-    catch { setIsAvailable(!next); }
   };
 
   // Fluxo de falha de entrega
@@ -948,7 +961,8 @@ export const DriverView: React.FC = () => {
             {/* Availability toggle */}
             <button
               onClick={toggleAvailability}
-              className={`w-full mb-4 p-5 rounded-2xl border-2 transition-all duration-300 text-left ${
+              disabled={isToggling}
+              className={`w-full mb-4 p-5 rounded-2xl border-2 transition-all duration-300 text-left ${isToggling ? 'opacity-70' : ''} ${
                 gpsBlocked
                   ? 'bg-gray-800/50 border-gray-600/40 opacity-60 cursor-not-allowed'
                   : isAvailable
