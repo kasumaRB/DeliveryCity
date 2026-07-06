@@ -894,7 +894,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                     >
                       {/* Imagem do restaurante */}
                       <div className="h-36 bg-gray-100 relative overflow-hidden">
-                        <img src={restaurant.image} loading="lazy" decoding="async" onError={e => { e.currentTarget.style.display = 'none'; }} className={`w-full h-full object-cover ${isClosed ? 'grayscale' : ''}`} />
+                        <img src={restaurant.image} alt={restaurant.name} loading="lazy" decoding="async" onError={e => { e.currentTarget.style.display = 'none'; }} className={`w-full h-full object-cover ${isClosed ? 'grayscale' : ''}`} />
                         {/* Badge de categoria no canto */}
                         <span className="absolute top-3 left-3 bg-white/90 backdrop-blur text-gray-700 text-[10px] font-black px-2 py-1 rounded-lg">
                           {restaurant.category}
@@ -950,7 +950,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
               {/* Banner do restaurante — sem gradiente pesado */}
               <div className="relative h-44 md:h-60 rounded-2xl overflow-hidden mb-6 border border-gray-100">
-                <img src={selectedRestaurant.image} onError={e => { e.currentTarget.style.display = 'none'; }} className="w-full h-full object-cover" />
+                <img src={selectedRestaurant.image} alt={selectedRestaurant.name} onError={e => { e.currentTarget.style.display = 'none'; }} className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex flex-col justify-end p-6">
                   <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight mb-0.5">
                     {selectedRestaurant.name}
@@ -1042,6 +1042,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                           <img
                             loading="lazy"
                             decoding="async"
+                            alt={product.name}
                             src={
                               product.image ||
                               'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500'
