@@ -1151,7 +1151,7 @@ export const RestaurantView: React.FC = () => {
                           </span>
                           <div className="text-right">
                             <p className="text-sm font-black text-gray-900">
-                              R$ {item.price.toFixed(2)}
+                              {item.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </p>
                             <p className="text-[9px] text-gray-400 font-bold">
                               Repasse: R$ {(item.price * (1 - (currentUserProfile?.customFeePct !== undefined ? currentUserProfile.customFeePct / 100 : (platformSettings?.restaurantFeePct ?? 0.08)))).toFixed(2)}
@@ -1356,9 +1356,9 @@ export const RestaurantView: React.FC = () => {
                       <p className="text-gray-500 text-sm mt-1">
                         {promo.discountType === 'PERCENT'
                           ? `${promo.discountValue}%`
-                          : `R$ ${promo.discountValue.toFixed(2)}`}{' '}
+                          : promo.discountValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}{' '}
                         de desconto
-                        {promo.minOrderValue && ` • Mín: R$ ${promo.minOrderValue.toFixed(2)}`}
+                        {promo.minOrderValue && ` • Mín: ${promo.minOrderValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}
                       </p>
                       <p className="text-gray-400 text-xs mt-1">
                         Validade: {new Date(promo.validUntil).toLocaleDateString('pt-BR')}

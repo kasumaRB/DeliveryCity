@@ -1507,7 +1507,7 @@ export const AdminView: React.FC = () => {
                               <p className="text-gray-500 text-sm">{new Date(order.timestamp).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
                             </div>
                             <div className="text-right shrink-0">
-                              <p className="font-black text-gray-900 text-lg">R$ {order.total.toFixed(2)}</p>
+                              <p className="font-black text-gray-900 text-lg">{fmt(order.total)}</p>
                               <p className="text-gray-400 text-xs">
                                 {order.status === 'RETURNED' ? 'reembolso processado' : 'a reembolsar'}
                               </p>
@@ -2119,7 +2119,7 @@ export const AdminView: React.FC = () => {
                           </div>
                           <div className="flex items-center gap-3 shrink-0">
                             <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg ${s.color}`}>{s.label}</span>
-                            <span className="font-black text-gray-900 text-sm">R$ {o.total.toFixed(2)}</span>
+                            <span className="font-black text-gray-900 text-sm">{fmt(o.total)}</span>
                           </div>
                         </div>
                       );
