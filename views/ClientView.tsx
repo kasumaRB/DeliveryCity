@@ -476,7 +476,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     }
 
     if (promo.minOrderValue && cartSubtotal < promo.minOrderValue) {
-      setCouponError(`Pedido mínimo: R$ ${promo.minOrderValue.toFixed(2)}`);
+      setCouponError(`Pedido mínimo: ${promo.minOrderValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`);
       setIsApplyingCoupon(false);
       return;
     }
@@ -540,7 +540,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
     // Valida valor mínimo do pedido
     const minOrderValue = platformSettings?.minOrderValue ?? 15;
     if (cartSubtotal < minOrderValue) {
-      alert(`Pedido mínimo é R$ ${minOrderValue.toFixed(2)}. Adicione mais itens ao carrinho.`);
+      alert(`Pedido mínimo é ${minOrderValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}. Adicione mais itens ao carrinho.`);
       return;
     }
 
@@ -935,7 +935,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                           {isClosed
                             ? 'Estabelecimento fechado'
                             : estFee !== null
-                              ? `${estFee === 0 ? 'Entrega grátis' : `Entrega R$ ${estFee.toFixed(2)}`} · ${timeLabel}`
+                              ? `${estFee === 0 ? 'Entrega grátis' : `Entrega ${estFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`} · ${timeLabel}`
                               : 'Defina seu endereço para ver o frete'}
                         </p>
                       </div>
@@ -1210,7 +1210,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                               </div>
                               <div className="flex items-center gap-2 ml-3 shrink-0">
                                 <span className="font-black text-lg text-gray-900">
-                                  R$ {order.total.toFixed(2)}
+                                  {order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                 </span>
                                 {order.status === OrderStatus.DELIVERED && (
                                   <button
@@ -1661,7 +1661,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
                       <Check size={16} className="text-green-600" />
                       <span className="font-bold text-green-700 text-sm">{appliedCoupon.code}</span>
                       <span className="text-green-600 text-xs">
-                        (-R$ {appliedCoupon.discount.toFixed(2)})
+                        (-{appliedCoupon.discount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})
                       </span>
                     </div>
                     <button
