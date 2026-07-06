@@ -405,8 +405,10 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
   const updateCartQuantity = (productId: string, quantity: number) => {
     setCart(currentCart => {
       if (quantity <= 0) return currentCart.filter(item => item.product.id !== productId);
+      // CLI2-11: teto de 99 por item (evita pedidos absurdos, ex.: 9999 unidades).
+      const q = Math.min(quantity, 99);
       return currentCart.map(item =>
-        item.product.id === productId ? { ...item, quantity } : item
+        item.product.id === productId ? { ...item, quantity: q } : item
       );
     });
   };
