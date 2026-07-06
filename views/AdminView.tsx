@@ -600,7 +600,7 @@ export const AdminView: React.FC = () => {
   } = useAppStore();
 
   const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'users' | 'requests' | 'partners' | 'support' | 'reviews' | 'settings' | 'system' | 'orders' | 'failures'
+    'dashboard' | 'users' | 'requests' | 'partners' | 'support' | 'reviews' | 'settings' | 'system' | 'orders' | 'failures' | 'categories'
   >('dashboard');
   const [userSearch, setUserSearch] = useState('');
   const [viewingUser, setViewingUser] = useState<UserProfile | null>(null);
