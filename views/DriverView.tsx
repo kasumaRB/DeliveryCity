@@ -1778,6 +1778,7 @@ export const DriverView: React.FC = () => {
                   <div className="relative mb-6">
                     <img
                       src={deliveryPhotoPreview}
+                      alt="Foto da entrega"
                       className="w-full h-48 object-cover rounded-2xl"
                     />
                     <button

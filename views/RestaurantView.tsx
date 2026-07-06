@@ -1032,7 +1032,7 @@ export const RestaurantView: React.FC = () => {
                       <div className={`flex items-center gap-4 p-3 rounded-2xl border-2 transition-all ${itemFormImageError ? 'border-red-300 bg-red-50' : 'border-transparent'}`}>
                         <div className="w-20 h-20 bg-gray-100 rounded-2xl overflow-hidden flex items-center justify-center shrink-0">
                           {itemFormImage ? (
-                            <img src={itemFormImage} className="w-full h-full object-cover" />
+                            <img src={itemFormImage} alt="Prévia do produto" className="w-full h-full object-cover" />
                           ) : (
                             <span className={`text-xs font-bold ${itemFormImageError ? 'text-red-400' : 'text-gray-400'}`}>Sem foto</span>
                           )}
@@ -1119,6 +1119,7 @@ export const RestaurantView: React.FC = () => {
                       <div className="relative h-44 overflow-hidden">
                         <img
                           src={item.image}
+                          alt={item.name}
                           loading="lazy"
                           decoding="async"
                           onError={e => { e.currentTarget.style.display = 'none'; }}
@@ -1654,6 +1655,8 @@ export const RestaurantView: React.FC = () => {
                   <div className="relative">
                     <img
                       src={myRestaurant.image}
+                      alt="Foto da loja"
+                      onError={e => { e.currentTarget.style.display = 'none'; }}
                       className="w-36 h-36 rounded-2xl object-cover border border-gray-200"
                     />
                     <input
