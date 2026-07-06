@@ -758,6 +758,7 @@ export const AdminView: React.FC = () => {
             </h2>
           </div>
           <button
+            aria-label="Atualizar dados"
             onClick={() => refreshData()}
             className="p-2.5 text-gray-400 hover:text-purple-600 bg-gray-50 rounded-xl transition-all border border-gray-100"
           >
@@ -2180,6 +2181,7 @@ export const AdminView: React.FC = () => {
                 <p className="text-xs text-gray-500 mt-0.5">{viewingUser.email}</p>
               </div>
               <button
+                aria-label="Fechar"
                 onClick={() => setViewingUser(null)}
                 className="p-2.5 bg-gray-100 rounded-xl hover:bg-gray-200 transition"
               >

@@ -645,6 +645,7 @@ export const RestaurantView: React.FC = () => {
         </div>
         <div className="flex items-center gap-3">
           <button
+            aria-label="Sair"
             onClick={signOut}
             className="p-2.5 bg-gray-50 border border-gray-100 rounded-xl text-gray-400"
           >
