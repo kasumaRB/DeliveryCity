@@ -893,7 +893,7 @@ export const DriverView: React.FC = () => {
 
     {/* Toast estilizado — substitui alert() nativo */}
     {toast && (
-      <div className={`fixed top-4 left-4 right-4 z-[300] px-4 py-3 rounded-2xl text-white font-bold text-sm shadow-2xl animate-in slide-in-from-top duration-300 flex items-start gap-3 ${
+      <div role="alert" aria-live="assertive" className={`fixed top-4 left-4 right-4 z-[300] px-4 py-3 rounded-2xl text-white font-bold text-sm shadow-2xl animate-in slide-in-from-top duration-300 flex items-start gap-3 ${
         toast.type === 'error'   ? 'bg-red-600' :
         toast.type === 'success' ? 'bg-green-600' :
         'bg-gray-800 border border-gray-700'
