@@ -49,19 +49,27 @@ Aplicado e validado contra o banco (testes com `ROLLBACK` simulando usuário com
 | **RLS-9** | Vazamento de PII fechado: view `profiles_safe` (colunas sensíveis mascaradas p/ não-dono), tabela `driver_locations` (tracking sem PII, RLS por pedido ativo), policy de `profiles` SELECT = próprio+admin, `is_admin()` SECURITY DEFINER. App lê `profiles_safe` + `driver_locations`. |
 | **SEC2-1/2** | Comprovantes de entrega/devolução → bucket **privado** `delivery-proofs` (RLS: só o entregador do pedido grava; partes+admin leem via signed URL). |
 | **SEC2-4** | Bucket `avatars`: limite 10 MB + só imagens (bloqueia HTML/SVG). |
-| **PERF-3** | Code-splitting das 5 views (bundle 796→432 KB; leaflet separado). |
+| ~~**PERF-3**~~ | Code-splitting das views: **REVERTIDO** (`import()` dinâmico não resolve no WebView do APK → tela do cliente travava). Voltou a bundle único. |
 | **PERF-4** | `loading=lazy` nas imagens de lista. |
 | **UI-5** | Som do lojista reutiliza 1 `AudioContext` + `resume()` + fecha no unmount (parava de alertar). |
 | **CALC-2/8/9** | `assignDriver` arredonda; `createOrder` rejeita `deliveryFee`/preço não-finito (evita `total=NaN`). |
 | **LOJ2-2/16** | Validação de produto (preço/nome) e promoção (desconto >0, %≤100). |
 | **ENT2-4/8/10/15/16** | GPS destrava; câmera fecha no unmount; código só-dígitos; data/hora; `R$ NaN`. |
-| **UX-2/4/5/8/10/11/12** | Pedidos recentes ordenados; confirmar exclusão; estados vazios do Kanban; pluralização; comentário vazio; typo; categoria. |
-| **A11Y-2** | Zoom liberado (pinch-zoom). |
+| **CLI2-8/11** | Avaliação não força "com problema" quando não respondido; teto de 99/item no carrinho. |
+| **UX-2/4/5/8/10/11/12/14** | Pedidos recentes ordenados; confirmar exclusão; estados vazios do Kanban; pluralização; comentário vazio; typo; categoria; `onError` em imagens. |
+| **A11Y-2/4/6/7/8/9/10** | Zoom liberado; `aria-label` em botões-ícone (todas as views); `type=tel`/`inputMode` nos formulários; moeda pt-BR (vírgula); `alt` nas imagens; `role="alert"` nos toasts. |
 | **PROMO-12** | Cupom com `trim()`. |
+| **APK** | CapacitorHttp `enabled:false` (login no nativo); mensagem de erro real no login. |
+
+### 🩹 Regressões introduzidas durante a fase de fixes e já corrigidas
+- **Recursão em `profiles`**: ao fechar a policy (RLS-9), as policies de UPDATE/DELETE com `EXISTS(SELECT FROM profiles)` inline passaram a recursar (42P17) → excluir/editar endereço/perfil quebrou. Fix: trocar por `is_admin()` (SECURITY DEFINER). Só banco.
+- **Code-splitting no APK**: `React.lazy` travava a tela do cliente no WebView. Fix: revert para imports estáticos.
+- **`fmt` fora de escopo** (AdminView): commit intermediário usou `fmt()` onde não existia → `ReferenceError`. Fix: `toLocaleString` inline. (Reforçou a regra: só commitar com `tsc`+`build` verdes.)
 
 **Pendências conhecidas (nenhuma crítica):**
 - **PERF-1** (Context sem `useMemo` → re-render geral) e **PERF-2** (`fetchData` redundante c/ Realtime): adiados — risco de stale-closure/comportamental, exigem QA rodando o app.
-- Cauda de **a11y/UX**: `alert()`/`confirm()` nativos → toast; `aria-label` em botões-ícone; `type=tel`/`inputMode` em formulários; moeda pt-BR consistente.
+- **PROMO-4** (horário de funcionamento não é aplicado), **ENT2-11** (GPS perdido pós-online) e outros comportamentais: exigem teste em device.
+- Resíduos: SEC2-2 (assets públicos sobrescrevíveis — defacement), SHARED-5 (chave Gemini no bundle), RLS-8 (ativar Leaked Password Protection no painel).
 - Residual **SEC2-2** (bucket `avatars` público — avatar/produto/logo sobrescrevíveis; defacement, não PII).
 - **SEC-03** (webhook por valor), **SHARED-5** (chave Gemini no bundle), **RLS-8** ("Leaked Password Protection" — ativar no painel Auth).
 
