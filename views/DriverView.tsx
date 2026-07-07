@@ -768,7 +768,10 @@ export const DriverView: React.FC = () => {
       // Salva imediatamente na primeira vez (lastLocationUpdate = 0) ou a cada 10s
       if (currentUserProfile?.id && isOnline && now - lastLocationUpdate > 10000) {
         lastLocationUpdate = now;
-        updateUserProfile(currentUserProfile.id, { currentLocation: newPos });
+        // M22: fire-and-forget com .catch — updateUserProfile faz throw em erro;
+        // sem isto cada tick de GPS gera uma unhandled promise rejection.
+        updateUserProfile(currentUserProfile.id, { currentLocation: newPos })
+          .catch(() => { /* update de localização é best-effort; ignora falha transitória */ });
       }
     };
 

@@ -70,6 +70,8 @@ Aplicado e validado contra o banco (testes com `ROLLBACK` simulando usuário com
 | **M24** | Aprovação de lojista usa `.maybeSingle()` (0 linhas = loja ainda não criada, estado válido) e agora interrompe/avisa em erro real de lookup em vez de ativar silenciosamente. |
 | **M26** | Destaques da home não re-embaralham mais a cada update de Realtime: ordenação determinística por `hash(seed, id)` com semente estável por montagem (varia por visita). |
 | **M5** | `deleteProduct` checa erros de select/update e propaga; o botão do lojista agora faz `await` + `showToast` de sucesso/erro (antes era fire-and-forget e a falha ficava invisível). |
+| **M22** | Update de localização do entregador agora tem `.catch` (o store faz `throw`); antes cada tick de GPS podia gerar unhandled promise rejection. |
+| **M8** | "Pular avaliação" agora persiste no `localStorage`; o modal não reaparece mais a cada reload para pedidos já dispensados. |
 
 ### 🩹 Regressões introduzidas durante a fase de fixes e já corrigidas
 - **Recursão em `profiles`**: ao fechar a policy (RLS-9), as policies de UPDATE/DELETE com `EXISTS(SELECT FROM profiles)` inline passaram a recursar (42P17) → excluir/editar endereço/perfil quebrou. Fix: trocar por `is_admin()` (SECURITY DEFINER). Só banco.

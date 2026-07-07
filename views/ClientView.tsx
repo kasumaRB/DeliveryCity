@@ -97,7 +97,14 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
   const [productOk, setProductOk] = useState<boolean | null>(null);
   const [packagingOk, setPackagingOk] = useState<boolean | null>(null);
   const [ratingComment, setRatingComment] = useState('');
-  const [dismissedRatingIds] = useState<Set<string>>(() => new Set());
+  // M8: persiste os "pular avaliação" no localStorage — antes era só em memória e o
+  // modal reaparecia a cada reload, incomodando o cliente com pedidos já dispensados.
+  const [dismissedRatingIds] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem('dc_dismissed_ratings');
+      return new Set<string>(raw ? JSON.parse(raw) : []);
+    } catch { return new Set<string>(); }
+  });
 
   const [cardNumber, setCardNumber] = useState('');
   const [cardHolder, setCardHolder] = useState('');
@@ -2256,6 +2263,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
             <button
               onClick={() => {
                 dismissedRatingIds.add(ratingOrder!.id);
+                try { localStorage.setItem('dc_dismissed_ratings', JSON.stringify([...dismissedRatingIds])); } catch { /* localStorage indisponível: mantém só em memória */ }
                 setRatingOrder(null);
                 setStoreStars(0); setDriverStars(0); setProductOk(null); setPackagingOk(null); setRatingComment('');
               }}
