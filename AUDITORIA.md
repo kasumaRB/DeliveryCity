@@ -61,6 +61,13 @@ Aplicado e validado contra o banco (testes com `ROLLBACK` simulando usuário com
 | **PROMO-12** | Cupom com `trim()`. |
 | **APK** | CapacitorHttp `enabled:false` (login no nativo); mensagem de erro real no login. |
 
+### ✅ CORRIGIDO (lote 4 — críticos de AdminView, sem QA de device; `tsc`+`build` OK)
+
+| ID | Correção |
+|----|----------|
+| **C5** | Dossiê do lojista deixava de zerar o CNPJ: `handleUpdateDossier` só grava campos cujo input existe de fato no form (`formData.has`), e o campo único "CPF / CNPJ" vai para a coluna correta (PJ → `cnpj`) sem apagar a outra. Também para de zerar `businessName`/`workingHours`/`licensePlate` ao editar outro papel. |
+| **C4** | "Liberar devolução" e "Encerrar sem devolução" agora conferem o resultado de `refund-asaas-payment`: push "💚 Reembolso aprovado" e ticket só saem se `refunded===true`; se falhar (ex.: RACE-2 409), o admin recebe `alert` para reversão manual; caso sem pagamento digital é tratado como "não aplicável". |
+
 ### 🩹 Regressões introduzidas durante a fase de fixes e já corrigidas
 - **Recursão em `profiles`**: ao fechar a policy (RLS-9), as policies de UPDATE/DELETE com `EXISTS(SELECT FROM profiles)` inline passaram a recursar (42P17) → excluir/editar endereço/perfil quebrou. Fix: trocar por `is_admin()` (SECURITY DEFINER). Só banco.
 - **Code-splitting no APK**: `React.lazy` travava a tela do cliente no WebView. Fix: revert para imports estáticos.
