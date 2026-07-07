@@ -1134,7 +1134,16 @@ export const RestaurantView: React.FC = () => {
                           </button>
                           <button
                             /* UX-4: confirma antes de excluir (evita apagar prato por toque acidental) */
-                            onClick={() => { if (window.confirm(`Remover "${item.name}" do cardápio?`)) deleteProduct(myRestaurant.id, item.id); }}
+                            /* M5: await + feedback de erro (antes era fire-and-forget e falha ficava invisível) */
+                            onClick={async () => {
+                              if (!window.confirm(`Remover "${item.name}" do cardápio?`)) return;
+                              try {
+                                await deleteProduct(myRestaurant.id, item.id);
+                                showToast('Produto removido do cardápio.', 'success');
+                              } catch (e: any) {
+                                showToast(e?.message || 'Não foi possível remover o produto.', 'error');
+                              }
+                            }}
                             className="p-2 bg-white/95 backdrop-blur-md text-red-600 rounded-xl shadow-md hover:bg-white transition active:scale-90"
                           >
                             <Trash2 size={16} />

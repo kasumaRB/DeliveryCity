@@ -1765,14 +1765,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           await fetchData();
         },
         deleteProduct: async (rid, pid) => {
-          const { data } = await supabase.from('restaurants').select('menu').eq('id', rid).single();
-          if (data) {
-            const currentMenu = data.menu || [];
-            await supabase
-              .from('restaurants')
-              .update({ menu: currentMenu.filter((p: any) => p.id !== pid) })
-              .eq('id', rid);
-          }
+          // M5: checa erros e propaga para o chamador dar feedback (antes falhava em silêncio).
+          const { data, error: selErr } = await supabase.from('restaurants').select('menu').eq('id', rid).single();
+          if (selErr) throw new Error(`Não foi possível carregar o cardápio: ${selErr.message}`);
+          const currentMenu = data?.menu || [];
+          const { error: updErr } = await supabase
+            .from('restaurants')
+            .update({ menu: currentMenu.filter((p: any) => p.id !== pid) })
+            .eq('id', rid);
+          if (updErr) throw new Error(`Não foi possível remover o produto: ${updErr.message}`);
           await fetchData();
         },
         addAddress,
