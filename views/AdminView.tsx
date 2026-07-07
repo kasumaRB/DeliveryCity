@@ -1060,11 +1060,14 @@ export const AdminView: React.FC = () => {
                           await updateUserProfile(p.id, { status: status as any });
                           if (status === 'APPROVED' && p.role === UserRole.RESTAURANT) {
                             const restaurantId = `rest-${p.id}`;
-                            const { data: existing } = await supabase
+                            // M24: maybeSingle → 0 linhas é estado válido (loja ainda não criada);
+                            // só um erro real (rede/RLS) deve interromper e avisar o admin.
+                            const { data: existing, error: lookupErr } = await supabase
                               .from('restaurants')
                               .select('id')
                               .eq('id', restaurantId)
-                              .single();
+                              .maybeSingle();
+                            if (lookupErr) throw new Error(`Perfil aprovado, mas falha ao localizar a loja: ${lookupErr.message}`);
                             if (existing) {
                               const { error: activateErr } = await supabase
                                 .from('restaurants')
