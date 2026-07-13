@@ -768,7 +768,10 @@ export const DriverView: React.FC = () => {
       // Salva imediatamente na primeira vez (lastLocationUpdate = 0) ou a cada 10s
       if (currentUserProfile?.id && isOnline && now - lastLocationUpdate > 10000) {
         lastLocationUpdate = now;
-        updateUserProfile(currentUserProfile.id, { currentLocation: newPos });
+        // M22: fire-and-forget com .catch — updateUserProfile faz throw em erro;
+        // sem isto cada tick de GPS gera uma unhandled promise rejection.
+        updateUserProfile(currentUserProfile.id, { currentLocation: newPos })
+          .catch(() => { /* update de localização é best-effort; ignora falha transitória */ });
       }
     };
 
@@ -1027,7 +1030,7 @@ export const DriverView: React.FC = () => {
                     <h2 className="text-3xl font-black text-white leading-tight mb-1">{activeOrder.restaurantName}</h2>
                     <p className="text-gray-500 text-sm mb-5">Vá até o restaurante e retire o pedido</p>
                     <button
-                      onClick={() => setShowCodeInput(true)}
+                      onClick={() => { setDeliveryPhotoStep(false); setInputCode(''); setShowCodeInput(true); }}
                       className="w-full bg-orange-500 text-white py-4 rounded-xl font-black text-sm tracking-wide flex items-center justify-center gap-2 active:scale-95 transition-all"
                     >
                       <KeyRound size={18} />
@@ -1051,7 +1054,7 @@ export const DriverView: React.FC = () => {
                     <p className="text-gray-500 text-sm mb-5">{activeOrder.customerAddress}</p>
                     <div className="flex gap-3">
                       <button
-                        onClick={() => setShowCodeInput(true)}
+                        onClick={() => { setDeliveryPhotoStep(false); setInputCode(''); setShowCodeInput(true); }}
                         className="flex-1 bg-green-600 text-white py-4 rounded-xl font-black text-sm tracking-wide flex items-center justify-center gap-2 active:scale-95 transition-all"
                       >
                         <CheckCircle size={18} />
@@ -1737,8 +1740,11 @@ export const DriverView: React.FC = () => {
                 <div className="flex gap-4">
                   <button
                     onClick={() => {
+                      // M23: reseta o passo de foto ao fechar — senão a próxima abertura
+                      // (retirada READY) abriria direto na foto e chamaria confirmDelivery.
                       setShowCodeInput(false);
                       setInputCode('');
+                      setDeliveryPhotoStep(false);
                     }}
                     className="flex-1 py-4 bg-gray-700 text-gray-300 rounded-2xl font-bold"
                   >

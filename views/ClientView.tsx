@@ -97,7 +97,14 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
   const [productOk, setProductOk] = useState<boolean | null>(null);
   const [packagingOk, setPackagingOk] = useState<boolean | null>(null);
   const [ratingComment, setRatingComment] = useState('');
-  const [dismissedRatingIds] = useState<Set<string>>(() => new Set());
+  // M8: persiste os "pular avaliação" no localStorage — antes era só em memória e o
+  // modal reaparecia a cada reload, incomodando o cliente com pedidos já dispensados.
+  const [dismissedRatingIds] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem('dc_dismissed_ratings');
+      return new Set<string>(raw ? JSON.parse(raw) : []);
+    } catch { return new Set<string>(); }
+  });
 
   const [cardNumber, setCardNumber] = useState('');
   const [cardHolder, setCardHolder] = useState('');
@@ -352,7 +359,12 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
       );
   }, [restaurants, searchQuery, showFavoritesOnly, currentUserProfile?.favoriteRestaurantIds]);
 
-  // Produtos em destaque: itens com foto de restaurantes ativos, embaralhados
+  // M26: semente estável por montagem — a ordem dos destaques varia a cada visita,
+  // mas NÃO re-embaralha na frente do usuário a cada update de Realtime.
+  const [featuredSeed] = useState(() => Math.floor(Math.random() * 1_000_000) + 1);
+
+  // Produtos em destaque: itens com foto de restaurantes ativos, ordenados de forma
+  // determinística por hash(seed, id) — estável entre updates, único por visita.
   const featuredProducts = useMemo(() => {
     const items: { product: Product; restaurant: (typeof restaurants)[0] }[] = [];
     restaurants
@@ -362,13 +374,14 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
           .filter(p => p.available !== false && p.image)
           .forEach(p => items.push({ product: p, restaurant: r }));
       });
-    // Fisher-Yates shuffle para variar a cada visita
-    for (let i = items.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [items[i], items[j]] = [items[j], items[i]];
-    }
+    const hash = (s: string) => {
+      let h = featuredSeed;
+      for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+      return h;
+    };
+    items.sort((a, b) => hash(a.product.id) - hash(b.product.id));
     return items.slice(0, 12);
-  }, [restaurants]);
+  }, [restaurants, featuredSeed]);
 
   const handleAddToCart = (product: Product) => {
     // 🔒 SEGURANÇA: Exige login antes de adicionar ao carrinho
@@ -2260,6 +2273,7 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
             <button
               onClick={() => {
                 dismissedRatingIds.add(ratingOrder!.id);
+                try { localStorage.setItem('dc_dismissed_ratings', JSON.stringify([...dismissedRatingIds])); } catch { /* localStorage indisponível: mantém só em memória */ }
                 setRatingOrder(null);
                 setStoreStars(0); setDriverStars(0); setProductOk(null); setPackagingOk(null); setRatingComment('');
               }}

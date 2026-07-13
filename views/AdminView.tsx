@@ -664,21 +664,38 @@ export const AdminView: React.FC = () => {
     setIsSaving(true);
     try {
       const formData = new FormData(e.currentTarget as HTMLFormElement);
-      const customFeeRaw = formData.get('customFeePct') as string;
-      await updateUserProfile(viewingUser.id, {
-        name: formData.get('name') as string,
-        cpf: formData.get('cpf') as string,
-        cnpj: formData.get('cnpj') as string,
-        licensePlate: formData.get('licensePlate') as string,
-        phoneNumber: formData.get('phone') as string,
-        status: formData.get('status') as any,
-        pixKey: formData.get('pixKey') as string,
-        businessName: formData.get('businessName') as string,
-        workingHours: formData.get('workingHours') as string,
-        description: formData.get('description') as string,
-        asaasAccountId: formData.get('asaasAccountId') as string,
-        customFeePct: customFeeRaw !== '' && customFeeRaw !== null ? parseFloat(customFeeRaw) : null,
-      } as any);
+      // C5: só grava um campo se o input existir de fato no formulário. Campos como
+      // businessName/workingHours/description só renderizam para lojista, licensePlate
+      // só para entregador, e NÃO existe input "cnpj" (o documento é um campo único).
+      // Escrever todos cegamente zerava CNPJ do lojista e campos do outro papel.
+      const patch: any = {};
+      const setIfPresent = (field: string, key: string) => {
+        if (formData.has(field)) patch[key] = formData.get(field) as string;
+      };
+      setIfPresent('name', 'name');
+      setIfPresent('phone', 'phoneNumber');
+      setIfPresent('status', 'status');
+      setIfPresent('pixKey', 'pixKey');
+      setIfPresent('businessName', 'businessName');
+      setIfPresent('workingHours', 'workingHours');
+      setIfPresent('description', 'description');
+      setIfPresent('asaasAccountId', 'asaasAccountId');
+      setIfPresent('licensePlate', 'licensePlate');
+
+      // Campo único "CPF / CNPJ": grava na coluna correta sem zerar a outra.
+      if (formData.has('cpf')) {
+        const doc = (formData.get('cpf') as string) || '';
+        if (viewingUser.cnpj && !viewingUser.cpf) patch.cnpj = doc; // usuário PJ
+        else patch.cpf = doc;
+      }
+
+      // customFeePct: só se o input existir; vazio → null (usa a taxa global).
+      if (formData.has('customFeePct')) {
+        const customFeeRaw = formData.get('customFeePct') as string;
+        patch.customFeePct = customFeeRaw !== '' && customFeeRaw !== null ? parseFloat(customFeeRaw) : null;
+      }
+
+      await updateUserProfile(viewingUser.id, patch);
       alert('Alterações salvas com sucesso!');
       setViewingUser(null);
     } catch (e: any) {
@@ -1043,11 +1060,14 @@ export const AdminView: React.FC = () => {
                           await updateUserProfile(p.id, { status: status as any });
                           if (status === 'APPROVED' && p.role === UserRole.RESTAURANT) {
                             const restaurantId = `rest-${p.id}`;
-                            const { data: existing } = await supabase
+                            // M24: maybeSingle → 0 linhas é estado válido (loja ainda não criada);
+                            // só um erro real (rede/RLS) deve interromper e avisar o admin.
+                            const { data: existing, error: lookupErr } = await supabase
                               .from('restaurants')
                               .select('id')
                               .eq('id', restaurantId)
-                              .single();
+                              .maybeSingle();
+                            if (lookupErr) throw new Error(`Perfil aprovado, mas falha ao localizar a loja: ${lookupErr.message}`);
                             if (existing) {
                               const { error: activateErr } = await supabase
                                 .from('restaurants')
@@ -1749,8 +1769,16 @@ export const AdminView: React.FC = () => {
                                       setAuthorizingReturnId(order.id);
                                       try {
                                         await startReturn(order.id);
-                                        await supabase.functions.invoke('refund-asaas-payment', { body: { orderId: order.id } });
-                                        if (order.customerId) {
+                                        // C4: confere o resultado do reembolso antes de avisar "aprovado".
+                                        const { data: refundData, error: refundError } =
+                                          await supabase.functions.invoke('refund-asaas-payment', { body: { orderId: order.id } });
+                                        const noDigitalPayment = !refundError && refundData?.refunded === false && refundData?.reason === 'no_asaas_payment';
+                                        const refundOk = !refundError && !refundData?.error && refundData?.refunded === true;
+                                        if (!refundOk && !noDigitalPayment) {
+                                          const reason = refundError?.message || refundData?.error || 'motivo desconhecido';
+                                          alert(`⚠️ Devolução liberada, mas o reembolso automático NÃO foi concluído (${reason}). Faça a reversão manual pela Asaas.`);
+                                        }
+                                        if (refundOk && order.customerId) {
                                           supabase.functions.invoke('send-push-notification', {
                                             body: {
                                               userId: order.customerId,
@@ -1784,7 +1812,7 @@ export const AdminView: React.FC = () => {
                                           user_id: order.customerId,
                                           user_name: order.customerName || 'Cliente',
                                           user_role: 'CLIENT',
-                                          message: `[ADMIN] Devolução liberada + reembolso processado — Pedido #${order.id}. Motivo: ${order.failureReason || 'não informado'}`,
+                                          message: `[ADMIN] Devolução liberada — Pedido #${order.id}. Reembolso: ${refundOk ? 'processado' : (noDigitalPayment ? 'não aplicável (sem pagamento digital)' : 'PENDENTE — reversão manual')}. Motivo: ${order.failureReason || 'não informado'}`,
                                           status: 'RESOLVED',
                                           from_admin: true,
                                           order_id: order.id,
@@ -1821,8 +1849,16 @@ export const AdminView: React.FC = () => {
                                               await supabase.from('orders')
                                                 .update({ status: 'CANCELLED' })
                                                 .eq('id', order.id);
-                                              await supabase.functions.invoke('refund-asaas-payment', { body: { orderId: order.id } });
-                                              if (order.customerId) {
+                                              // C4: só avisa "reembolso aprovado" se o reembolso realmente ocorreu.
+                                              const { data: refundData, error: refundError } =
+                                                await supabase.functions.invoke('refund-asaas-payment', { body: { orderId: order.id } });
+                                              const noDigitalPayment = !refundError && refundData?.refunded === false && refundData?.reason === 'no_asaas_payment';
+                                              const refundOk = !refundError && !refundData?.error && refundData?.refunded === true;
+                                              if (!refundOk && !noDigitalPayment) {
+                                                const reason = refundError?.message || refundData?.error || 'motivo desconhecido';
+                                                alert(`⚠️ Pedido encerrado, mas o reembolso automático NÃO foi concluído (${reason}). Faça a reversão manual pela Asaas.`);
+                                              }
+                                              if (refundOk && order.customerId) {
                                                 supabase.functions.invoke('send-push-notification', {
                                                   body: {
                                                     userId: order.customerId,
