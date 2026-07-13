@@ -1115,7 +1115,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const { data, error } = await supabase.from('orders').insert(newOrder).select('id').single();
       if (error) throw new Error(`Falha ao criar pedido: ${error.message}`);
-      await fetchData();
+      // Não bloqueia o checkout esperando o refresh completo — o realtime já atualiza os pedidos.
+      // (Antes: `await fetchData()` — se travasse, o botão ficava preso em "Processando...".)
+      fetchData().catch(() => {});
 
       // Notifica restaurante imediatamente (apenas para PENDING — PIX/cartão notifica via webhook)
       if (newOrder.status === OrderStatus.PENDING) {

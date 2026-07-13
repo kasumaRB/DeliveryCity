@@ -548,21 +548,29 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
 
     setIsProcessing(true);
     setPaymentError(null);
+    // Corre contra um tempo limite: se alguma chamada travar, mostra erro e libera o botão
+    // em vez de ficar preso em "Processando..." para sempre.
+    const withTimeout = <T,>(p: Promise<T>, ms: number, msg: string): Promise<T> =>
+      Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => reject(new Error(msg)), ms))]);
     try {
       const savedCards = currentUserProfile.savedCards || [];
       const selectedSaved = savedCards.find(c => c.id === selectedSavedCardId);
 
       // ── 1. Criar o pedido no banco (status PENDING_PAYMENT ou PENDING para dinheiro) ──
-      const createdOrder = await createOrder(
-        selectedRestaurant.id,
-        cart,
-        selectedPayment,
-        formatAddressDisplay(selectedAddress),
-        currentUserProfile.name,
-        undefined, // paymentId — preenchido após cobrança Asaas
-        selectedAddress.coords,
-        deliveryFee,
-        discount
+      const createdOrder = await withTimeout(
+        createOrder(
+          selectedRestaurant.id,
+          cart,
+          selectedPayment,
+          formatAddressDisplay(selectedAddress),
+          currentUserProfile.name,
+          undefined, // paymentId — preenchido após cobrança Asaas
+          selectedAddress.coords,
+          deliveryFee,
+          discount
+        ),
+        25000,
+        'Não foi possível criar o pedido (tempo esgotado). Verifique sua conexão e tente novamente.'
       );
 
       // ── 2. Para CREDIT_CARD ou PIX — chamar Edge Function create-asaas-payment ──
@@ -604,9 +612,11 @@ export const ClientView: React.FC<{ onOpenProfile: () => void }> = ({ onOpenProf
           }
         }
 
-        const { data: pmData, error: pmError } = await supabase.functions.invoke('create-asaas-payment', {
-          body: paymentBody,
-        });
+        const { data: pmData, error: pmError } = await withTimeout(
+          supabase.functions.invoke('create-asaas-payment', { body: paymentBody }),
+          30000,
+          'O pagamento demorou demais para responder. Tente novamente em instantes.'
+        );
 
         // Erro de rede/timeout na Edge Function
         if (pmError) {
